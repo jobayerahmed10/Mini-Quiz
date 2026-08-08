@@ -15,6 +15,7 @@ export default function App() {
   const [isFromSupabase, setIsFromSupabase] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState<boolean>(false);
@@ -51,6 +52,7 @@ export default function App() {
       percentage,
       userAnswers,
       completedAt: new Date().toISOString(),
+      selectedSubject: selectedSubject,
     };
 
     setQuizResult(result);
@@ -60,8 +62,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleStartPractice = () => {
+  const handleStartPractice = (subject: string = 'all') => {
     if (questions.length === 0) return;
+    setSelectedSubject(subject);
     setCurrentPage('practice');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -82,6 +85,7 @@ export default function App() {
       {/* Top Navigation Header */}
       <Header
         currentPage={currentPage}
+        selectedSubject={selectedSubject}
         onNavigateHome={handleNavigateHome}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
@@ -95,6 +99,8 @@ export default function App() {
             isFromSupabase={isFromSupabase}
             fetchError={fetchError}
             studentStats={studentStats}
+            selectedSubject={selectedSubject}
+            onSelectSubject={setSelectedSubject}
             onStartPractice={handleStartPractice}
             onRefreshQuestions={loadQuestions}
             onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
@@ -104,6 +110,7 @@ export default function App() {
         {currentPage === 'practice' && (
           <PracticePage
             questions={questions}
+            initialSubject={selectedSubject}
             onFinishQuiz={handleFinishQuiz}
             onNavigateHome={handleNavigateHome}
           />
@@ -117,6 +124,7 @@ export default function App() {
           />
         )}
       </main>
+
 
       {/* Footer */}
       <footer className="border-t border-slate-200/80 bg-white/60 py-6 text-center text-xs text-slate-500">

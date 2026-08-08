@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Question } from '../types';
+import { detectQuestionSubject } from './subjects';
 
 /**
  * Safely retrieve Supabase configuration.
@@ -77,7 +78,7 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   try {
     const { data, error } = await supabaseInstance
       .from('questions')
-      .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, created_at')
+      .select('*')
       .eq('status', 'published')
       .order('created_at', { ascending: false });
 
@@ -98,19 +99,27 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
       };
     }
 
-    // Cast & format fetched items from public.questions
-    const questionsList: Question[] = data.map((item) => ({
-      id: String(item.id),
-      question: String(item.question || ''),
-      option_a: String(item.option_a || ''),
-      option_b: String(item.option_b || ''),
-      option_c: String(item.option_c || ''),
-      option_d: String(item.option_d || ''),
-      correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
-      explanation: item.explanation ? String(item.explanation) : null,
-      status: item.status || 'published',
-      created_at: item.created_at || new Date().toISOString(),
-    }));
+    // Cast & format fetched items from public.questions with subject auto-detection fallback
+    const questionsList: Question[] = data.map((item) => {
+      const qObj: Question = {
+        id: String(item.id),
+        question: String(item.question || ''),
+        option_a: String(item.option_a || ''),
+        option_b: String(item.option_b || ''),
+        option_c: String(item.option_c || ''),
+        option_d: String(item.option_d || ''),
+        correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+        explanation: item.explanation ? String(item.explanation) : null,
+        status: item.status || 'published',
+        subject: item.subject ? String(item.subject) : null,
+        topic: item.topic ? String(item.topic) : null,
+        created_at: item.created_at || new Date().toISOString(),
+      };
+
+      // Assign detected subject if null
+      qObj.subject = detectQuestionSubject(qObj);
+      return qObj;
+    });
 
     return {
       questions: questionsList,
@@ -126,5 +135,6 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     };
   }
 }
+
 
 

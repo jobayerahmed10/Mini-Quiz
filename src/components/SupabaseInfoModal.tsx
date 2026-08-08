@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS public.questions (
   option_d TEXT NOT NULL,
   correct_answer TEXT NOT NULL, -- 'option_a', 'option_b', 'option_c', বা 'option_d'
   explanation TEXT,
+  subject TEXT, -- যেমন: 'বাংলা ভাষা ও সাহিত্য', 'বাংলাদেশ বিষয়াবলী', 'ইংরেজি ভাষা ও সাহিত্য'
+  topic TEXT, -- যেমন: 'ব্যাকরণ', 'ইতিহাস', 'জ্যোতির্বিজ্ঞান'
   status TEXT DEFAULT 'published', -- 'published' অথবা 'draft'
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -33,12 +35,12 @@ CREATE POLICY "Allow public read access for published questions"
 ON public.questions FOR SELECT 
 USING (status = 'published');
 
--- ৩. নমুনা প্রকাশিত প্রশ্ন যুক্ত করতে এই কোড চালান:
-INSERT INTO public.questions (question, option_a, option_b, option_c, option_d, correct_answer, explanation, status)
+-- ৩. নমুনা বিষয ভিত্তিক প্রকাশিত প্রশ্ন যুক্ত করতে এই কোড চালান:
+INSERT INTO public.questions (question, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, status)
 VALUES 
-('বাংলাদেশের রাজধানীর নাম কী?', 'চট্টগ্রাম', 'ঢাকা', 'খুলনা', 'রাজশাহী', 'option_b', 'ঢাকা বাংলাদেশের রাজধানী ও বৃহত্তম শহর।', 'published'),
-('বাংলাদেশের জাতীয় ফুল কোনটি?', 'গোলাপ', 'পদ্ম', 'শাপলা', 'জবা', 'option_c', 'সাদা শাপলা বাংলাদেশের জাতীয় ফুল।', 'published'),
-('আন্তর্জাতিক মাতৃভাষা দিবস কত তারিখে পালিত হয়?', '২৬ মার্চ', '১৬ ডিসেম্বর', '২১ ফেব্রুয়ারি', '১৪ এপ্রিল', 'option_c', 'ইউনেস্কো ২১ ফেব্রুয়ারিকে আন্তর্জাতিক মাতৃভাষা দিবস ঘোষণা করেছে।', 'published');
+('বাংলাদেশের রাজধানীর নাম কী?', 'চট্টগ্রাম', 'ঢাকা', 'খুলনা', 'রাজশাহী', 'option_b', 'ঢাকা বাংলাদেশের রাজধানী ও বৃহত্তম শহর।', 'বাংলাদেশ বিষয়াবলী', 'ভৌগোলিক পরিচিতি', 'published'),
+('‘সোনার তরী’ কাব্যগ্রন্থ কার রচনা?', 'কাজী নজরুল ইসলাম', 'রবীন্দ্রনাথ ঠাকুর', 'জসীমউদ্দীন', 'মাইকেল মধুসূদন দত্ত', 'option_b', 'বিশ্বকবি রবীন্দ্রনাথ ঠাকুর ১৮৯৪ সালে ‘সোনার তরী’ প্রকাশ করেন।', 'বাংলা ভাষা ও সাহিত্য', 'বাংলা সাহিত্য', 'published'),
+('আন্তর্জাতিক মাতৃভাষা দিবস কত তারিখে পালিত হয়?', '২৬ মার্চ', '১৬ ডিসেম্বর', '২১ ফেব্রুয়ারি', '১৪ এপ্রিল', 'option_c', 'ইউনেস্কো ২১ ফেব্রুয়ারিকে আন্তর্জাতিক মাতৃভাষা দিবস ঘোষণা করেছে।', 'আন্তর্জাতিক বিষয়াবলী', 'আন্তর্জাতিক দিবস', 'published');
 `;
 
   const copyToClipboard = () => {
