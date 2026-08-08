@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-bengali: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
+  --color-forest: #2D4B3E;
+  --color-sage: #8AA682;
+  --color-sand: #F5F2EA;
+  --color-stone-bg: #FDFBF7;
+  --color-stone-border: #E6E2D3;
+}
+
+body {
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #FDFBF7;
+  color: #2D4B3E;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom smooth transitions and utility animations */
+.touch-active:active {
+  transform: scale(0.98);
+}
+
+/* Number font adjustment for clean Bengali digits if needed */
+.bengali-num {
+  font-variant-numeric: tabular-nums;
+}
+
