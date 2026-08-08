@@ -1,6 +1,49 @@
 import { Question } from '../types';
 
 export const SAMPLE_QUESTIONS: Question[] = [
+  // 0. আরবি ও ইসলামী শিক্ষা (মাদ্রাসা স্পেশাল)
+  {
+    id: 'sample-madrasa-1',
+    question: 'পবিত্র কোরআনের দীর্ঘতম সূরা কোনটি?',
+    option_a: 'সূরা আল-ইমরান',
+    option_b: 'সূরা আল-বাকারা',
+    option_c: 'সূরা আন-নিসা',
+    option_d: 'সূরা আল-মাইদা',
+    correct_answer: 'option_b',
+    explanation: 'সূরা আল-বাকারা পবিত্র কোরআনের ২য় এবং দীর্ঘতম সূরা, যাতে মোট ২৮৬টি আয়াত রয়েছে।',
+    subject: 'আরবি ও ইসলামী শিক্ষা',
+    topic: 'আল-কোরআন',
+    status: 'published',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sample-madrasa-2',
+    question: 'হাদিস শাস্ত্রের বিশুদ্ধতম দুই গ্রন্থকে একসাথে কী বলা হয়?',
+    option_a: 'সিহাহ সিত্তা',
+    option_b: 'সহীহাইন',
+    option_c: 'মুসনাদ',
+    option_d: 'সুনান',
+    correct_answer: 'option_b',
+    explanation: 'সহীহ আল-বুখারী ও সহীহ মুসলিম—এই দুটি বিখ্যাত হাদিস গ্রন্থকে একত্রে "সহীহাইন" বলা হয়।',
+    subject: 'আরবি ও ইসলামী শিক্ষা',
+    topic: 'আল-হাদিস',
+    status: 'published',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sample-madrasa-3',
+    question: 'শ্রেণিকক্ষে কার্যকর শিক্ষাদানের ক্ষেত্রে কোন পদ্ধতিটি শিক্ষার্থী-কেন্দ্রিক?',
+    option_a: 'বক্তৃতা পদ্ধতি (Lecture Method)',
+    option_b: 'একমুখী আলোচনা পদ্ধতি',
+    option_c: 'পারস্পরিক অংশগ্রহণমূলক/দলগত আলোচনা পদ্ধতি',
+    option_d: 'প্রথাগত মুখস্থকরণ পদ্ধতি',
+    correct_answer: 'option_c',
+    explanation: 'দলগত আলোচনা ও সক্রিয় অংশগ্রহণমূলক পদ্ধতি সরাসরি শিক্ষার্থীদের চিন্তাশক্তি বৃদ্ধি করে এবং এটি শিক্ষার্থী-কেন্দ্রিক শিক্ষা ব্যবস্থার মূল ভিত্তি।',
+    subject: 'পেডাগোজি ও শিক্ষাদান পদ্ধতি',
+    topic: 'শ্রেণি ব্যবস্থাপনা ও শিক্ষাদান',
+    status: 'published',
+    created_at: new Date().toISOString(),
+  },
   // 1. বাংলাদেশ বিষয়াবলী
   {
     id: 'sample-1',

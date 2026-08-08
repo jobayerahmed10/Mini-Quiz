@@ -136,5 +136,113 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   }
 }
 
+export interface NewQuestionInput {
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: 'option_a' | 'option_b' | 'option_c' | 'option_d';
+  subject: string;
+  topic?: string;
+  explanation?: string;
+  status?: string;
+}
+
+/**
+ * Inserts a new MCQ question into Supabase 'public.questions' table
+ */
+export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ success: boolean; data?: Question; error?: string }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase সংযোগ নেই। ডেমো মোডে নতুন প্রশ্ন যুক্ত হচ্ছে।',
+    };
+  }
+
+  try {
+    const newRecord = {
+      question: input.question.trim(),
+      option_a: input.option_a.trim(),
+      option_b: input.option_b.trim(),
+      option_c: input.option_c.trim(),
+      option_d: input.option_d.trim(),
+      correct_answer: input.correct_answer,
+      subject: input.subject.trim(),
+      topic: input.topic?.trim() || null,
+      explanation: input.explanation?.trim() || null,
+      status: input.status || 'published',
+      created_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabaseInstance
+      .from('questions')
+      .insert([newRecord])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      return {
+        success: false,
+        error: `প্রশ্ন যুক্ত করতে ব্যর্থ: ${error.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: String(data.id),
+        question: data.question,
+        option_a: data.option_a,
+        option_b: data.option_b,
+        option_c: data.option_c,
+        option_d: data.option_d,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
+        subject: data.subject,
+        topic: data.topic,
+        status: data.status,
+        created_at: data.created_at,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
+    return {
+      success: false,
+      error: `Supabase ইনসার্ট ত্রুটি: ${msg}`,
+    };
+  }
+}
+
+/**
+ * Deletes a question from Supabase by ID
+ */
+export async function deleteQuestionFromSupabase(id: string | number): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase সংযোগ নেই।',
+    };
+  }
+
+  try {
+    const { error } = await supabaseInstance
+      .from('questions')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
+    return { success: false, error: msg };
+  }
+}
+
+
 
 

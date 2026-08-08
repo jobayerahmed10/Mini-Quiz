@@ -1,6 +1,6 @@
 {
-  "name": "MiniQuiz",
-  "description": "ক্ষুদ্র বাংলা এমসিকিউ অনুশীলন প্ল্যাটফর্ম - MiniQuiz Student App",
+  "name": "শিক্ষক নিবন্ধন ও জব পোর্টাল",
+  "description": "NTRCA শিক্ষক নিবন্ধন (স্কুল, কলেজ, মাদ্রাসা), প্রাথমিক ও সরকারি স্কুল নিয়োগের সেরা প্রস্তুতি, মডেল টেস্ট, নিয়োগ বিজ্ঞপ্তি ও ১৮তম বিগত প্রশ্ন সমাধান",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

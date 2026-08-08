@@ -2,27 +2,65 @@
 
 @theme {
   --font-bengali: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
-  --color-forest: #2D4B3E;
-  --color-sage: #8AA682;
-  --color-sand: #F5F2EA;
-  --color-stone-bg: #FDFBF7;
-  --color-stone-border: #E6E2D3;
+  --color-navy-dark: #0B132B;
+  --color-navy-card: #16223D;
+  --color-navy-border: #233558;
 }
 
 body {
   font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #FDFBF7;
-  color: #2D4B3E;
+  background-color: #0B132B;
+  color: #F8FAFC;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Custom smooth transitions and utility animations */
-.touch-active:active {
-  transform: scale(0.98);
+/* Custom Neumorphic Styling for Navy Blue Theme */
+.neu-card {
+  background: #121E36;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 6px 6px 14px #060a17, -6px -6px 14px #1a2a4f;
+  border-radius: 1.25rem;
 }
 
-/* Number font adjustment for clean Bengali digits if needed */
+.neu-btn {
+  background: #14223E;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 4px 4px 10px #070c1b, -4px -4px 10px #1e3056;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-btn:hover {
+  box-shadow: 6px 6px 14px #050914, -6px -6px 14px #223762;
+  transform: translateY(-1px);
+}
+
+.neu-btn:active, .neu-btn-active {
+  background: #0E1A30 !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  box-shadow: inset 3px 3px 6px #060a17, inset -3px -3px 6px #1a2b4f !important;
+  color: #38BDF8 !important;
+}
+
+.neu-inset {
+  background: #0D172A;
+  box-shadow: inset 4px 4px 8px #060a17, inset -4px -4px 8px #1a2b4f;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.neu-glow-gold {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+.neu-glow-blue {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+}
+
+.touch-active:active {
+  transform: scale(0.97);
+}
+
 .bengali-num {
   font-variant-numeric: tabular-nums;
 }
+
 

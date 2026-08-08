@@ -8,12 +8,9 @@ import {
   Check, 
   X,
   Filter,
-  Layers,
-  ChevronDown,
-  RotateCcw,
-  Sparkles,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from 'lucide-react';
 import { Question, SelectedOption, UserAnswer } from '../types';
 import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption } from '../lib/utils';
@@ -37,11 +34,9 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const [selectedOption, setSelectedOption] = useState<SelectedOption>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
-  const [showGridNavigator, setShowGridNavigator] = useState(false);
 
-  // Filter questions according to activeSubject
   const filteredQuestions = useMemo(() => {
-    if (!activeSubject || activeSubject === 'all') return questions;
+    if (!activeSubject || activeSubject === 'all' || activeSubject === 'সকল বিষয়') return questions;
     return questions.filter((q) => {
       const subj = detectQuestionSubject(q);
       return subj === activeSubject;
@@ -51,7 +46,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const totalQuestions = filteredQuestions.length;
   const currentQuestion = filteredQuestions[currentIndex];
 
-  // When subject changes, reset index & answers
   const handleSubjectChange = (newSubject: string) => {
     setActiveSubject(newSubject);
     setCurrentIndex(0);
@@ -62,29 +56,29 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   if (!currentQuestion || totalQuestions === 0) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-5 animate-fade-in">
-        <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-5 animate-fade-in mb-24">
+        <div className="w-16 h-16 neu-card flex items-center justify-center mx-auto text-amber-400">
           <HelpCircle className="w-8 h-8" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-[#2D4B3E]">
-            {activeSubject !== 'all' ? `"${activeSubject}" বিষয়ে কোনো প্রশ্ন পাওয়া যায়নি` : 'কোনো প্রশ্ন পাওয়া যায়নি'}
+          <h2 className="text-xl font-black text-white">
+            {activeSubject !== 'all' ? `"${activeSubject}" বিষয়ে প্রশ্ন লোড হচ্ছে...` : 'কোনো প্রশ্ন পাওয়া যায়নি'}
           </h2>
-          <p className="text-xs text-[#8AA682]">
+          <p className="text-xs text-slate-300">
             অনুগ্রহ করে অন্য একটি বিষয় নির্বাচন করুন অথবা সকল বিষয় নির্বাচন করে টেস্ট শুরু করুন।
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button
             onClick={() => handleSubjectChange('all')}
-            className="px-5 py-2.5 bg-[#2D4B3E] text-white font-bold rounded-xl text-xs hover:bg-[#1E332A] transition-colors cursor-pointer"
+            className="neu-btn px-5 py-2.5 text-amber-300 font-bold rounded-xl text-xs hover:text-amber-200 cursor-pointer"
           >
             সকল বিষয় বেছে নিন
           </button>
           <button
             onClick={onNavigateHome}
-            className="px-5 py-2.5 bg-white text-[#2D4B3E] border border-[#E6E2D3] font-bold rounded-xl text-xs hover:bg-[#F5F2EA] transition-colors cursor-pointer"
+            className="px-5 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs hover:text-white cursor-pointer"
           >
             হোমে ফিরে যান
           </button>
@@ -93,7 +87,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     );
   }
 
-  // Calculate actual normalized correct option for this question
   const correctOptionKey = normalizeCorrectOption(
     currentQuestion.correct_answer,
     currentQuestion.option_a,
@@ -103,7 +96,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   );
 
   const handleSelectOption = (optionKey: 'option_a' | 'option_b' | 'option_c' | 'option_d') => {
-    if (isAnswered) return; // Only allow selecting once
+    if (isAnswered) return;
 
     setSelectedOption(optionKey);
     setIsAnswered(true);
@@ -136,7 +129,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       setSelectedOption(null);
       setIsAnswered(false);
     } else {
-      // Quiz completed!
       onFinishQuiz(userAnswers);
     }
   };
@@ -145,27 +137,24 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const currentSubjectTag = detectQuestionSubject(currentQuestion);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 space-y-6 animate-fade-in">
-      
-      {/* Top Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#E6E2D3] shadow-xs">
-        {/* Back Link */}
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6 animate-fade-in mb-24">
+      {/* Top Header Bar */}
+      <div className="neu-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <button
           onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8AA682] hover:text-[#2D4B3E] transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-amber-300 cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-amber-400" />
           <span>হোমে যান</span>
         </button>
 
-        {/* Subject Filter Dropdown */}
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-[#8AA682]" />
-          <span className="text-xs font-bold text-[#8AA682]">বিষয়:</span>
+          <Filter className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-bold text-slate-300">বিষয়:</span>
           <select
             value={activeSubject}
             onChange={(e) => handleSubjectChange(e.target.value)}
-            className="px-3 py-1.5 bg-[#F5F2EA] text-[#2D4B3E] font-bold text-xs rounded-xl border border-[#E6E2D3] focus:outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-[#0D172A] text-amber-300 font-bold text-xs rounded-xl border border-slate-700/80 focus:outline-none cursor-pointer shadow-[inset_2px_2px_4px_#060a17]"
           >
             <option value="all">সকল বিষয় (Mixed)</option>
             {SUBJECT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
@@ -176,51 +165,37 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           </select>
         </div>
 
-        {/* Progress Counter Pill */}
-        <div className="px-3.5 py-1.5 bg-[#2D4B3E] text-white rounded-full text-xs font-bold tracking-wide self-start sm:self-auto">
+        <div className="px-3.5 py-1.5 bg-[#14223E] text-amber-300 border border-amber-400/30 rounded-full text-xs font-black self-start sm:self-auto">
           প্রশ্ন {toBengaliNumeral(currentIndex + 1)} / {toBengaliNumeral(totalQuestions)}
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300/60">
+      <div className="w-full h-2 bg-[#0D172A] rounded-full overflow-hidden p-0.5 border border-slate-800 shadow-[inset_1px_1px_3px_#060a17]">
         <div
-          className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out"
+          className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-300"
           style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
         />
       </div>
 
-      {/* MCQ Main Card Container */}
-      <div className="bg-white rounded-[32px] border border-[#E6E2D3] shadow-md p-6 sm:p-9 space-y-6 relative overflow-hidden">
-        
-        {/* Subject Badge & Topic Line */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D3]/60 pb-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
-              <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{currentSubjectTag}</span>
-            </span>
+      {/* Question Card */}
+      <div className="neu-card p-6 sm:p-8 space-y-6 relative border border-slate-700/80">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-4">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span>{currentSubjectTag}</span>
+          </span>
 
-            {currentQuestion.topic && (
-              <span className="text-xs font-medium text-[#8AA682] bg-[#F5F2EA] px-2.5 py-1 rounded-full border border-[#E6E2D3]">
-                টপিক: {currentQuestion.topic}
-              </span>
-            )}
-          </div>
-
-          <span className="text-xs font-mono font-bold text-[#8AA682]">
+          <span className="text-xs font-black text-slate-400">
             Q.{currentIndex + 1}
           </span>
         </div>
 
-        {/* Question Text */}
-        <div className="space-y-2">
-          <h2 className="text-xl sm:text-2xl font-black text-[#2D4B3E] leading-relaxed">
-            {currentQuestion.question}
-          </h2>
-        </div>
+        <h2 className="text-xl sm:text-2xl font-black text-white leading-relaxed">
+          {currentQuestion.question}
+        </h2>
 
-        {/* Options Grid / List */}
+        {/* Options List */}
         <div className="space-y-3 pt-2">
           {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
             const optionText = currentQuestion[optionKey];
@@ -228,26 +203,22 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             const isSelected = selectedOption === optionKey;
             const isCorrectOption = optionKey === correctOptionKey;
 
-            // Option Button Styling
-            let containerStyles =
-              'border-[#E6E2D3] hover:border-[#8AA682] hover:bg-[#F5F2EA]/70 text-[#2D4B3E]';
-            let badgeStyles = 'bg-[#F5F2EA] text-[#2D4B3E] border-[#E6E2D3]';
+            let buttonStyles = 'neu-btn text-white hover:border-amber-400/80';
+            let badgeStyles = 'bg-[#0D172A] text-slate-300 border-slate-700';
             let iconElement = null;
 
             if (isAnswered) {
               if (isCorrectOption) {
-                containerStyles =
-                  'border-emerald-500 bg-emerald-50/80 text-emerald-950 ring-2 ring-emerald-500/30 font-bold';
-                badgeStyles = 'bg-emerald-600 text-white border-emerald-600';
-                iconElement = <Check className="w-5 h-5 text-emerald-700 shrink-0" />;
+                buttonStyles = 'bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold';
+                badgeStyles = 'bg-emerald-600 text-white border-emerald-500';
+                iconElement = <Check className="w-5 h-5 text-emerald-400 shrink-0" />;
               } else if (isSelected) {
-                containerStyles =
-                  'border-rose-400 bg-rose-50 text-rose-950 ring-2 ring-rose-400/30 font-medium';
-                badgeStyles = 'bg-rose-500 text-white border-rose-500';
-                iconElement = <X className="w-5 h-5 text-rose-600 shrink-0" />;
+                buttonStyles = 'bg-rose-950/80 border-rose-500 text-rose-200 font-bold';
+                badgeStyles = 'bg-rose-600 text-white border-rose-500';
+                iconElement = <X className="w-5 h-5 text-rose-400 shrink-0" />;
               } else {
-                containerStyles = 'border-[#E6E2D3] opacity-45 text-[#2D4B3E]/50 bg-[#F5F2EA]/20';
-                badgeStyles = 'bg-[#F5F2EA] text-[#2D4B3E]/40 border-[#E6E2D3]';
+                buttonStyles = 'opacity-40 text-slate-400 border-slate-800 bg-[#0A1224]';
+                badgeStyles = 'bg-slate-900 text-slate-500 border-slate-800';
               }
             }
 
@@ -256,15 +227,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                 key={optionKey}
                 onClick={() => handleSelectOption(optionKey)}
                 disabled={isAnswered}
-                className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3.5 active:scale-[0.99] focus:outline-none cursor-pointer ${containerStyles}`}
+                className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3.5 cursor-pointer ${buttonStyles}`}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <span
-                    className={`w-8 h-8 rounded-xl font-bold text-sm flex items-center justify-center border shrink-0 transition-colors ${badgeStyles}`}
-                  >
+                  <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center border shrink-0 ${badgeStyles}`}>
                     {prefix}
                   </span>
-                  <span className="font-semibold text-base sm:text-lg leading-relaxed break-words">
+                  <span className="font-bold text-sm sm:text-base leading-relaxed">
                     {optionText}
                   </span>
                 </div>
@@ -274,25 +243,22 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           })}
         </div>
 
-        {/* Feedback Alert Box */}
+        {/* Feedback Alert */}
         {isAnswered && (
           <div className="pt-2 animate-fade-in">
             {selectedOption === correctOptionKey ? (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+              <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 flex items-center gap-3">
+                <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
                 <div>
-                  <p className="font-bold text-base text-emerald-900">অভিনন্দন! আপনার উত্তর সঠিক হয়েছে।</p>
-                  <p className="text-xs text-emerald-800/80 mt-0.5">
-                    পরবর্তী প্রশ্ন অনুশীলনের জন্য নিচে বাটনে ক্লিক করুন।
-                  </p>
+                  <p className="font-bold text-sm text-emerald-100">অভিনন্দন! আপনার উত্তর সঠিক হয়েছে।</p>
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 flex items-start gap-3">
-                <XCircle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-rose-200 flex items-start gap-3">
+                <XCircle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-base text-rose-900">ভুল উত্তর!</p>
-                  <p className="text-xs text-rose-900 mt-1">
+                  <p className="font-bold text-sm text-rose-100">ভুল উত্তর!</p>
+                  <p className="text-xs text-rose-200 mt-1">
                     সঠিক উত্তর হলো: <strong className="font-bold underline">{OPTION_BENGLI_LABEL[correctOptionKey]}) {currentQuestion[correctOptionKey]}</strong>
                   </p>
                 </div>
@@ -301,37 +267,37 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           </div>
         )}
 
-        {/* Rich Explanation Box */}
+        {/* Explanation */}
         {isAnswered && currentQuestion.explanation && (
-          <div className="p-5 rounded-2xl bg-[#F5F2EA] border border-[#E6E2D3] text-[#2D4B3E] space-y-2 animate-fade-in">
-            <div className="flex items-center gap-2 font-bold text-sm text-[#2D4B3E]">
-              <Lightbulb className="w-4 h-4 text-amber-600 fill-amber-500" />
+          <div className="p-4 rounded-2xl bg-[#0D172A] border border-slate-700/80 text-slate-200 space-y-1.5 animate-fade-in">
+            <div className="flex items-center gap-2 font-bold text-xs text-amber-300">
+              <Lightbulb className="w-4 h-4 text-amber-400" />
               <span>সহজ তথ্য ও ব্যাখ্যা:</span>
             </div>
-            <p className="text-xs sm:text-sm leading-relaxed font-medium text-[#2D4B3E]/90 pl-6">
+            <p className="text-xs leading-relaxed text-slate-300 pl-6">
               {currentQuestion.explanation}
             </p>
           </div>
         )}
 
-        {/* Action Controls */}
+        {/* Next Question Button */}
         {isAnswered && (
-          <div className="pt-4 flex items-center justify-between border-t border-[#E6E2D3]/60">
-            <span className="text-xs text-[#8AA682] font-semibold">
-              প্রশ্ন {currentIndex + 1} / {totalQuestions} সম্পন্ন
+          <div className="pt-4 flex items-center justify-between border-t border-slate-700/60">
+            <span className="text-xs text-slate-400 font-semibold">
+              প্রশ্ন {currentIndex + 1} / {totalQuestions}
             </span>
 
             <button
               onClick={handleNextQuestion}
-              className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-[#2D4B3E] hover:bg-[#1E332A] text-white font-bold text-base rounded-2xl shadow-md transition-all active:scale-[0.98] cursor-pointer"
+              className="neu-btn px-7 py-3 rounded-2xl text-amber-300 font-black text-sm flex items-center gap-2 hover:text-amber-200 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)]"
             >
-              <span>{isLastQuestion ? 'ফলাফল ও পারফরম্যান্স দেখুন' : 'পরবর্তী প্রশ্ন'}</span>
-              <ArrowRight className="w-5 h-5" />
+              <span>{isLastQuestion ? 'ফলাফল ও বিশ্লেষণ দেখুন' : 'পরবর্তী প্রশ্ন'}</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
       </div>
-
     </div>
   );
 };
+

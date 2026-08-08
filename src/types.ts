@@ -41,6 +41,7 @@ export interface SubjectCategory {
   borderColor: string;
   textColor: string;
   description: string;
+  totalQuestionsCount?: number;
 }
 
 export interface QuizResult {
@@ -54,5 +55,61 @@ export interface QuizResult {
   selectedSubject?: string | null;
 }
 
+export type TabRoute = 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';
+
 export type PageRoute = 'home' | 'practice' | 'result';
+
+export interface CourseModule {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  duration: string;
+  lessonsCount: number;
+  enrolledCount: string;
+  rating: number;
+  iconName: string;
+  badge?: string;
+  topics: string[];
+  pdfAvailable?: boolean;
+}
+
+export interface UstadAiMessage {
+  id: string;
+  sender: 'user' | 'ustad';
+  text: string;
+  timestamp: string;
+  category?: string;
+  references?: string[];
+}
+
+export interface JobCircular {
+  id: string;
+  title: string;
+  organization: string;
+  designation: string;
+  vacancyCount: string;
+  deadline: string;
+  publishedDate: string;
+  category: 'NTRCA' | 'প্রাথমিক বিদ্যালয়' | 'সরকারি হাইস্কুল' | 'মাদ্রাসা ও কারিগরি' | 'কলেজ ও বিশ্ববিদ্যালয়';
+  location: string;
+  salaryRange: string;
+  isHot?: boolean;
+  isNtrcaOfficial?: boolean;
+  applyUrl?: string;
+  requirements: string[];
+  description: string;
+}
+
+export interface PastPaper {
+  id: string;
+  title: string;
+  year: string;
+  examType: 'স্কুল পর্যায়' | 'কলেজ পর্যায়' | 'মাদ্রাসা পর্যায়' | 'স্কুল পর্যায়-২';
+  totalQuestions: number;
+  timeMinutes: number;
+  difficulty: 'সহজ' | 'মাঝারি' | 'কঠিন';
+  passingMarks: number;
+}
+
 
