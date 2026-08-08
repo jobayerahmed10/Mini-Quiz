@@ -87,22 +87,28 @@ VALUES
           </div>
 
           <div>
-            <h4 className="font-bold text-[#2D4B3E] text-base mb-2">১. এনভায়রনমেন্ট ভ্যারিয়েবল (.env)</h4>
-            <p className="text-[#2D4B3E]/80 mb-2">
-              আপনার প্রজেক্টের <code className="bg-[#F5F2EA] px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">.env.example</code> ফাইলটি অনুসরণ করে আসল credentials যোগ করুন:
+            <h4 className="font-bold text-[#2D4B3E] text-base mb-2">১. Supabase Key & URL কোথায় পাবেন?</h4>
+            <ol className="list-decimal pl-5 text-xs text-[#2D4B3E]/90 space-y-1.5 mb-3 bg-[#F5F2EA] p-3.5 rounded-2xl border border-[#E6E2D3]">
+              <li><strong>Supabase Dashboard</strong> (supabase.com) এ লগইন করে আপনার প্রজেক্ট ওপেন করুন।</li>
+              <li>বাম সাইডবারের গিয়ার আইকন <strong>Project Settings</strong> এ যান।</li>
+              <li><strong>API</strong> ট্যাবে ক্লিক করুন।</li>
+              <li>সেখানে <strong>Project URL</strong> এবং <strong>anon / public</strong> (Project API Key) কপি করুন।</li>
+            </ol>
+
+            <h4 className="font-bold text-[#2D4B3E] text-base mb-2">২. Vercel এ কীভাবে যুক্ত করবেন?</h4>
+            <p className="text-[#2D4B3E]/80 mb-2 text-xs">
+              Vercel এ ডিপ্লয় করা থাকলে <strong>Project Settings &gt; Environment Variables</strong> এ নিচের কাস্টম নাম দিয়ে Key দুটি যোগ করে <strong>Redeploy</strong> দিন:
             </p>
             <div className="bg-[#2D4B3E] text-slate-100 p-3.5 rounded-2xl font-mono text-xs overflow-x-auto space-y-1">
-              <div>VITE_SUPABASE_URL=https://your-project.supabase.co</div>
-              <div>VITE_SUPABASE_ANON_KEY=your-actual-anon-key</div>
-              <div className="text-[#8AA682] mt-1">// Vercel / Next.js এর জন্য:</div>
-              <div className="text-[#8AA682]">NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co</div>
-              <div className="text-[#8AA682]">NEXT_PUBLIC_SUPABASE_ANON_KEY=your-actual-anon-key</div>
+              <div className="text-[#8AA682]">// Vercel Environment Variables:</div>
+              <div>VITE_SUPABASE_URL = https://xxxx.supabase.co</div>
+              <div>VITE_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6...</div>
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="font-bold text-[#2D4B3E] text-base">২. Supabase Table & RLS SQL Schema</h4>
+              <h4 className="font-bold text-[#2D4B3E] text-base">৩. Supabase Table & RLS SQL Schema</h4>
               <button
                 onClick={copyToClipboard}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#F5F2EA] text-[#2D4B3E] hover:bg-[#E6E2D3] border border-[#E6E2D3] rounded-full text-xs font-semibold transition-colors"

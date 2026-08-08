@@ -77,23 +77,32 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Error / Notice Banner */}
       {fetchError && (
-        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs sm:text-sm flex items-start justify-between gap-3 shadow-xs">
+        <div className="p-4 sm:p-5 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs sm:text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">{fetchError}</p>
-              <p className="opacity-90 mt-0.5">
-                সঠিক Supabase credentials পেতে উপরের &apos;গাইড&apos; অপশনে ক্লিক করুন।
+              <p className="font-bold text-amber-950 text-sm">{fetchError}</p>
+              <p className="opacity-90 mt-1 text-xs leading-relaxed">
+                Vercel এর Settings &gt; Environment Variables এ <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold">VITE_SUPABASE_URL</code> এবং <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold">VITE_SUPABASE_ANON_KEY</code> যোগ করে প্রজেক্ট রি-ডিপ্লয় (Redeploy) করুন।
               </p>
             </div>
           </div>
-          <button
-            onClick={onRefreshQuestions}
-            className="px-3 py-1 bg-amber-200/80 hover:bg-amber-200 text-amber-900 rounded-xl font-medium text-xs shrink-0 flex items-center gap-1"
-          >
-            <RefreshCw className="w-3 h-3" />
-            <span>রিফ্রেশ</span>
-          </button>
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              onClick={onOpenSupabaseModal}
+              className="px-3 py-1.5 bg-amber-200/80 hover:bg-amber-300 text-amber-950 rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>গাইড দেখুন</span>
+            </button>
+            <button
+              onClick={onRefreshQuestions}
+              className="px-3 py-1.5 bg-[#2D4B3E] hover:bg-[#233B31] text-white rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>রিফ্রেশ</span>
+            </button>
+          </div>
         </div>
       )}
 
