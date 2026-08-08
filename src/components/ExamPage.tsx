@@ -27,7 +27,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
   const [questionCount, setQuestionCount] = useState<number>(25);
   const [timeMinutes, setTimeMinutes] = useState<number>(20);
-  const [instantFeedback, setInstantFeedback] = useState<boolean>(true);
 
   const examPresets = [
     {
@@ -72,19 +71,19 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 mb-24">
+    <div className="max-w-5xl mx-auto px-4 py-6 mb-24 space-y-6">
       {/* Banner */}
-      <div className="neu-card p-6 mb-6 border border-amber-400/30 bg-gradient-to-r from-[#121E36] via-[#1A2C4E] to-[#0E172A] relative overflow-hidden">
+      <div className="neu-card p-6 sm:p-8 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-black px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full inline-flex items-center gap-1.5 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-black px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full inline-flex items-center gap-1.5 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               লাইভ কুইজ ও প্রিলিমিনারি মডেল টেস্ট
             </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#0B132B] dark:text-white">
               পরীক্ষা দিন & প্রস্তুতি যাচাই করুন
             </h1>
-            <p className="text-sm text-slate-300 mt-1">
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
               স্বয়ংক্রিয় টাইমার, নেগেটিভ মার্কিং (-০.৫০) এবং বিস্তারিত সমাধানসহ মডেল টেস্ট
             </p>
           </div>
@@ -96,7 +95,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
               timeMinutes: 60,
               examType: '১০০ মার্কস লাইভ মডেল টেস্ট'
             })}
-            className="neu-btn px-6 py-3.5 rounded-2xl text-amber-300 font-black text-sm flex items-center gap-2 hover:text-amber-200 cursor-pointer shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+            className="neu-btn px-6 py-3.5 rounded-2xl bg-[#0B132B] text-white font-black text-sm flex items-center gap-2 cursor-pointer shrink-0 shadow-md transition-all active:scale-95"
           >
             <Play className="w-5 h-5 text-amber-400 fill-amber-400" />
             <span>১০০ মার্কস পরীক্ষা শুরু করুন</span>
@@ -105,80 +104,81 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
       </div>
 
       {/* Featured Exam Presets */}
-      <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
-        <Target className="w-5 h-5 text-amber-400" />
-        পপুলার মডেল টেস্ট সমূহ:
-      </h2>
+      <div>
+        <h2 className="text-lg font-black text-[#0B132B] dark:text-white mb-3 flex items-center gap-2">
+          <Target className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
+          পপুলার মডেল টেস্ট সমূহ:
+        </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {examPresets.map((preset) => {
-          const IconComp = preset.icon;
-          return (
-            <div
-              key={preset.id}
-              className="neu-card p-5 flex flex-col justify-between hover:border-amber-400/60 transition-all group"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[10px] font-black px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">
-                    {preset.badge}
-                  </span>
-                  <div className="flex items-center gap-1 text-xs font-bold text-slate-300">
-                    <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{preset.timeMinutes} মিনিট</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {examPresets.map((preset) => {
+            return (
+              <div
+                key={preset.id}
+                className="neu-card p-5 flex flex-col justify-between hover:border-amber-400/60 transition-all group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[10px] font-black px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full">
+                      {preset.badge}
+                    </span>
+                    <div className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                      <Clock className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
+                      <span>{preset.timeMinutes} মিনিট</span>
+                    </div>
                   </div>
+
+                  <h3 className="text-base font-black text-[#0B132B] dark:text-white group-hover:text-amber-400 transition-colors">
+                    {preset.title}
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+                    {preset.description}
+                  </p>
                 </div>
 
-                <h3 className="text-base font-black text-white group-hover:text-amber-300 transition-colors">
-                  {preset.title}
-                </h3>
-                <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-                  {preset.description}
-                </p>
+                <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
+                    {preset.questionCount}টি প্রশ্ন
+                  </span>
+                  <button
+                    onClick={() => onStartExam({
+                      subject: preset.subject,
+                      questionCount: preset.questionCount,
+                      timeMinutes: preset.timeMinutes,
+                      examType: preset.title,
+                    })}
+                    className="neu-btn px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                    <span>শুরু করুন</span>
+                  </button>
+                </div>
               </div>
-
-              <div className="mt-5 pt-3 border-t border-slate-700/50 flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-400">
-                  {preset.questionCount}টি প্রশ্ন
-                </span>
-                <button
-                  onClick={() => onStartExam({
-                    subject: preset.subject,
-                    questionCount: preset.questionCount,
-                    timeMinutes: preset.timeMinutes,
-                    examType: preset.title,
-                  })}
-                  className="neu-btn px-4 py-2 rounded-xl text-xs font-black text-amber-300 hover:text-amber-200 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 fill-amber-300" />
-                  <span>শুরু করুন</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Custom Exam Builder */}
-      <div className="neu-card p-6 border border-slate-700/80">
-        <h2 className="text-lg font-black text-white mb-2 flex items-center gap-2">
-          <FileCheck2 className="w-5 h-5 text-amber-400" />
+      <div className="neu-card p-6 relative overflow-hidden">
+        <h2 className="text-lg font-black text-[#0B132B] dark:text-white mb-1 flex items-center gap-2">
+          <FileCheck2 className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
           নিজের পছন্দমতো পরীক্ষা সেটআপ করুন:
         </h2>
-        <p className="text-xs text-slate-300 mb-6">
+        <p className="text-xs text-slate-600 dark:text-slate-300 mb-6">
           আপনার সুবিধামতো বিষয়, প্রশ্ন সংখ্যা ও সময় নির্ধারণ করে কাস্টম টেস্ট তৈরি করুন
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Subject Select */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
               বিষয় নির্বাচন করুন:
             </label>
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full bg-[#0D172A] border border-slate-700 text-white text-xs rounded-xl p-3 focus:outline-none focus:border-amber-400 shadow-[inset_2px_2px_4px_#060a17]"
+              className="w-full bg-slate-50 dark:bg-[#0D172A] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl p-3 focus:outline-none focus:border-[#0B132B] dark:focus:border-amber-400"
             >
               <option value="সকল বিষয়">সকল বিষয় (মডেল টেস্ট)</option>
               {SUBJECT_CATEGORIES.filter(s => s.id !== 'all').map((s) => (
@@ -191,7 +191,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
 
           {/* Question Count Select */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
               প্রশ্ন সংখ্যা:
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -200,10 +200,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
                   key={num}
                   type="button"
                   onClick={() => setQuestionCount(num)}
-                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all border ${
                     questionCount === num
-                      ? 'bg-[#0E1A30] border border-amber-400/80 text-amber-300 shadow-[inset_2px_2px_4px_#060a17]'
-                      : 'neu-btn text-slate-300'
+                      ? 'bg-[#0B132B] border-[#0B132B] text-amber-400 shadow-xs'
+                      : 'neu-btn text-slate-800 dark:text-slate-200'
                   }`}
                 >
                   {num}টি
@@ -214,7 +214,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
 
           {/* Time Select */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
               সময়সীমা (মিনিট):
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -223,10 +223,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
                   key={mins}
                   type="button"
                   onClick={() => setTimeMinutes(mins)}
-                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all border ${
                     timeMinutes === mins
-                      ? 'bg-[#0E1A30] border border-amber-400/80 text-amber-300 shadow-[inset_2px_2px_4px_#060a17]'
-                      : 'neu-btn text-slate-300'
+                      ? 'bg-[#0B132B] border-[#0B132B] text-amber-400 shadow-xs'
+                      : 'neu-btn text-slate-800 dark:text-slate-200'
                   }`}
                 >
                   {mins}মি
@@ -236,17 +236,17 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
           </div>
         </div>
 
-        <div className="mt-6 pt-5 border-t border-slate-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>প্রতি ভুল উত্তরের জন্য ০.৫০ নম্বর কাটা যাবে</span>
           </div>
 
           <button
             onClick={handleLaunchCustom}
-            className="neu-btn px-8 py-3.5 rounded-2xl text-amber-300 font-black text-sm flex items-center gap-2 hover:text-amber-200 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+            className="neu-btn px-8 py-3.5 bg-[#0B132B] text-white rounded-2xl font-black text-sm flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
           >
-            <Play className="w-4 h-4 fill-amber-300" />
+            <Play className="w-4 h-4 fill-amber-400 text-amber-400" />
             <span>কাস্টম পরীক্ষা শুরু করুন</span>
           </button>
         </div>

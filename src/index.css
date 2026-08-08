@@ -1,50 +1,178 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-bengali: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
   --color-navy-dark: #0B132B;
-  --color-navy-card: #16223D;
+  --color-navy-card: #121E36;
   --color-navy-border: #233558;
 }
 
 body {
   font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #0B132B;
-  color: #F8FAFC;
+  background-color: #F1F5F9;
+  color: #0F172A;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Custom Neumorphic Styling for Navy Blue Theme */
+/* Dark Mode Body */
+.dark body, body.dark {
+  background-color: #0B132B !important;
+  color: #F8FAFC !important;
+}
+
+/* Global Dark Mode Overrides for Cards, Modals & Containers */
+.dark .bg-white, body.dark .bg-white {
+  background-color: #121E36 !important;
+  color: #F8FAFC !important;
+}
+
+.dark .bg-slate-50, body.dark .bg-slate-50,
+.dark .bg-slate-100, body.dark .bg-slate-100,
+.dark .bg-[#F5F2EA], body.dark .bg-[#F5F2EA],
+.dark .bg-[#F5F2EA]\/60, body.dark .bg-[#F5F2EA]\/60 {
+  background-color: #0D172A !important;
+  color: #E2E8F0 !important;
+}
+
+.dark .bg-slate-200, body.dark .bg-slate-200 {
+  background-color: #1A2A4A !important;
+  color: #E2E8F0 !important;
+}
+
+.dark .border-slate-100, body.dark .border-slate-100,
+.dark .border-slate-200, body.dark .border-slate-200,
+.dark .border-[#E6E2D3], body.dark .border-[#E6E2D3],
+.dark .border-slate-300, body.dark .border-slate-300 {
+  border-color: #233760 !important;
+}
+
+.dark .text-[#0B132B], body.dark .text-[#0B132B],
+.dark .text-slate-900, body.dark .text-slate-900,
+.dark .text-slate-800, body.dark .text-slate-800,
+.dark .text-slate-700, body.dark .text-slate-700,
+.dark .text-[#1B4332], body.dark .text-[#1B4332],
+.dark .text-[#2D4B3E], body.dark .text-[#2D4B3E] {
+  color: #F8FAFC !important;
+}
+
+.dark .text-slate-600, body.dark .text-slate-600,
+.dark .text-slate-500, body.dark .text-slate-500 {
+  color: #CBD5E1 !important;
+}
+
+.dark .text-slate-400, body.dark .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+/* Inputs, Selects & Textareas in Dark Mode */
+.dark input, .dark select, .dark textarea,
+body.dark input, body.dark select, body.dark textarea {
+  background-color: #0D172A !important;
+  color: #F8FAFC !important;
+  border-color: #233760 !important;
+}
+
+/* Font Family Utility Classes */
+.font-hind {
+  font-family: 'Hind Siliguri', sans-serif !important;
+}
+.font-noto {
+  font-family: 'Noto Sans Bengali', sans-serif !important;
+}
+.font-tiro {
+  font-family: 'Tiro Bangla', serif !important;
+}
+.font-anek {
+  font-family: 'Anek Bangla', sans-serif !important;
+}
+
+/* Font Size Scaling Classes */
+.font-scale-normal {
+  font-size: 100%;
+}
+.font-scale-medium {
+  font-size: 108%;
+}
+.font-scale-large {
+  font-size: 116%;
+}
+
+/* --- LIGHT MODE NEUMORPHIC STYLES --- */
 .neu-card {
-  background: #121E36;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 6px 6px 14px #060a17, -6px -6px 14px #1a2a4f;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 6px 6px 14px #e2e8f0, -6px -6px 14px #ffffff;
   border-radius: 1.25rem;
+  transition: all 0.2s ease;
 }
 
 .neu-btn {
-  background: #14223E;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 4px 4px 10px #070c1b, -4px -4px 10px #1e3056;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #0F172A;
+  box-shadow: 4px 4px 10px #e2e8f0, -4px -4px 10px #ffffff;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .neu-btn:hover {
-  box-shadow: 6px 6px 14px #050914, -6px -6px 14px #223762;
+  border-color: #0B132B;
+  color: #0B132B;
+  box-shadow: 6px 6px 14px #cbd5e1, -6px -6px 14px #ffffff;
   transform: translateY(-1px);
 }
 
-.neu-btn:active, .neu-btn-active {
-  background: #0E1A30 !important;
-  border-color: rgba(56, 189, 248, 0.4) !important;
-  box-shadow: inset 3px 3px 6px #060a17, inset -3px -3px 6px #1a2b4f !important;
-  color: #38BDF8 !important;
+/* Clicked / Active Neumorphic Button in Light Mode -> Turns Navy Blue (#0B132B) */
+.neu-btn:active, .neu-btn-active, .neu-active {
+  background: #0B132B !important;
+  border-color: #0B132B !important;
+  color: #FFFFFF !important;
+  box-shadow: inset 3px 3px 6px #040711, inset -3px -3px 6px #121f45 !important;
 }
 
 .neu-inset {
-  background: #0D172A;
-  box-shadow: inset 4px 4px 8px #060a17, inset -4px -4px 8px #1a2b4f;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #F1F5F9;
+  box-shadow: inset 3px 3px 6px #cbd5e1, inset -3px -3px 6px #ffffff;
+  border: 1px solid #E2E8F0;
+}
+
+/* --- DARK MODE NEUMORPHIC STYLES --- */
+.dark .neu-card, body.dark .neu-card {
+  background: #121E36 !important;
+  border: 1px solid #233760 !important;
+  box-shadow: 6px 6px 16px #060a17, -6px -6px 16px #1a2c50 !important;
+  color: #F8FAFC !important;
+}
+
+.dark .neu-btn, body.dark .neu-btn {
+  background: #162444 !important;
+  border: 1px solid #233760 !important;
+  color: #F8FAFC !important;
+  box-shadow: 4px 4px 10px #070c1b, -4px -4px 10px #213662 !important;
+}
+
+.dark .neu-btn:hover, body.dark .neu-btn:hover {
+  border-color: #F59E0B !important;
+  color: #F59E0B !important;
+  box-shadow: 6px 6px 14px #050914, -6px -6px 14px #233966 !important;
+  transform: translateY(-1px);
+}
+
+/* Clicked / Active Neumorphic Button in Dark Mode -> High Contrast Navy Blue + Gold/Cyan Highlight */
+.dark .neu-btn:active, .dark .neu-btn-active, .dark .neu-active,
+body.dark .neu-btn:active, body.dark .neu-btn-active, body.dark .neu-active {
+  background: #0B132B !important;
+  border-color: #F59E0B !important;
+  color: #F59E0B !important;
+  box-shadow: inset 3px 3px 6px #040711, inset -3px -3px 6px #121f45 !important;
+}
+
+.dark .neu-inset, body.dark .neu-inset {
+  background: #0D172A !important;
+  box-shadow: inset 3px 3px 6px #060a17, inset -3px -3px 6px #1a2c50 !important;
+  border: 1px solid #233760 !important;
 }
 
 .neu-glow-gold {

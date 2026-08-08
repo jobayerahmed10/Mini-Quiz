@@ -142,19 +142,19 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       <div className="neu-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <button
           onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-amber-300 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-[#0B132B] dark:hover:text-amber-400 cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4 text-amber-400" />
+          <ArrowLeft className="w-4 h-4 text-[#0B132B] dark:text-amber-400" />
           <span>হোমে যান</span>
         </button>
 
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-bold text-slate-300">বিষয়:</span>
+          <Filter className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">বিষয়:</span>
           <select
             value={activeSubject}
             onChange={(e) => handleSubjectChange(e.target.value)}
-            className="px-3 py-1.5 bg-[#0D172A] text-amber-300 font-bold text-xs rounded-xl border border-slate-700/80 focus:outline-none cursor-pointer shadow-[inset_2px_2px_4px_#060a17]"
+            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 focus:outline-none cursor-pointer"
           >
             <option value="all">সকল বিষয় (Mixed)</option>
             {SUBJECT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
@@ -165,24 +165,24 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           </select>
         </div>
 
-        <div className="px-3.5 py-1.5 bg-[#14223E] text-amber-300 border border-amber-400/30 rounded-full text-xs font-black self-start sm:self-auto">
+        <div className="px-3.5 py-1.5 bg-[#0B132B] text-white border border-[#0B132B] rounded-full text-xs font-black self-start sm:self-auto">
           প্রশ্ন {toBengaliNumeral(currentIndex + 1)} / {toBengaliNumeral(totalQuestions)}
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full h-2 bg-[#0D172A] rounded-full overflow-hidden p-0.5 border border-slate-800 shadow-[inset_1px_1px_3px_#060a17]">
+      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-300 dark:border-slate-700">
         <div
-          className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-300"
+          className="h-full bg-[#0B132B] dark:bg-amber-400 rounded-full transition-all duration-300"
           style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
         />
       </div>
 
       {/* Question Card */}
-      <div className="neu-card p-6 sm:p-8 space-y-6 relative border border-slate-700/80">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-4">
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">
-            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+      <div className="neu-card p-6 sm:p-8 space-y-6 relative">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-200 dark:border-slate-700 rounded-full">
+            <BookOpen className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
             <span>{currentSubjectTag}</span>
           </span>
 
@@ -191,7 +191,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           </span>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-black text-white leading-relaxed">
+        <h2 className="text-xl sm:text-2xl font-black text-[#0B132B] dark:text-white leading-relaxed">
           {currentQuestion.question}
         </h2>
 
@@ -203,22 +203,22 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             const isSelected = selectedOption === optionKey;
             const isCorrectOption = optionKey === correctOptionKey;
 
-            let buttonStyles = 'neu-btn text-white hover:border-amber-400/80';
-            let badgeStyles = 'bg-[#0D172A] text-slate-300 border-slate-700';
+            let buttonStyles = 'neu-btn hover:border-[#0B132B] dark:hover:border-amber-400';
+            let badgeStyles = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700';
             let iconElement = null;
 
             if (isAnswered) {
               if (isCorrectOption) {
-                buttonStyles = 'bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold';
+                buttonStyles = 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold';
                 badgeStyles = 'bg-emerald-600 text-white border-emerald-500';
-                iconElement = <Check className="w-5 h-5 text-emerald-400 shrink-0" />;
+                iconElement = <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />;
               } else if (isSelected) {
-                buttonStyles = 'bg-rose-950/80 border-rose-500 text-rose-200 font-bold';
+                buttonStyles = 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-950 dark:text-rose-200 font-bold';
                 badgeStyles = 'bg-rose-600 text-white border-rose-500';
-                iconElement = <X className="w-5 h-5 text-rose-400 shrink-0" />;
+                iconElement = <X className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />;
               } else {
-                buttonStyles = 'opacity-40 text-slate-400 border-slate-800 bg-[#0A1224]';
-                badgeStyles = 'bg-slate-900 text-slate-500 border-slate-800';
+                buttonStyles = 'opacity-40 text-slate-400 border-slate-200 bg-slate-50 dark:bg-slate-900/40';
+                badgeStyles = 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300';
               }
             }
 
@@ -227,7 +227,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                 key={optionKey}
                 onClick={() => handleSelectOption(optionKey)}
                 disabled={isAnswered}
-                className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3.5 cursor-pointer ${buttonStyles}`}
+                className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3.5 cursor-pointer shadow-xs ${buttonStyles}`}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
                   <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center border shrink-0 ${badgeStyles}`}>
@@ -247,18 +247,18 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         {isAnswered && (
           <div className="pt-2 animate-fade-in">
             {selectedOption === correctOptionKey ? (
-              <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center gap-3">
+                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
                 <div>
-                  <p className="font-bold text-sm text-emerald-100">অভিনন্দন! আপনার উত্তর সঠিক হয়েছে।</p>
+                  <p className="font-bold text-sm text-emerald-900">অভিনন্দন! আপনার উত্তর সঠিক হয়েছে।</p>
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-rose-200 flex items-start gap-3">
-                <XCircle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-950 flex items-start gap-3">
+                <XCircle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-sm text-rose-100">ভুল উত্তর!</p>
-                  <p className="text-xs text-rose-200 mt-1">
+                  <p className="font-bold text-sm text-rose-900">ভুল উত্তর!</p>
+                  <p className="text-xs text-rose-800 mt-1">
                     সঠিক উত্তর হলো: <strong className="font-bold underline">{OPTION_BENGLI_LABEL[correctOptionKey]}) {currentQuestion[correctOptionKey]}</strong>
                   </p>
                 </div>
@@ -269,12 +269,12 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
         {/* Explanation */}
         {isAnswered && currentQuestion.explanation && (
-          <div className="p-4 rounded-2xl bg-[#0D172A] border border-slate-700/80 text-slate-200 space-y-1.5 animate-fade-in">
-            <div className="flex items-center gap-2 font-bold text-xs text-amber-300">
-              <Lightbulb className="w-4 h-4 text-amber-400" />
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 space-y-1.5 animate-fade-in">
+            <div className="flex items-center gap-2 font-bold text-xs text-[#0B132B]">
+              <Lightbulb className="w-4 h-4 text-amber-500" />
               <span>সহজ তথ্য ও ব্যাখ্যা:</span>
             </div>
-            <p className="text-xs leading-relaxed text-slate-300 pl-6">
+            <p className="text-xs leading-relaxed text-slate-700 pl-6">
               {currentQuestion.explanation}
             </p>
           </div>
@@ -282,14 +282,14 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
         {/* Next Question Button */}
         {isAnswered && (
-          <div className="pt-4 flex items-center justify-between border-t border-slate-700/60">
-            <span className="text-xs text-slate-400 font-semibold">
+          <div className="pt-4 flex items-center justify-between border-t border-slate-100">
+            <span className="text-xs text-slate-500 font-semibold">
               প্রশ্ন {currentIndex + 1} / {totalQuestions}
             </span>
 
             <button
               onClick={handleNextQuestion}
-              className="neu-btn px-7 py-3 rounded-2xl text-amber-300 font-black text-sm flex items-center gap-2 hover:text-amber-200 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+              className="px-7 py-3 bg-[#0B132B] hover:bg-slate-800 text-white font-black text-sm rounded-2xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
             >
               <span>{isLastQuestion ? 'ফলাফল ও বিশ্লেষণ দেখুন' : 'পরবর্তী প্রশ্ন'}</span>
               <ArrowRight className="w-4 h-4" />

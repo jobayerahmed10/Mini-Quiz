@@ -51,7 +51,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0B132B]/95 backdrop-blur-lg border-t border-[#1E2E4F] shadow-2xl px-1.5 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-[#0B132B]/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-2xl px-1.5 py-2 transition-colors duration-300">
       <div className="max-w-xl mx-auto flex items-center justify-around gap-1.5 sm:gap-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -64,18 +64,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               onClick={() => onTabChange(tab.id)}
               className={`relative flex flex-col items-center justify-center py-2 px-1.5 sm:px-3 rounded-2xl transition-all cursor-pointer select-none min-w-[62px] sm:min-w-[76px] ${
                 isActive
-                  ? 'bg-[#0E1A30] border border-amber-400/60 text-amber-300 shadow-[inset_3px_3px_7px_#060a17,inset_-3px_-3px_7px_#1a2a4f] scale-102'
-                  : 'bg-[#14223E] border border-slate-700/60 text-slate-300 hover:text-white shadow-[3px_3px_8px_#060a17,-3px_-3px_8px_#1d2d50] hover:bg-[#182848]'
+                  ? 'neu-active bg-[#0B132B] border-amber-400/60 text-white shadow-md scale-102'
+                  : 'neu-btn text-slate-700 dark:text-slate-200'
               }`}
             >
               <div className="relative">
                 <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${
-                  isActive ? 'text-amber-400 stroke-[2.5px] scale-110 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'text-slate-300 stroke-[1.8px]'
+                  isActive ? 'text-amber-400 stroke-[2.5px] scale-110' : 'text-slate-600 dark:text-slate-300 stroke-[1.8px]'
                 }`} />
                 {tab.badge && (
                   <span className={`absolute -top-2 -right-3.5 text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.2 rounded-full shadow-xs ${
                     tab.id === 'ustad_ai' 
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black animate-pulse'
+                      ? 'bg-amber-500 text-slate-950 font-black'
                       : 'bg-rose-600 text-white'
                   }`}>
                     {tab.badge}
@@ -83,7 +83,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 )}
               </div>
               <span className={`text-[9px] sm:text-[10.5px] leading-tight mt-1 text-center transition-colors ${
-                isActive ? 'font-black text-amber-300' : 'font-medium text-slate-300'
+                isActive ? 'font-black text-amber-400' : 'font-semibold text-slate-600 dark:text-slate-300'
               }`}>
                 {tab.label}
               </span>

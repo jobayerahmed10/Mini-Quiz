@@ -153,19 +153,18 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 mb-24">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 mb-24 space-y-4">
       {/* Banner */}
-      <div className="neu-card p-5 mb-5 relative overflow-hidden border border-amber-400/30 bg-gradient-to-r from-[#121E36] via-[#162648] to-[#0F182D]">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#182848] border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-[inset_2px_2px_5px_#060a17]">
-            <Sparkles className="w-6 h-6 animate-pulse" />
+          <div className="w-12 h-12 rounded-2xl bg-[#0B132B] text-white flex items-center justify-center shrink-0 shadow-md">
+            <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-              উস্তাদ এআই <span className="text-xs font-bold px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">স্মার্ট টিউটর</span>
+            <h1 className="text-xl sm:text-2xl font-black text-[#0B132B] flex items-center gap-2">
+              উস্তাদ এআই <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-[#0B132B] border border-slate-300 rounded-full">স্মার্ট টিউটর</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
               কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি ও গণিতের যেকোনো প্রশ্ন মুহূর্তে বুঝে নিন
             </p>
           </div>
@@ -173,9 +172,9 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
       </div>
 
       {/* Preset Fast Click Prompts */}
-      <div className="mb-5">
-        <p className="text-xs font-bold text-amber-300/90 mb-2 flex items-center gap-1.5">
-          <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+      <div>
+        <p className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
           দ্রুত ক্লিক করে উত্তর জানুন:
         </p>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
@@ -183,9 +182,9 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
             <button
               key={idx}
               onClick={() => handleSendMessage(q)}
-              className="neu-btn text-xs font-semibold text-slate-200 px-3 py-2 rounded-xl whitespace-nowrap hover:text-amber-300 flex items-center gap-1.5 shrink-0"
+              className="bg-white border border-slate-300 text-slate-800 text-xs font-semibold px-3 py-2 rounded-xl whitespace-nowrap hover:border-[#0B132B] hover:bg-slate-50 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs"
             >
-              <HelpCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <HelpCircle className="w-3.5 h-3.5 text-[#0B132B] shrink-0" />
               <span>{q}</span>
             </button>
           ))}
@@ -193,7 +192,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
       </div>
 
       {/* Chat Messages */}
-      <div className="neu-inset rounded-2xl p-4 min-h-[380px] max-h-[550px] overflow-y-auto space-y-4 mb-4">
+      <div className="bg-slate-100/80 rounded-3xl p-4 min-h-[380px] max-h-[550px] overflow-y-auto space-y-4 border border-slate-200">
         {messages.map((msg) => {
           const isUser = msg.sender === 'user';
           return (
@@ -202,34 +201,34 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
               className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
             >
               {!isUser && (
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 mt-1">
-                  <Bot className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-xl bg-[#0B132B] text-white flex items-center justify-center shrink-0 mt-1 shadow-xs">
+                  <Bot className="w-4 h-4 text-amber-400" />
                 </div>
               )}
 
               <div
                 className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 relative text-sm leading-relaxed ${
                   isUser
-                    ? 'bg-amber-500/20 border border-amber-400/50 text-white rounded-tr-xs shadow-md'
-                    : 'bg-[#14223E] border border-slate-700/60 text-slate-100 rounded-tl-xs shadow-md'
+                    ? 'bg-[#0B132B] text-white rounded-tr-xs shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-900 rounded-tl-xs shadow-xs'
                 }`}
               >
                 <div className="whitespace-pre-line font-normal">
                   {msg.text}
                 </div>
 
-                <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-slate-700/40 text-[10px] text-slate-400">
+                <div className={`flex items-center justify-between gap-3 mt-2 pt-2 border-t text-[10px] ${isUser ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-500'}`}>
                   <span>{msg.timestamp}</span>
                   {!isUser && (
                     <button
                       onClick={() => handleCopy(msg.id, msg.text)}
-                      className="hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                      className="hover:text-[#0B132B] flex items-center gap-1 cursor-pointer transition-colors"
                       title="অনুলিপি করুন"
                     >
                       {copiedId === msg.id ? (
                         <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          <span className="text-emerald-400">কপি হয়েছে</span>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span className="text-emerald-600">কপি হয়েছে</span>
                         </>
                       ) : (
                         <>
@@ -243,7 +242,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
               </div>
 
               {isUser && (
-                <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center shrink-0 mt-1">
+                <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-800 flex items-center justify-center shrink-0 mt-1 border border-slate-300">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -252,8 +251,8 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
         })}
 
         {isTyping && (
-          <div className="flex items-center gap-2 text-xs text-amber-300/80 p-2">
-            <Bot className="w-4 h-4 animate-spin text-amber-400" />
+          <div className="flex items-center gap-2 text-xs text-[#0B132B] p-2 font-bold">
+            <Bot className="w-4 h-4 animate-spin text-amber-500" />
             <span>উস্তাদ এআই উত্তর তৈরি করছেন...</span>
           </div>
         )}
@@ -274,15 +273,15 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             placeholder="আপনার যেকোনো প্রশ্ন এখানে লিখুন (যেমন: সূরার মাক্কী মাদানী চেনার উপায়)..."
-            className="w-full bg-[#121E36] border border-slate-700/80 text-white placeholder-slate-400 text-sm rounded-2xl px-4 py-3.5 focus:outline-none focus:border-amber-400/80 shadow-[inset_2px_2px_5px_#060a17]"
+            className="w-full bg-white border border-slate-300 text-slate-900 placeholder-slate-400 text-sm font-medium rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#0B132B] shadow-xs"
           />
         </div>
         <button
           type="submit"
           disabled={!inputQuery.trim() || isTyping}
-          className="neu-btn px-5 py-3.5 rounded-2xl text-amber-400 font-bold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:text-amber-300 cursor-pointer"
+          className="px-5 py-3.5 bg-[#0B132B] hover:bg-slate-800 text-white font-black text-sm rounded-2xl flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md transition-all active:scale-95"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-4 h-4 text-amber-400" />
           <span className="hidden sm:inline">পাঠান</span>
         </button>
       </form>

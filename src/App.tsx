@@ -25,6 +25,40 @@ export default function App() {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
 
+  // Dark Mode & Font Customization State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('miniquiz_darkmode') === 'true';
+  });
+
+  const [fontSize, setFontSize] = useState<'normal' | 'medium' | 'large'>(() => {
+    return (localStorage.getItem('miniquiz_fontsize') as 'normal' | 'medium' | 'large') || 'normal';
+  });
+
+  const [fontFamily, setFontFamily] = useState<'hind' | 'noto' | 'tiro' | 'anek'>(() => {
+    return (localStorage.getItem('miniquiz_fontfamily') as 'hind' | 'noto' | 'tiro' | 'anek') || 'hind';
+  });
+
+  // Apply Dark Mode class to documentElement & body
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
+    localStorage.setItem('miniquiz_darkmode', String(isDarkMode));
+  }, [isDarkMode]);
+
+  // Persist Font settings
+  useEffect(() => {
+    localStorage.setItem('miniquiz_fontsize', fontSize);
+  }, [fontSize]);
+
+  useEffect(() => {
+    localStorage.setItem('miniquiz_fontfamily', fontFamily);
+  }, [fontFamily]);
+
   // Load published questions on mount
   const loadQuestions = useCallback(async () => {
     setIsLoading(true);
@@ -67,8 +101,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleStartPractice = (subject: string = 'সকল বিষয়') => {
-    setSelectedSubject(subject);
+  const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
+    const subjName = typeof subjectOrOpts === 'string' ? subjectOrOpts : subjectOrOpts.subject;
+    setSelectedSubject(subjName);
     setCurrentPage('practice');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -90,13 +125,38 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const getFontFamilyClass = () => {
+    switch (fontFamily) {
+      case 'noto': return 'font-noto';
+      case 'tiro': return 'font-tiro';
+      case 'anek': return 'font-anek';
+      default: return 'font-hind';
+    }
+  };
+
+  const getFontSizeClass = () => {
+    switch (fontSize) {
+      case 'medium': return 'font-scale-medium';
+      case 'large': return 'font-scale-large';
+      default: return 'font-scale-normal';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#0B132B] text-slate-100 flex flex-col font-bengali selection:bg-amber-500 selection:text-slate-950 pb-20">
+    <div className={`min-h-screen flex flex-col selection:bg-[#0B132B] selection:text-white pb-20 transition-colors duration-300 ${
+      isDarkMode ? 'bg-[#0B132B] text-slate-100 dark' : 'bg-slate-100 text-slate-900'
+    } ${getFontFamilyClass()} ${getFontSizeClass()}`}>
       {/* Top Navigation Header */}
       <Header
         currentPage={currentPage}
         selectedSubject={selectedSubject}
         onNavigateHome={handleNavigateHome}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        fontSize={fontSize}
+        onChangeFontSize={setFontSize}
+        fontFamily={fontFamily}
+        onChangeFontFamily={setFontFamily}
       />
 
       {/* Main Content Router */}

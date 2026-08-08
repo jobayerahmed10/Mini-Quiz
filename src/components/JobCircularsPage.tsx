@@ -60,19 +60,19 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
     <div className="max-w-4xl mx-auto px-4 py-6 pb-24 space-y-6 animate-fade-in">
       
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-[#1B4332] via-[#2D6A4F] to-[#1F4E3A] rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
+      <div className="bg-[#0B132B] rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         
         <div className="relative z-10 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 backdrop-blur-md rounded-full border border-emerald-400/30 text-xs font-bold text-emerald-200">
-            <Sparkles className="w-4 h-4 text-emerald-300" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold text-amber-300">
+            <Sparkles className="w-4 h-4 text-amber-400" />
             <span>শিক্ষক নিয়োগ ও সরকারি চাকরি আপডেট ২০২৬</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
             শিক্ষক নিয়োগ জব পোর্টাল ও সার্কুলার
           </h1>
-          <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
             বেসরকারি শিক্ষক নিবন্ধন (NTRCA), মাদ্রাসা শিক্ষা অধিদপ্তর, প্রাথমিক সহকারী শিক্ষক ও সরকারি হাইস্কুল নিয়োগের সঠিক তথ্য ও আপডেট।
           </p>
 
@@ -80,15 +80,15 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
           <div className="pt-2 grid grid-cols-3 gap-2 sm:gap-4 max-w-lg">
             <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
               <p className="text-lg font-black text-amber-300">৩৫,০০০+</p>
-              <p className="text-[10px] text-emerald-100 font-semibold">NTRCA পদসংখ্যা</p>
+              <p className="text-[10px] text-slate-300 font-semibold">NTRCA পদসংখ্যা</p>
             </div>
             <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
               <p className="text-lg font-black text-emerald-300">৪,৫২০+</p>
-              <p className="text-[10px] text-emerald-100 font-semibold">মাদ্রাসা শিক্ষক</p>
+              <p className="text-[10px] text-slate-300 font-semibold">মাদ্রাসা শিক্ষক</p>
             </div>
             <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
               <p className="text-lg font-black text-sky-300">১৩,৭৭০+</p>
-              <p className="text-[10px] text-emerald-100 font-semibold">প্রাথমিক শিক্ষক</p>
+              <p className="text-[10px] text-slate-300 font-semibold">প্রাথমিক শিক্ষক</p>
             </div>
           </div>
         </div>
@@ -103,7 +103,7 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="পদ, প্রতিষ্ঠান বা সার্কুলার নাম লিখে খুঁজুন..."
-            className="w-full pl-12 pr-4 py-3 bg-white border border-[#E6E2D3] rounded-2xl text-xs sm:text-sm text-[#1B4332] font-semibold focus:outline-none focus:border-[#1B4332] shadow-xs"
+            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-900 font-semibold focus:outline-none focus:border-[#0B132B] shadow-xs"
           />
         </div>
 
@@ -113,10 +113,10 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer border ${
                 selectedCategory === cat.id
-                  ? 'bg-[#1B4332] text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-[#E6E2D3] hover:bg-emerald-50'
+                  ? 'bg-[#0B132B] border-[#0B132B] text-white shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-[#0B132B] hover:bg-slate-50'
               }`}
             >
               {cat.label}
@@ -127,7 +127,7 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
 
       {/* Circulars List */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between text-xs font-bold text-[#1B4332]">
+        <div className="flex items-center justify-between text-xs font-bold text-[#0B132B]">
           <span>সর্বশেষ শিক্ষক নিয়োগ সার্কুলারসমূহ ({filteredJobs.length}টি)</span>
           <span className="text-emerald-700">নিয়মিত হালনাগাদকৃত</span>
         </div>
@@ -137,17 +137,17 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
             <div
               key={job.id}
               onClick={() => setActiveJobModal(job)}
-              className="bg-white rounded-2xl border border-[#E6E2D3] p-5 shadow-xs hover:border-[#2D6A4F] hover:shadow-md transition-all cursor-pointer space-y-3 group relative overflow-hidden"
+              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-[#0B132B] hover:shadow-md transition-all cursor-pointer space-y-3 group relative overflow-hidden"
             >
               {job.isHot && (
-                <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-xs">
+                <div className="absolute top-0 right-0 bg-[#0B132B] text-amber-300 text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-xs">
                   হট সার্কুলার 🔥
                 </div>
               )}
 
               <div className="space-y-1 pr-12">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-200">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 bg-slate-100 text-[#0B132B] rounded-full border border-slate-300">
                     {job.category}
                   </span>
                   <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
@@ -156,21 +156,21 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
                   </span>
                 </div>
 
-                <h2 className="text-base sm:text-lg font-black text-[#1B4332] group-hover:text-emerald-700 transition-colors">
+                <h2 className="text-base sm:text-lg font-black text-[#0B132B] group-hover:text-amber-800 transition-colors">
                   {job.title}
                 </h2>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-600 font-medium">
-                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl">
-                  <Briefcase className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate">পদসংখ্যা: <strong className="text-emerald-800">{job.vacancyCount}</strong></span>
+                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                  <Briefcase className="w-3.5 h-3.5 text-[#0B132B] shrink-0" />
+                  <span className="truncate">পদসংখ্যা: <strong className="text-slate-900">{job.vacancyCount}</strong></span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl">
+                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
                   <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                   <span className="truncate">শেষ সময়: <strong className="text-rose-700">{job.deadline}</strong></span>
                 </div>
-                <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl">
+                <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
                   <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                   <span className="truncate">{job.location}</span>
                 </div>
@@ -185,8 +185,8 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
                   >
                     <Bookmark className={`w-4 h-4 ${savedJobs.includes(job.id) ? 'fill-amber-500 text-amber-500' : ''}`} />
                   </button>
-                  <span className="font-extrabold text-[#1B4332] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                    বিস্তারিত দেখুন <ChevronRight className="w-4 h-4 text-emerald-600" />
+                  <span className="font-extrabold text-[#0B132B] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                    বিস্তারিত দেখুন <ChevronRight className="w-4 h-4 text-[#0B132B]" />
                   </span>
                 </div>
               </div>

@@ -103,16 +103,16 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12 space-y-8 animate-fade-in">
       
       {/* Top Trophy Banner */}
-      <div className="text-center space-y-4 bg-white p-8 sm:p-10 rounded-[36px] border border-[#E6E2D3] shadow-md relative overflow-hidden">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-100/70 text-[#2D4B3E] border border-emerald-200 flex items-center justify-center mx-auto shadow-xs">
-          <Trophy className="w-8 h-8 text-emerald-700" />
+      <div className="text-center space-y-4 neu-card p-8 sm:p-10 relative overflow-hidden">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto shadow-xs">
+          <Trophy className="w-8 h-8 text-[#0B132B] dark:text-amber-400" />
         </div>
 
         <div className="space-y-1">
-          <span className="text-xs font-bold text-[#8AA682] uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             {result.selectedSubject && result.selectedSubject !== 'all' ? `${result.selectedSubject} ` : ''}মডেল টেস্ট
           </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#2D4B3E]">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0B132B] dark:text-white">
             পরীক্ষার ফলাফল
           </h1>
         </div>
@@ -126,40 +126,40 @@ export const ResultPage: React.FC<ResultPageProps> = ({
       {/* Main Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {/* Total */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E6E2D3] text-center space-y-1 shadow-xs">
-          <span className="text-xs font-bold text-[#8AA682] uppercase tracking-wider block">
+        <div className="neu-card p-4 sm:p-5 text-center space-y-1 shadow-xs">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             মোট প্রশ্ন
           </span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-[#2D4B3E]">
+          <span className="text-2xl sm:text-3xl font-extrabold text-[#0B132B] dark:text-white">
             {toBengaliNumeral(result.totalQuestions)}টি
           </span>
         </div>
 
         {/* Correct */}
-        <div className="bg-emerald-50/80 p-4 sm:p-5 rounded-2xl border border-emerald-200 text-center space-y-1 shadow-xs">
-          <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-center gap-1">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+        <div className="bg-emerald-50/80 dark:bg-emerald-950/60 p-4 sm:p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-center space-y-1 shadow-xs">
+          <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center justify-center gap-1">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             সঠিক
           </span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-900">
+          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-900 dark:text-emerald-100">
             {toBengaliNumeral(result.correctCount)}টি
           </span>
         </div>
 
         {/* Wrong */}
-        <div className="bg-rose-50/80 p-4 sm:p-5 rounded-2xl border border-rose-200 text-center space-y-1 shadow-xs">
-          <span className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center justify-center gap-1">
-            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+        <div className="bg-rose-50/80 dark:bg-rose-950/60 p-4 sm:p-5 rounded-2xl border border-rose-200 dark:border-rose-800 text-center space-y-1 shadow-xs">
+          <span className="text-xs font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider flex items-center justify-center gap-1">
+            <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
             ভুল
           </span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-rose-900">
+          <span className="text-2xl sm:text-3xl font-extrabold text-rose-900 dark:text-rose-100">
             {toBengaliNumeral(result.wrongCount)}টি
           </span>
         </div>
 
         {/* Score Percentage */}
-        <div className="bg-[#2D4B3E] text-white p-4 sm:p-5 rounded-2xl text-center space-y-1 shadow-xs">
-          <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider block">
+        <div className="bg-[#0B132B] text-white p-4 sm:p-5 rounded-2xl text-center space-y-1 shadow-xs border border-[#0B132B] dark:border-amber-500/40">
+          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
             প্রাপ্ত নম্বর
           </span>
           <span className="text-2xl sm:text-3xl font-extrabold text-white">
@@ -170,18 +170,18 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
       {/* Subject-Wise Performance Breakdown */}
       {subjectBreakdown.length > 0 && (
-        <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-[#E6E2D3] shadow-xs space-y-5">
-          <div className="flex items-center gap-2.5 text-[#2D4B3E] font-extrabold text-lg sm:text-xl">
-            <BarChart3 className="w-5 h-5 text-emerald-600" />
+        <div className="neu-card p-6 sm:p-8 space-y-5">
+          <div className="flex items-center gap-2.5 text-[#0B132B] dark:text-white font-extrabold text-lg sm:text-xl">
+            <BarChart3 className="w-5 h-5 text-amber-500" />
             <h2>বিষয় ভিত্তিক ফলাফল বিশ্লেষণ</h2>
           </div>
 
           <div className="space-y-4">
             {subjectBreakdown.map((item, idx) => (
-              <div key={idx} className="p-4 bg-[#F5F2EA]/60 rounded-2xl border border-[#E6E2D3] space-y-2">
-                <div className="flex items-center justify-between font-bold text-xs sm:text-sm text-[#2D4B3E]">
+              <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between font-bold text-xs sm:text-sm text-[#0B132B] dark:text-white">
                   <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-emerald-600" />
+                    <BookOpen className="w-4 h-4 text-amber-500" />
                     <span>{item.subject}</span>
                   </div>
                   <span>
@@ -190,9 +190,9 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full h-2.5 bg-[#E6E2D3] rounded-full overflow-hidden">
+                <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                    className="h-full bg-amber-500 rounded-full transition-all duration-500"
                     style={{ width: `${item.percentage}%` }}
                   />
                 </div>
@@ -206,7 +206,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <button
           onClick={onRetry}
-          className="w-full sm:w-1/2 inline-flex items-center justify-center gap-2 px-6 py-4 bg-[#2D4B3E] hover:bg-[#1E332A] text-white font-bold text-base rounded-2xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
+          className="neu-btn w-full sm:w-1/2 inline-flex items-center justify-center gap-2 px-6 py-4 bg-[#0B132B] text-amber-400 font-bold text-base rounded-2xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
         >
           <RotateCcw className="w-5 h-5" />
           <span>পুনরায় পরীক্ষা দিন</span>
@@ -214,7 +214,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
         <button
           onClick={onNavigateHome}
-          className="w-full sm:w-1/2 inline-flex items-center justify-center gap-2 px-6 py-4 bg-white hover:bg-[#F5F2EA] text-[#2D4B3E] font-bold text-base rounded-2xl border border-[#E6E2D3] cursor-pointer transition-all active:scale-[0.98]"
+          className="neu-btn w-full sm:w-1/2 inline-flex items-center justify-center gap-2 px-6 py-4 text-[#0B132B] dark:text-white font-bold text-base rounded-2xl cursor-pointer transition-all active:scale-[0.98]"
         >
           <Home className="w-5 h-5" />
           <span>অন্যান্য বিষয় বেছে নিন</span>
@@ -222,27 +222,27 @@ export const ResultPage: React.FC<ResultPageProps> = ({
       </div>
 
       {/* Review Answer Sheet Section */}
-      <div className="bg-white rounded-[32px] border border-[#E6E2D3] overflow-hidden shadow-xs">
-        <div className="p-5 sm:p-6 bg-[#F5F2EA] border-b border-[#E6E2D3] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="neu-card overflow-hidden shadow-xs">
+        <div className="p-5 sm:p-6 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
             onClick={() => setShowAnswerSheet((prev) => !prev)}
-            className="flex items-center gap-2 font-bold text-[#2D4B3E] text-base cursor-pointer text-left"
+            className="flex items-center gap-2 font-bold text-[#0B132B] dark:text-white text-base cursor-pointer text-left"
           >
-            <HelpCircle className="w-5 h-5 text-emerald-600" />
+            <HelpCircle className="w-5 h-5 text-amber-500" />
             <span>উত্তরপত্রের বিস্তারিত পর্যালোচনা ({toBengaliNumeral(result.userAnswers.length)}টি প্রশ্ন)</span>
             {showAnswerSheet ? (
-              <ChevronUp className="w-5 h-5 text-[#2D4B3E] ml-1" />
+              <ChevronUp className="w-5 h-5 text-[#0B132B] dark:text-white ml-1" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-[#2D4B3E] ml-1" />
+              <ChevronDown className="w-5 h-5 text-[#0B132B] dark:text-white ml-1" />
             )}
           </button>
 
           {/* Filter Status Buttons */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#E6E2D3] self-start sm:self-auto">
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
             <button
               onClick={() => setFilterStatus('all')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'all' ? 'bg-[#2D4B3E] text-white' : 'text-[#2D4B3E]'
+                filterStatus === 'all' ? 'bg-[#0B132B] text-amber-400' : 'text-slate-700 dark:text-slate-300'
               }`}
             >
               সব
@@ -250,7 +250,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             <button
               onClick={() => setFilterStatus('correct')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'correct' ? 'bg-emerald-600 text-white' : 'text-emerald-700'
+                filterStatus === 'correct' ? 'bg-emerald-600 text-white' : 'text-emerald-700 dark:text-emerald-400'
               }`}
             >
               সঠিক ({toBengaliNumeral(result.correctCount)})
@@ -258,7 +258,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             <button
               onClick={() => setFilterStatus('wrong')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterStatus === 'wrong' ? 'bg-rose-600 text-white' : 'text-rose-700'
+                filterStatus === 'wrong' ? 'bg-rose-600 text-white' : 'text-rose-700 dark:text-rose-400'
               }`}
             >
               ভুল ({toBengaliNumeral(result.wrongCount)})
@@ -267,7 +267,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         </div>
 
         {showAnswerSheet && (
-          <div className="p-6 space-y-6 divide-y divide-[#E6E2D3]/70">
+          <div className="p-6 space-y-6 divide-y divide-slate-200 dark:divide-slate-800">
             {filteredAnswers.map((answer, idx) => {
               const isCorrect = answer.isCorrect;
               return (
@@ -275,11 +275,11 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       {answer.subject && (
-                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md">
+                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-200 dark:border-slate-700 rounded-md">
                           {answer.subject}
                         </span>
                       )}
-                      <p className="font-bold text-sm sm:text-base text-[#2D4B3E] leading-relaxed">
+                      <p className="font-bold text-sm sm:text-base text-[#0B132B] dark:text-white leading-relaxed">
                         {toBengaliNumeral(idx + 1)}. {answer.questionText}
                       </p>
                     </div>
@@ -287,18 +287,18 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     <span
                       className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
                         isCorrect
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                          : 'bg-rose-50 text-rose-800 border border-rose-200'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800'
+                          : 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800'
                       }`}
                     >
                       {isCorrect ? (
                         <>
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>সঠিক</span>
                         </>
                       ) : (
                         <>
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                           <span>ভুল</span>
                         </>
                       )}
@@ -309,8 +309,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     <div
                       className={`p-3 rounded-xl border ${
                         answer.selectedOption === answer.correctOption
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold'
-                          : 'bg-rose-50 border-rose-200 text-rose-950 font-semibold'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100 font-semibold'
+                          : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-950 dark:text-rose-100 font-semibold'
                       }`}
                     >
                       <span>আপনার প্রদত্ত উত্তর: </span>
@@ -322,7 +322,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     </div>
 
                     {!isCorrect && (
-                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 font-semibold">
+                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100 font-semibold">
                         <span>সঠিক উত্তর: </span>
                         <strong className="font-bold">
                           {OPTION_BENGLI_LABEL[answer.correctOption]}){' '}
@@ -333,8 +333,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   </div>
 
                   {answer.explanation && (
-                    <div className="text-xs text-[#2D4B3E] bg-[#F5F2EA] p-3.5 rounded-xl border border-[#E6E2D3] leading-relaxed">
-                      <strong className="text-[#2D4B3E] font-bold">ব্যাখ্যা: </strong>
+                    <div className="text-xs text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed">
+                      <strong className="text-[#0B132B] dark:text-amber-400 font-bold">ব্যাখ্যা: </strong>
                       {answer.explanation}
                     </div>
                   )}
@@ -343,7 +343,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             })}
 
             {filteredAnswers.length === 0 && (
-              <div className="text-center py-6 text-xs text-[#8AA682] font-semibold">
+              <div className="text-center py-6 text-xs text-slate-500 dark:text-slate-400 font-semibold">
                 এই ফিল্টারে কোনো উত্তর নেই।
               </div>
             )}
