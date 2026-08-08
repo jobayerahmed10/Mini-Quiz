@@ -1,13 +1,27 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Question } from '../types';
-import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
 
-// Access env vars safely for both Vite (import.meta.env) and Next.js (process.env)
+// Access env vars safely for Vite, Next.js, or Node environment
 const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env || {};
 const procEnv = (typeof process !== 'undefined' && process.env) || {};
 
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || procEnv.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || procEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = 
+  metaEnv.VITE_SUPABASE_URL || 
+  metaEnv.NEXT_PUBLIC_SUPABASE_URL || 
+  metaEnv.SUPABASE_URL || 
+  procEnv.VITE_SUPABASE_URL || 
+  procEnv.NEXT_PUBLIC_SUPABASE_URL || 
+  procEnv.SUPABASE_URL || 
+  '';
+
+const supabaseAnonKey = 
+  metaEnv.VITE_SUPABASE_ANON_KEY || 
+  metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+  metaEnv.SUPABASE_ANON_KEY || 
+  procEnv.VITE_SUPABASE_ANON_KEY || 
+  procEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+  procEnv.SUPABASE_ANON_KEY || 
+  '';
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
@@ -38,20 +52,12 @@ export interface FetchQuestionsResult {
  * Fetches published questions from Supabase table 'questions'
  * Only fetches rows where status = 'published'
  */
-export async function fetchPublishedQuestions(allowDemoFallback: boolean = true): Promise<FetchQuestionsResult> {
+export async function fetchPublishedQuestions(allowDemoFallback: boolean = false): Promise<FetchQuestionsResult> {
   if (!supabaseInstance) {
-    if (allowDemoFallback) {
-      // In preview/demo mode when Supabase is not connected yet, return sample questions
-      return {
-        questions: SAMPLE_QUESTIONS,
-        isFromSupabase: false,
-        error: 'Supabase URL & Anon Key সেটআপ করা হয়নি। ডেমো প্রশ্ন দেখানো হচ্ছে।',
-      };
-    }
     return {
       questions: [],
       isFromSupabase: false,
-      error: 'Supabase credentials missing.',
+      error: 'Supabase credentials (VITE_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL) সেট করা নেই। .env ফাইলে VITE_SUPABASE_URL ও VITE_SUPABASE_ANON_KEY যোগ করুন।',
     };
   }
 
@@ -64,17 +70,10 @@ export async function fetchPublishedQuestions(allowDemoFallback: boolean = true)
 
     if (error) {
       console.error('Supabase fetch error:', error);
-      if (allowDemoFallback) {
-        return {
-          questions: SAMPLE_QUESTIONS,
-          isFromSupabase: false,
-          error: `Supabase ত্রুটি: ${error.message}। ডেমো প্রশ্ন ব্যবহার করা হচ্ছে।`,
-        };
-      }
       return {
         questions: [],
         isFromSupabase: true,
-        error: error.message,
+        error: `Supabase ত্রুটি: ${error.message}`,
       };
     }
 
@@ -107,17 +106,11 @@ export async function fetchPublishedQuestions(allowDemoFallback: boolean = true)
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown database error';
-    if (allowDemoFallback) {
-      return {
-        questions: SAMPLE_QUESTIONS,
-        isFromSupabase: false,
-        error: `সংযোগ ত্রুটি: ${errorMsg}। ডেমো প্রশ্ন দেখানো হচ্ছে।`,
-      };
-    }
     return {
       questions: [],
-      isFromSupabase: false,
-      error: errorMsg,
+      isFromSupabase: true,
+      error: `সংযোগ ত্রুটি: ${errorMsg}`,
     };
   }
 }
+
