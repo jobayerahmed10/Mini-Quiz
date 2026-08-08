@@ -1,33 +1,46 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Question } from '../types';
 
-// Access env vars safely for Vite, Next.js, or Node environment
-const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env || {};
-const procEnv = (typeof process !== 'undefined' && process.env) || {};
+/**
+ * Safely retrieve Supabase configuration.
+ * For this Vite project:
+ * Primary: import.meta.env.VITE_SUPABASE_URL & import.meta.env.VITE_SUPABASE_ANON_KEY
+ * Fallbacks: process.env or NEXT_PUBLIC_* variables
+ */
+const getSupabaseUrl = (): string => {
+  const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env;
+  if (metaEnv) {
+    if (metaEnv.VITE_SUPABASE_URL) return metaEnv.VITE_SUPABASE_URL;
+    if (metaEnv.NEXT_PUBLIC_SUPABASE_URL) return metaEnv.NEXT_PUBLIC_SUPABASE_URL;
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.VITE_SUPABASE_URL) return process.env.VITE_SUPABASE_URL;
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL) return process.env.NEXT_PUBLIC_SUPABASE_URL;
+  }
+  return '';
+};
 
-const supabaseUrl = 
-  metaEnv.VITE_SUPABASE_URL || 
-  metaEnv.NEXT_PUBLIC_SUPABASE_URL || 
-  metaEnv.SUPABASE_URL || 
-  procEnv.VITE_SUPABASE_URL || 
-  procEnv.NEXT_PUBLIC_SUPABASE_URL || 
-  procEnv.SUPABASE_URL || 
-  '';
+const getSupabaseAnonKey = (): string => {
+  const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env;
+  if (metaEnv) {
+    if (metaEnv.VITE_SUPABASE_ANON_KEY) return metaEnv.VITE_SUPABASE_ANON_KEY;
+    if (metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) return metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.VITE_SUPABASE_ANON_KEY) return process.env.VITE_SUPABASE_ANON_KEY;
+    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  }
+  return '';
+};
 
-const supabaseAnonKey = 
-  metaEnv.VITE_SUPABASE_ANON_KEY || 
-  metaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  metaEnv.SUPABASE_ANON_KEY || 
-  procEnv.VITE_SUPABASE_ANON_KEY || 
-  procEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  procEnv.SUPABASE_ANON_KEY || 
-  '';
+const supabaseUrl = getSupabaseUrl();
+const supabaseAnonKey = getSupabaseAnonKey();
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
   supabaseAnonKey && 
-  supabaseUrl !== 'https://your-supabase-project.supabase.co' && 
-  supabaseUrl !== 'MY_SUPABASE_URL'
+  !supabaseUrl.includes('your-supabase-project') &&
+  !supabaseUrl.includes('your-project')
 );
 
 let supabaseInstance: SupabaseClient | null = null;
@@ -49,15 +62,15 @@ export interface FetchQuestionsResult {
 }
 
 /**
- * Fetches published questions from Supabase table 'questions'
+ * Fetches published questions from Supabase table 'public.questions'
  * Only fetches rows where status = 'published'
  */
-export async function fetchPublishedQuestions(allowDemoFallback: boolean = false): Promise<FetchQuestionsResult> {
+export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   if (!supabaseInstance) {
     return {
       questions: [],
       isFromSupabase: false,
-      error: 'Supabase credentials (VITE_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL) সেট করা নেই। .env ফাইলে VITE_SUPABASE_URL ও VITE_SUPABASE_ANON_KEY যোগ করুন।',
+      error: 'Supabase এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা নেই। VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY আপনার .env ফাইলে প্রদান করুন।',
     };
   }
 
@@ -73,7 +86,7 @@ export async function fetchPublishedQuestions(allowDemoFallback: boolean = false
       return {
         questions: [],
         isFromSupabase: true,
-        error: `Supabase ত্রুটি: ${error.message}`,
+        error: `Supabase কুয়েরি ত্রুটি: ${error.message} (Code: ${error.code || 'N/A'})`,
       };
     }
 
@@ -85,18 +98,18 @@ export async function fetchPublishedQuestions(allowDemoFallback: boolean = false
       };
     }
 
-    // Cast & format fetched items
+    // Cast & format fetched items from public.questions
     const questionsList: Question[] = data.map((item) => ({
-      id: item.id,
-      question: item.question,
-      option_a: item.option_a,
-      option_b: item.option_b,
-      option_c: item.option_c,
-      option_d: item.option_d,
-      correct_answer: item.correct_answer,
-      explanation: item.explanation || null,
+      id: String(item.id),
+      question: String(item.question || ''),
+      option_a: String(item.option_a || ''),
+      option_b: String(item.option_b || ''),
+      option_c: String(item.option_c || ''),
+      option_d: String(item.option_d || ''),
+      correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+      explanation: item.explanation ? String(item.explanation) : null,
       status: item.status || 'published',
-      created_at: item.created_at,
+      created_at: item.created_at || new Date().toISOString(),
     }));
 
     return {
@@ -109,8 +122,9 @@ export async function fetchPublishedQuestions(allowDemoFallback: boolean = false
     return {
       questions: [],
       isFromSupabase: true,
-      error: `সংযোগ ত্রুটি: ${errorMsg}`,
+      error: `Supabase সংযোগ ত্রুটি: ${errorMsg}`,
     };
   }
 }
+
 

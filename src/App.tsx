@@ -24,7 +24,7 @@ export default function App() {
     setIsLoading(true);
     setFetchError(null);
 
-    const result = await fetchPublishedQuestions(false);
+    const result = await fetchPublishedQuestions();
     setQuestions(result.questions);
     setIsFromSupabase(result.isFromSupabase);
     setFetchError(result.error || null);
