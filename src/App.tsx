@@ -9,6 +9,7 @@ import { CoursesPage } from './components/CoursesPage';
 import { UstadAiPage } from './components/UstadAiPage';
 import { JobCircularsPage } from './components/JobCircularsPage';
 import { SubjectsPage } from './components/SubjectsPage';
+import { ProfileModal } from './components/ProfileModal';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions } from './lib/supabase';
@@ -27,6 +28,7 @@ export default function App() {
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
 
   // Dark Mode & Font Customization State
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -228,6 +230,14 @@ export default function App() {
         onChangeFontFamily={setFontFamily}
         showHarakat={showHarakat}
         onChangeShowHarakat={setShowHarakat}
+        onOpenProfile={() => setShowProfileModal(true)}
+        onOpenLeaderboard={handleOpenLeaderboard}
+      />
+
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onOpenLeaderboard={handleOpenLeaderboard}
       />
 
       {/* Main Content Router */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft } from 'lucide-react';
+import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3 } from 'lucide-react';
 import { PageRoute } from '../types';
+import { getUserProfile } from '../lib/utils';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
@@ -18,6 +19,8 @@ interface HeaderProps {
   onChangeFontFamily: (font: FontFamilyType) => void;
   showHarakat: boolean;
   onChangeShowHarakat: (show: boolean) => void;
+  onOpenProfile?: () => void;
+  onOpenLeaderboard?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,8 +37,13 @@ export const Header: React.FC<HeaderProps> = ({
   onChangeFontFamily,
   showHarakat,
   onChangeShowHarakat,
+  onOpenProfile,
+  onOpenLeaderboard,
 }) => {
   const [showFontMenu, setShowFontMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const userProfile = getUserProfile();
 
   const bengaliFonts: { id: FontFamilyType; name: string; sample: string }[] = [
     { id: 'hind', name: 'হিন্দ শিলিগুড়ি', sample: 'Bengali Standard' },
@@ -281,6 +289,151 @@ export const Header: React.FC<HeaderProps> = ({
               <Moon className="w-4 h-4 text-[#0B132B]" />
             )}
           </button>
+
+          {/* User Profile / Top-Right Menu Button */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowUserMenu(!showUserMenu);
+                setShowFontMenu(false);
+              }}
+              className={`p-1.5 sm:px-3 sm:py-2 rounded-2xl flex items-center gap-2 cursor-pointer transition-all border shadow-xs active:scale-95 ${
+                showUserMenu
+                  ? 'bg-[#0b705c] text-white border-[#0b705c]'
+                  : isDarkMode
+                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+              }`}
+              title="ব্যবহারকারীর প্রোফাইল ও মেনু"
+            >
+              {userProfile?.avatar ? (
+                <img
+                  src={userProfile.avatar}
+                  alt={userProfile.name}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-amber-400 shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#0b705c] text-amber-300 flex items-center justify-center font-black text-xs shrink-0 border border-emerald-400">
+                  <User className="w-4 h-4" />
+                </div>
+              )}
+              <div className="text-left hidden md:block min-w-0 max-w-[100px]">
+                <span className="block text-xs font-black truncate leading-tight">
+                  {userProfile?.name || 'প্রোফাইল'}
+                </span>
+                <span className="block text-[9px] opacity-75 font-bold truncate">
+                  {userProfile?.phone ? userProfile.phone : 'মেনু ও তথ্য'}
+                </span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 opacity-70 shrink-0 hidden sm:block" />
+            </button>
+
+            {/* Top Right User Menu Dropdown Popover */}
+            {showUserMenu && (
+              <div className={`absolute right-0 mt-3 w-72 sm:w-80 rounded-3xl p-4 shadow-2xl z-50 border transition-all animate-fade-in ${
+                isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+              }`}>
+                {/* User Header Profile Card */}
+                <div className="p-3 bg-gradient-to-r from-[#0b705c] to-[#0B132B] text-white rounded-2xl mb-3 flex items-center gap-3 relative overflow-hidden shadow-xs">
+                  {userProfile?.avatar ? (
+                    <img
+                      src={userProfile.avatar}
+                      alt={userProfile?.name || 'User'}
+                      className="w-12 h-12 rounded-2xl object-cover ring-2 ring-amber-400 border border-white/20 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center font-black text-lg border border-white/20 text-amber-300 shrink-0">
+                      <User className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-black truncate text-white">
+                      {userProfile?.name || 'ব্যবহারকারীর নাম নেই'}
+                    </h4>
+                    <p className="text-[11px] font-bold text-amber-200 truncate">
+                      {userProfile?.phone || 'ফোন নম্বর যুক্ত করুন'}
+                    </p>
+                    <span className="inline-block mt-1 text-[9px] font-black px-2 py-0.5 bg-amber-400 text-[#0B132B] rounded-full">
+                      শিক্ষক নিবন্ধন পরীক্ষার্থী
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowUserMenu(false)}
+                    className="p-1 text-white/70 hover:text-white cursor-pointer absolute top-2 right-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Menu Items List */}
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (onOpenProfile) onOpenProfile();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-[#0b705c] dark:text-emerald-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-black">👤 প্রোফাইল ও এডিট</span>
+                      <span className="block text-[10px] font-medium opacity-60">ছবি, নাম ও নম্বর পরিবর্তন</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (onOpenProfile) onOpenProfile();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <BarChart3 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-black">📊 ড্যাশবোর্ড ও পরিসংখ্যান</span>
+                      <span className="block text-[10px] font-medium opacity-60">মোট পরীক্ষা, পয়েন্ট ও নির্ভুলতা</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (onOpenLeaderboard) onOpenLeaderboard();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-black">🏆 জাতীয় মেধা তালিকা</span>
+                      <span className="block text-[10px] font-medium opacity-60">মেধা অবস্থান ও সেরা পারফরমার</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setShowFontMenu(true);
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-800/80 pt-2.5"
+                  >
+                    <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                      <Settings className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-black">⚙️ ফন্ট সাইজ ও আরবি সেটিং</span>
+                      <span className="block text-[10px] font-medium opacity-60">ফন্ট, হরকত ও ডিসপ্লে পরিবর্তন</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Home Link if not on Home Page */}
           {currentPage !== 'home' && (

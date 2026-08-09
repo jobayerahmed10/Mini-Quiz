@@ -150,6 +150,7 @@ const PROFILE_STORAGE_KEY = 'tamreen_user_profile';
 export interface UserProfile {
   name: string;
   phone: string;
+  avatar?: string;
 }
 
 export function getUserProfile(): UserProfile | null {
@@ -161,6 +162,7 @@ export function getUserProfile(): UserProfile | null {
       return {
         name: parsed.name.trim(),
         phone: parsed.phone ? parsed.phone.trim() : '',
+        avatar: parsed.avatar || '',
       };
     }
     return null;
@@ -169,10 +171,11 @@ export function getUserProfile(): UserProfile | null {
   }
 }
 
-export function saveUserProfile(name: string, phone: string): UserProfile {
+export function saveUserProfile(name: string, phone: string, avatar?: string): UserProfile {
   const profile: UserProfile = {
     name: name.trim(),
     phone: phone.trim(),
+    avatar: avatar || '',
   };
   try {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));

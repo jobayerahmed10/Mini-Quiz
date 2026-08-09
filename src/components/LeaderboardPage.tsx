@@ -74,7 +74,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
     {
       rank: 4,
       name: userProfile?.name ? `${userProfile.name} (আপনি)` : 'তামরীন শিক্ষার্থী (ঢাকা)',
-      avatar: '',
+      avatar: userProfile?.avatar || '',
       isCurrentUser: true,
       accuracy: `${userPercentage}%`,
       correct: correctCount,
@@ -156,9 +156,17 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
 
           <div className="flex items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center font-black text-lg border border-white/20">
-                <User className="w-6 h-6 text-amber-300" />
-              </div>
+              {userProfile?.avatar ? (
+                <img
+                  src={userProfile.avatar}
+                  alt={userName}
+                  className="w-12 h-12 rounded-2xl object-cover ring-2 ring-amber-400 border border-white/30 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center font-black text-lg border border-white/20 shrink-0">
+                  <User className="w-6 h-6 text-amber-300" />
+                </div>
+              )}
               <div>
                 <h3 className="font-black text-sm sm:text-base text-white">
                   {userName}

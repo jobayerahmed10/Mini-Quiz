@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Trophy, Sparkles, Award, ArrowLeft } from 'lucide-react';
-import { toBengaliNumeral } from '../lib/utils';
+import { X, Trophy, Sparkles, Award, ArrowLeft, User } from 'lucide-react';
+import { toBengaliNumeral, getUserProfile } from '../lib/utils';
 
 interface LeaderboardModalProps {
   isOpen: boolean;
@@ -20,6 +20,9 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   wrongCount = 15,
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<'current' | 'week' | 'month' | 'all'>('current');
+  const userProfile = getUserProfile();
+  const userName = userProfile?.name || 'আপনার স্থান';
+  const userAvatar = userProfile?.avatar;
 
   if (!isOpen) return null;
 
@@ -333,11 +336,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                 36.
               </span>
               <div className="relative shrink-0">
-                <img
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150"
-                  alt="আপনার প্রোফাইল"
-                  className="w-11 h-11 rounded-full object-cover border-2 border-emerald-500"
-                />
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={userName}
+                    className="w-11 h-11 rounded-full object-cover border-2 border-emerald-500"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-black text-xs border-2 border-emerald-500">
+                    <User className="w-6 h-6 text-amber-300" />
+                  </div>
+                )}
                 <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-emerald-600 text-white text-[9px] font-black rounded-full border border-white">
                   আপনি
                 </span>
@@ -345,7 +354,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <h4 className="text-sm font-black text-[#0B132B] dark:text-white truncate">
-                    জোবায়ের আহমদ
+                    {userName}
                   </h4>
                   <span className="px-2 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-full shrink-0">
                     আপনি

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Phone, CheckCircle2, ShieldCheck, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, Phone, CheckCircle2, ShieldCheck, X, Camera, Upload } from 'lucide-react';
 import { saveUserProfile, UserProfile } from '../lib/utils';
 
 interface UserRegistrationModalProps {
@@ -9,6 +9,13 @@ interface UserRegistrationModalProps {
   title?: string;
 }
 
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=250',
+];
+
 export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   isOpen,
   onClose,
@@ -17,9 +24,28 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!isOpen) return null;
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMsg('ছবি সাইজ ৫ মেগাবাইটের কম হতে হবে');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result as string);
+        setErrorMsg('');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,14 +58,14 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
       return;
     }
 
-    const saved = saveUserProfile(name, phone);
+    const saved = saveUserProfile(name, phone, avatar);
     setErrorMsg('');
     onSaveSuccess(saved);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-md w-full p-6 sm:p-7 space-y-5 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+      <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-md w-full p-6 sm:p-7 space-y-5 border border-slate-200 dark:border-slate-800 shadow-2xl relative my-8">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-full transition-colors cursor-pointer"
@@ -47,18 +73,61 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        {/* Top Header Icon */}
-        <div className="w-16 h-16 rounded-3xl bg-[#0b705c]/10 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center mx-auto text-2xl shadow-inner border border-[#0b705c]/20">
-          <User className="w-8 h-8" />
+        {/* Top Avatar Upload / Circle */}
+        <div className="text-center space-y-2">
+          <div className="relative inline-block">
+            {avatar ? (
+              <img
+                src={avatar}
+                alt="Profile Preview"
+                className="w-20 h-20 rounded-full object-cover mx-auto ring-4 ring-[#0b705c]/30 shadow-md border-2 border-white dark:border-slate-800"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-[#0b705c]/10 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner border border-[#0b705c]/20">
+                <User className="w-9 h-9" />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 p-2 bg-[#0b705c] text-white rounded-full shadow-md cursor-pointer hover:bg-[#085a4a] transition-transform active:scale-95 border-2 border-white dark:border-slate-800"
+              title="ছবি নির্বাচন করুন"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <span className="text-[11px] font-bold text-slate-500">ছবি বা অবয়ব পছন্দ করুন:</span>
+            {PRESET_AVATARS.map((url, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setAvatar(url)}
+                className={`w-7 h-7 rounded-full overflow-hidden border transition-all cursor-pointer ${
+                  avatar === url ? 'border-[#0b705c] scale-110 ring-2 ring-[#0b705c]/40' : 'border-transparent'
+                }`}
+              >
+                <img src={url} alt={`Preset ${idx}`} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Header Text */}
-        <div className="text-center space-y-1.5">
+        <div className="text-center space-y-1">
           <h3 className="text-xl font-black text-[#0B132B] dark:text-white leading-tight">
             {title}
           </h3>
           <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-            পরীক্ষার ফলাফল ও মেধা তালিকায় আপনার নাম প্রদর্শনের জন্য নাম ও নম্বর সেভ করুন।
+            পরীক্ষার ফলাফল ও মেধা তালিকায় আপনার ছবি ও নাম প্রদর্শন করার জন্য তথ্য প্রদান করুন।
           </p>
         </div>
 
@@ -125,3 +194,4 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
     </div>
   );
 };
+
