@@ -1,24 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  ArrowRight, 
-  CheckCircle, 
-  XCircle, 
   ArrowLeft, 
-  Lightbulb, 
-  Check, 
-  X,
-  Filter,
   HelpCircle,
-  BookOpen,
-  Sparkles
+  CheckCircle2,
+  Clock,
+  Check
 } from 'lucide-react';
-import { Question, SelectedOption, UserAnswer } from '../types';
+import { Question, UserAnswer } from '../types';
 import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText } from '../lib/utils';
-import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
+import { detectQuestionSubject } from '../lib/subjects';
 
 interface PracticePageProps {
   questions: Question[];
   initialSubject?: string;
+  timeMinutes?: number;
   onFinishQuiz: (userAnswers: UserAnswer[]) => void;
   onNavigateHome: () => void;
   showHarakat?: boolean;
@@ -27,16 +22,16 @@ interface PracticePageProps {
 export const PracticePage: React.FC<PracticePageProps> = ({
   questions,
   initialSubject = 'all',
+  timeMinutes = 30,
   onFinishQuiz,
   onNavigateHome,
   showHarakat = true,
 }) => {
-  const [activeSubject, setActiveSubject] = useState<string>(initialSubject);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<SelectedOption>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
-  const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
+  const [activeSubject] = useState<string>(initialSubject);
+  const [userSelections, setUserSelections] = useState<Record<string, 'option_a' | 'option_b' | 'option_c' | 'option_d'>>({});
+  const [timeLeft, setTimeLeft] = useState<number>(timeMinutes * 60);
 
+  // Filter questions based on subject if needed
   const filteredQuestions = useMemo(() => {
     if (!activeSubject || activeSubject === 'all' || activeSubject === 'সকল বিষয়') return questions;
     return questions.filter((q) => {
@@ -46,261 +41,232 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   }, [questions, activeSubject]);
 
   const totalQuestions = filteredQuestions.length;
-  const currentQuestion = filteredQuestions[currentIndex];
+  const answeredCount = Object.keys(userSelections).length;
 
-  const handleSubjectChange = (newSubject: string) => {
-    setActiveSubject(newSubject);
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setIsAnswered(false);
-    setUserAnswers([]);
+  // Countdown timer
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      handleSubmitExam();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTimerBengali = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const formattedMins = mins < 10 ? `0${mins}` : `${mins}`;
+    const formattedSecs = secs < 10 ? `0${secs}` : `${secs}`;
+    return `${toBengaliNumeral(formattedMins)}:${toBengaliNumeral(formattedSecs)}`;
   };
 
-  if (!currentQuestion || totalQuestions === 0) {
+  const handleSelectOption = (questionId: string, optionKey: 'option_a' | 'option_b' | 'option_c' | 'option_d') => {
+    setUserSelections((prev) => ({
+      ...prev,
+      [questionId]: optionKey,
+    }));
+  };
+
+  const handleSubmitExam = () => {
+    // Construct UserAnswer list for all questions
+    const finalAnswers: UserAnswer[] = filteredQuestions.map((q) => {
+      const selectedOption = userSelections[q.id] || null;
+      const correctOptionKey = normalizeCorrectOption(
+        q.correct_answer,
+        q.option_a,
+        q.option_b,
+        q.option_c,
+        q.option_d
+      );
+      const isCorrect = selectedOption === correctOptionKey;
+      const currentSubjectTag = detectQuestionSubject(q);
+
+      return {
+        questionId: q.id,
+        questionText: q.question,
+        subject: currentSubjectTag,
+        options: {
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+        },
+        selectedOption: selectedOption as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+        correctOption: correctOptionKey,
+        isCorrect,
+        explanation: q.explanation,
+      };
+    });
+
+    onFinishQuiz(finalAnswers);
+  };
+
+  if (totalQuestions === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-5 animate-fade-in mb-24">
         <div className="w-16 h-16 neu-card flex items-center justify-center mx-auto text-amber-400">
           <HelpCircle className="w-8 h-8" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-black text-white">
-            {activeSubject !== 'all' ? `"${activeSubject}" বিষয়ে প্রশ্ন লোড হচ্ছে...` : 'কোনো প্রশ্ন পাওয়া যায়নি'}
+          <h2 className="text-xl font-black text-slate-800 dark:text-white">
+            কোনো প্রশ্ন পাওয়া যায়নি
           </h2>
-          <p className="text-xs text-slate-300">
-            অনুগ্রহ করে অন্য একটি বিষয় নির্বাচন করুন অথবা সকল বিষয় নির্বাচন করে টেস্ট শুরু করুন।
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            অনুগ্রহ করে অন্য একটি বিষয় নির্বাচন করুন অথবা হোমে ফিরে নতুন টেস্ট শুরু করুন।
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <button
-            onClick={() => handleSubjectChange('all')}
-            className="neu-btn px-5 py-2.5 text-amber-300 font-bold rounded-xl text-xs hover:text-amber-200 cursor-pointer"
-          >
-            সকল বিষয় বেছে নিন
-          </button>
-          <button
-            onClick={onNavigateHome}
-            className="px-5 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs hover:text-white cursor-pointer"
-          >
-            হোমে ফিরে যান
-          </button>
-        </div>
+        <button
+          onClick={onNavigateHome}
+          className="px-6 py-3 bg-[#0B132B] text-white font-bold rounded-xl text-xs hover:bg-slate-800 cursor-pointer"
+        >
+          হোমে ফিরে যান
+        </button>
       </div>
     );
   }
 
-  const correctOptionKey = normalizeCorrectOption(
-    currentQuestion.correct_answer,
-    currentQuestion.option_a,
-    currentQuestion.option_b,
-    currentQuestion.option_c,
-    currentQuestion.option_d
-  );
-
-  const handleSelectOption = (optionKey: 'option_a' | 'option_b' | 'option_c' | 'option_d') => {
-    if (isAnswered) return;
-
-    setSelectedOption(optionKey);
-    setIsAnswered(true);
-
-    const isCorrect = optionKey === correctOptionKey;
-    const currentSubject = detectQuestionSubject(currentQuestion);
-
-    const answerRecord: UserAnswer = {
-      questionId: currentQuestion.id,
-      questionText: currentQuestion.question,
-      subject: currentSubject,
-      options: {
-        option_a: currentQuestion.option_a,
-        option_b: currentQuestion.option_b,
-        option_c: currentQuestion.option_c,
-        option_d: currentQuestion.option_d,
-      },
-      selectedOption: optionKey,
-      correctOption: correctOptionKey,
-      isCorrect,
-      explanation: currentQuestion.explanation,
-    };
-
-    setUserAnswers((prev) => [...prev, answerRecord]);
-  };
-
-  const handleNextQuestion = () => {
-    if (currentIndex < totalQuestions - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setSelectedOption(null);
-      setIsAnswered(false);
-    } else {
-      onFinishQuiz(userAnswers);
-    }
-  };
-
-  const isLastQuestion = currentIndex === totalQuestions - 1;
-  const currentSubjectTag = detectQuestionSubject(currentQuestion);
-
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6 animate-fade-in mb-24">
-      {/* Top Header Bar */}
-      <div className="neu-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <button
-          onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-[#0B132B] dark:hover:text-amber-400 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4 text-[#0B132B] dark:text-amber-400" />
-          <span>হোমে যান</span>
-        </button>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">বিষয়:</span>
-          <select
-            value={activeSubject}
-            onChange={(e) => handleSubjectChange(e.target.value)}
-            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 focus:outline-none cursor-pointer"
+    <div className="min-h-screen bg-slate-100 dark:bg-[#070D1E] pb-28">
+      
+      {/* Top Sticky Header Bar (Exactly as Screenshot) */}
+      <div className="sticky top-0 z-40 bg-white/95 dark:bg-[#0B132B]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 shadow-xs">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2">
+          
+          {/* Back Button */}
+          <button
+            onClick={onNavigateHome}
+            className="p-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors"
+            title="ফিরে যান"
           >
-            <option value="all">সকল বিষয় (Mixed)</option>
-            {SUBJECT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
-              <option key={cat.id} value={cat.name}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
 
-        <div className="px-3.5 py-1.5 bg-[#0B132B] text-white border border-[#0B132B] rounded-full text-xs font-black self-start sm:self-auto">
-          প্রশ্ন {toBengaliNumeral(currentIndex + 1)} / {toBengaliNumeral(totalQuestions)}
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-300 dark:border-slate-700">
-        <div
-          className="h-full bg-[#0B132B] dark:bg-amber-400 rounded-full transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
-        />
-      </div>
-
-      {/* Question Card */}
-      <div className="neu-card p-6 sm:p-8 space-y-6 relative">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-200 dark:border-slate-700 rounded-full">
-            <BookOpen className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
-            <span>{currentSubjectTag}</span>
-          </span>
-
-          <span className="text-xs font-black text-slate-400">
-            Q.{currentIndex + 1}
-          </span>
-        </div>
-
-        <h2 className="text-xl sm:text-2xl font-black text-[#0B132B] dark:text-white leading-relaxed">
-          {formatArabicText(currentQuestion.question, showHarakat)}
-        </h2>
-
-        {/* Options List */}
-        <div className="space-y-3 pt-2">
-          {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-            const rawOptionText = currentQuestion[optionKey];
-            const optionText = formatArabicText(rawOptionText, showHarakat);
-            const prefix = OPTION_BENGLI_LABEL[optionKey];
-            const isSelected = selectedOption === optionKey;
-            const isCorrectOption = optionKey === correctOptionKey;
-
-            let buttonStyles = 'neu-btn hover:border-[#0B132B] dark:hover:border-amber-400';
-            let badgeStyles = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700';
-            let iconElement = null;
-
-            if (isAnswered) {
-              if (isCorrectOption) {
-                buttonStyles = 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold';
-                badgeStyles = 'bg-emerald-600 text-white border-emerald-500';
-                iconElement = <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />;
-              } else if (isSelected) {
-                buttonStyles = 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-950 dark:text-rose-200 font-bold';
-                badgeStyles = 'bg-rose-600 text-white border-rose-500';
-                iconElement = <X className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />;
-              } else {
-                buttonStyles = 'opacity-40 text-slate-400 border-slate-200 bg-slate-50 dark:bg-slate-900/40';
-                badgeStyles = 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300';
-              }
-            }
-
-            return (
-              <button
-                key={optionKey}
-                onClick={() => handleSelectOption(optionKey)}
-                disabled={isAnswered}
-                className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3.5 cursor-pointer shadow-xs ${buttonStyles}`}
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center border shrink-0 ${badgeStyles}`}>
-                    {prefix}
-                  </span>
-                  <span className="font-bold text-sm sm:text-base leading-relaxed">
-                    {optionText}
-                  </span>
-                </div>
-                {iconElement}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Feedback Alert */}
-        {isAnswered && (
-          <div className="pt-2 animate-fade-in">
-            {selectedOption === correctOptionKey ? (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-bold text-sm text-emerald-900">অভিনন্দন! আপনার উত্তর সঠিক হয়েছে।</p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-950 flex items-start gap-3">
-                <XCircle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-sm text-rose-900">ভুল উত্তর!</p>
-                  <p className="text-xs text-rose-800 mt-1">
-                    সঠিক উত্তর হলো: <strong className="font-bold underline">{OPTION_BENGLI_LABEL[correctOptionKey]}) {formatArabicText(currentQuestion[correctOptionKey], showHarakat)}</strong>
-                  </p>
-                </div>
-              </div>
-            )}
+          {/* Countdown Timer */}
+          <div className="flex items-center gap-1.5 text-base sm:text-lg font-black text-[#0B132B] dark:text-amber-400">
+            <Clock className="w-4 h-4 text-emerald-600 dark:text-amber-400" />
+            <span>{formatTimerBengali(timeLeft)}</span>
           </div>
-        )}
 
-        {/* Explanation */}
-        {isAnswered && currentQuestion.explanation && (
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 space-y-1.5 animate-fade-in">
-            <div className="flex items-center gap-2 font-bold text-xs text-[#0B132B]">
-              <Lightbulb className="w-4 h-4 text-amber-500" />
-              <span>সহজ তথ্য ও ব্যাখ্যা:</span>
+          {/* Answered Ratio Counter */}
+          <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+            {toBengaliNumeral(answeredCount)}/{toBengaliNumeral(totalQuestions)} উত্তর
+          </div>
+
+          {/* Top Submit Button */}
+          <button
+            onClick={handleSubmitExam}
+            className="px-4 py-2 bg-[#0b705c] hover:bg-[#085a4a] text-white font-extrabold text-xs rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+          >
+            <span>🧺</span>
+            <span>জমা দিন</span>
+          </button>
+
+        </div>
+      </div>
+
+      {/* Main Scrollable Vertical List of Questions */}
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-5 space-y-5">
+        {filteredQuestions.map((q, index) => {
+          const selectedOpt = userSelections[q.id];
+
+          return (
+            <div
+              key={q.id}
+              className="bg-white dark:bg-[#0D172A] rounded-[24px] sm:rounded-[28px] p-5 sm:p-6 shadow-md border-l-4 border-l-[#0b705c] border-y border-r border-slate-200 dark:border-slate-800 space-y-5 transition-all"
+            >
+              {/* Question Header (Number Badge + Question Text) */}
+              <div className="flex items-start gap-3">
+                {/* Bengali Question Number Badge */}
+                <div className="w-8 h-8 rounded-full bg-[#0b705c] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  {toBengaliNumeral(index + 1)}
+                </div>
+
+                {/* Question Text */}
+                <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed pt-0.5">
+                  {formatArabicText(q.question, showHarakat)}
+                </h3>
+              </div>
+
+              {/* Options List (ক, খ, গ, ঘ) */}
+              <div className="space-y-3 pt-1">
+                {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
+                  const rawOptionText = q[optionKey];
+                  const optionText = formatArabicText(rawOptionText, showHarakat);
+                  const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
+                  const isSelected = selectedOpt === optionKey;
+
+                  return (
+                    <button
+                      key={optionKey}
+                      type="button"
+                      onClick={() => handleSelectOption(q.id, optionKey)}
+                      className={`w-full text-left p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-[#0b705c] text-[#0B132B] dark:text-white font-bold shadow-xs'
+                          : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Option Letter Box */}
+                        <div
+                          className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected
+                              ? 'bg-[#0b705c] text-white'
+                              : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <Check className="w-4 h-4 text-white stroke-[3]" />
+                          ) : (
+                            prefixLabel
+                          )}
+                        </div>
+
+                        {/* Option Text */}
+                        <span className="font-bold text-xs sm:text-sm leading-relaxed">
+                          {optionText}
+                        </span>
+                      </div>
+
+                      {/* Right Selected Check Indicator */}
+                      {isSelected && (
+                        <CheckCircle2 className="w-5 h-5 text-[#0b705c] shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <p className="text-xs leading-relaxed text-slate-700 pl-6">
-              {formatArabicText(currentQuestion.explanation, showHarakat)}
+          );
+        })}
+
+        {/* Bottom Finish/Submit Card (Exact Match to Screenshot 2) */}
+        <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-6 sm:p-8 text-center space-y-4 border border-slate-200 dark:border-slate-800 shadow-md">
+          <div className="space-y-1.5">
+            <h3 className="text-lg sm:text-xl font-black text-[#0B132B] dark:text-white">
+              সকল প্রশ্নের উত্তর শেষ হয়েছে?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed font-semibold">
+              পরীক্ষা জমা দিলে আপনার অর্জিত ফলাফল ও বিস্তারিত বিশ্লেষণ মেধা তালিকায় যুক্ত হবে।
             </p>
           </div>
-        )}
 
-        {/* Next Question Button */}
-        {isAnswered && (
-          <div className="pt-4 flex items-center justify-between border-t border-slate-100">
-            <span className="text-xs text-slate-500 font-semibold">
-              প্রশ্ন {currentIndex + 1} / {totalQuestions}
-            </span>
+          <button
+            onClick={handleSubmitExam}
+            className="w-full sm:w-auto px-8 py-3.5 bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-sm rounded-2xl inline-flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+          >
+            <span>🧺</span>
+            <span>পরীক্ষা সাবমিট করুন</span>
+          </button>
+        </div>
 
-            <button
-              onClick={handleNextQuestion}
-              className="px-7 py-3 bg-[#0B132B] hover:bg-slate-800 text-white font-black text-sm rounded-2xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-            >
-              <span>{isLastQuestion ? 'ফলাফল ও বিশ্লেষণ দেখুন' : 'পরবর্তী প্রশ্ন'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
 };
-

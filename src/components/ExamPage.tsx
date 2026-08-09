@@ -151,8 +151,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
             onClick={() => setFilterType('all')}
             className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
               filterType === 'all'
-                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+                ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -163,8 +163,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
             onClick={() => setFilterType('daily')}
             className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
               filterType === 'daily'
-                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+                ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             <Flame className="w-3.5 h-3.5 text-amber-500" />
@@ -175,8 +175,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
             onClick={() => setFilterType('free')}
             className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
               filterType === 'free'
-                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+                ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             <Zap className="w-3.5 h-3.5 text-emerald-500" />
@@ -187,8 +187,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
             onClick={() => setFilterType('weekly')}
             className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
               filterType === 'weekly'
-                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+                ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             <Crown className="w-3.5 h-3.5 text-amber-400" />
@@ -366,10 +366,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
                   className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
                     isVip
                       ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
-                      : 'bg-[#0b705c] hover:bg-[#085a4a] text-white'
+                      : 'bg-[#0B132B] hover:bg-slate-900 text-white border border-slate-800'
                   }`}
                 >
-                  <Play className="w-4 h-4 fill-current shrink-0" />
+                  <Play className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
                   <span>{isVip ? 'প্রিমিয়াম পরীক্ষা দিন' : 'ফ্রি পরীক্ষা দিন'}</span>
                 </button>
 

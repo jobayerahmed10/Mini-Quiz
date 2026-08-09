@@ -22,6 +22,7 @@ export default function App() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
+  const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
 
@@ -111,7 +112,9 @@ export default function App() {
 
   const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
     const subjName = typeof subjectOrOpts === 'string' ? subjectOrOpts : subjectOrOpts.subject;
+    const timeMins = typeof subjectOrOpts === 'object' && subjectOrOpts.timeMinutes ? subjectOrOpts.timeMinutes : 30;
     setSelectedSubject(subjName);
+    setExamTimeMinutes(timeMins);
     setCurrentPage('practice');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -178,6 +181,7 @@ export default function App() {
           <PracticePage
             questions={questions}
             initialSubject={selectedSubject}
+            timeMinutes={examTimeMinutes}
             onFinishQuiz={handleFinishQuiz}
             onNavigateHome={handleNavigateHome}
             showHarakat={showHarakat}
@@ -197,7 +201,7 @@ export default function App() {
           <>
             {activeTab === 'exam' && (
               <ExamPage
-                onStartExam={(opts) => handleStartPractice(opts.subject)}
+                onStartExam={(opts) => handleStartPractice(opts)}
               />
             )}
 
