@@ -4,7 +4,6 @@ import {
   Target, 
   Play, 
   Sparkles, 
-  Shield,
   Search,
   Share2,
   GraduationCap,
@@ -23,7 +22,6 @@ import {
 } from 'lucide-react';
 import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
 import { SUBJECT_CATEGORIES } from '../lib/subjects';
-import { ExamAdminModal } from './ExamAdminModal';
 
 interface ExamPageProps {
   onStartExam: (options: {
@@ -41,7 +39,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const [isLoading, setIsLoading] = useState(false);
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadExams = useCallback(async () => {
@@ -118,15 +115,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
               ফ্রিতে পরীক্ষার প্রস্তুতি নিন
             </p>
           </div>
-
-          {/* Admin Panel Link */}
-          <button
-            onClick={() => setIsAdminModalOpen(true)}
-            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-[#0B132B] font-black text-xs rounded-2xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
-          >
-            <Shield className="w-4 h-4 text-[#0B132B]" />
-            <span>এডমিন প্যানেল (মডেল টেস্ট যুক্ত করুন)</span>
-          </button>
         </div>
       </div>
 
@@ -378,14 +366,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
           })
         )}
       </div>
-
-      {/* Admin Panel Modal */}
-      <ExamAdminModal
-        isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
-        examsList={exams}
-        onExamsUpdated={loadExams}
-      />
     </div>
   );
 };

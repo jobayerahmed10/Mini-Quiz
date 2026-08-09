@@ -42,6 +42,18 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;
+  const unansweredCount = totalQuestions - answeredCount;
+
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+
+  const handleOpenSubmitModal = () => {
+    setShowSubmitModal(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowSubmitModal(false);
+    handleSubmitExam();
+  };
 
   // Countdown timer
   useEffect(() => {
@@ -166,7 +178,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
           {/* Top Submit Button */}
           <button
-            onClick={handleSubmitExam}
+            onClick={handleOpenSubmitModal}
             className="px-4 py-2 bg-[#0b705c] hover:bg-[#085a4a] text-white font-extrabold text-xs rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
           >
             <span>🧺</span>
@@ -252,7 +264,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           );
         })}
 
-        {/* Bottom Finish/Submit Card (Exact Match to Screenshot 2) */}
+        {/* Bottom Finish/Submit Card */}
         <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-6 sm:p-8 text-center space-y-4 border border-slate-200 dark:border-slate-800 shadow-md">
           <div className="space-y-1.5">
             <h3 className="text-lg sm:text-xl font-black text-[#0B132B] dark:text-white">
@@ -264,7 +276,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           </div>
 
           <button
-            onClick={handleSubmitExam}
+            onClick={handleOpenSubmitModal}
             className="w-full sm:w-auto px-8 py-3.5 bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-sm rounded-2xl inline-flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
           >
             <span>🧺</span>
@@ -273,6 +285,51 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         </div>
 
       </div>
+
+      {/* Submission Confirmation Modal (Matching Image 1) */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-sm w-full p-6 text-center space-y-5 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+            
+            {/* Top Badge Icon */}
+            <div className="w-16 h-16 rounded-full bg-amber-100/80 dark:bg-amber-950/50 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+              <span className="text-3xl">🏅</span>
+            </div>
+
+            {/* Modal Title & Description */}
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-[#0B132B] dark:text-white">
+                পরীক্ষা সাবমিট করবেন?
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                সাবমিট করার পর উত্তর পরিবর্তন করা সম্ভব হবে না।
+              </p>
+            </div>
+
+            {/* Unanswered count box */}
+            <div className="p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-xs sm:text-sm">
+              উত্তর না দেওয়া প্রশ্ন: <span className="text-amber-600 dark:text-amber-400 font-black">{toBengaliNumeral(unansweredCount)}টি</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="py-3 px-4 rounded-2xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all active:scale-95"
+              >
+                বাতিল
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                className="py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
+              >
+                সাবমিট
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
