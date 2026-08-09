@@ -88,6 +88,15 @@ body.dark input, body.dark select, body.dark textarea {
 .font-anek {
   font-family: 'Anek Bangla', sans-serif !important;
 }
+.font-amiri {
+  font-family: 'Amiri', 'Hind Siliguri', serif !important;
+}
+.font-scheherazade {
+  font-family: 'Scheherazade New', 'Hind Siliguri', serif !important;
+}
+.font-cairo {
+  font-family: 'Cairo', 'Hind Siliguri', sans-serif !important;
+}
 
 /* Font Size Scaling Classes */
 .font-scale-normal {

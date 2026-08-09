@@ -136,6 +136,246 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   }
 }
 
+export interface ExamItem {
+  id: string;
+  title: string;
+  badge: string;
+  badge_type: 'free' | 'daily' | 'weekly' | 'live';
+  subject: string;
+  question_count: number;
+  time_minutes: number;
+  negative_marks: number;
+  total_marks: number;
+  description?: string;
+  status?: string;
+  created_at?: string;
+}
+
+export interface FetchExamsResult {
+  exams: ExamItem[];
+  isFromSupabase: boolean;
+  error?: string | null;
+}
+
+/**
+ * Default fallback list of exams when Supabase is empty or not configured
+ */
+export const DEFAULT_EXAM_PRESETS: ExamItem[] = [
+  {
+    id: 'free-daily-1',
+    title: 'দৈনিক ফ্রি ১০০ মার্কস প্রিলিমিনারি প্রাকটিস মডেল টেস্ট',
+    badge: 'দৈনিক মডেল টেস্ট',
+    badge_type: 'daily',
+    subject: 'সকল বিষয়',
+    question_count: 100,
+    time_minutes: 60,
+    negative_marks: 0.50,
+    total_marks: 100,
+    description: '১০০ নম্বরের ১ ঘণ্টার পূর্ণাঙ্গ বিসিএস ও এনটিআরসিএ সিলেবাস কভারড মডেল টেস্ট।',
+    status: 'active',
+  },
+  {
+    id: 'free-weekly-1',
+    title: 'সাপ্তাহিক স্পেশাল মেগা প্রিলিমিনারি মডেল টেস্ট',
+    badge: 'সাপ্তাহিক মডেল টেস্ট',
+    badge_type: 'weekly',
+    subject: 'সকল বিষয়',
+    question_count: 50,
+    time_minutes: 35,
+    negative_marks: 0.50,
+    total_marks: 50,
+    description: 'সপ্তাহের সেরা বাছাইকৃত গুরুত্বপূর্ণ ৫০টি প্রশ্ন নিয়ে মেগা টেস্ট।',
+    status: 'active',
+  },
+  {
+    id: 'free-topic-1',
+    title: 'ফ্রি সাধারণ জ্ঞান ও বাংলাদেশ বিষয়াবলী কুইক টেস্ট',
+    badge: 'ফ্রি পরীক্ষা',
+    badge_type: 'free',
+    subject: 'বাংলাদেশ বিষয়াবলী',
+    question_count: 25,
+    time_minutes: 15,
+    negative_marks: 0.50,
+    total_marks: 25,
+    description: 'সাম্প্রতিক তথ্য ও ইতিহাস নির্ভর ফ্রি কুইক প্রাকটিস।',
+    status: 'active',
+  },
+  {
+    id: 'free-live-1',
+    title: 'মাদ্রাসা বিশেষ আল কুরআন ও আরবি ভাষা লাইভ টেস্ট',
+    badge: 'লাইভ টেস্ট',
+    badge_type: 'live',
+    subject: 'আল কুরআন ও তাফসির',
+    question_count: 30,
+    time_minutes: 20,
+    negative_marks: 0.50,
+    total_marks: 30,
+    description: 'মাদ্রাসা শিক্ষক নিবন্ধন প্রার্থীদের জন্য বিশেষ বিষয়ের লাইভ মডেল টেস্ট।',
+    status: 'active',
+  },
+];
+
+/**
+ * Fetches exams/model tests from Supabase table 'public.exams'
+ */
+export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
+  if (!supabaseInstance) {
+    return {
+      exams: DEFAULT_EXAM_PRESETS,
+      isFromSupabase: false,
+      error: null,
+    };
+  }
+
+  try {
+    const { data, error } = await supabaseInstance
+      .from('exams')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetch exams error:', error);
+      // Fallback to default presets if table doesn't exist yet
+      return {
+        exams: DEFAULT_EXAM_PRESETS,
+        isFromSupabase: true,
+        error: `Supabase Table 'exams' পাওয়া যায়নি। ডেমো লিস্ট দেখানো হচ্ছে। (ত্রুটি: ${error.message})`,
+      };
+    }
+
+    if (!data || data.length === 0) {
+      return {
+        exams: DEFAULT_EXAM_PRESETS,
+        isFromSupabase: true,
+        error: null,
+      };
+    }
+
+    const fetchedExams: ExamItem[] = data.map((item) => ({
+      id: String(item.id),
+      title: String(item.title || 'পরীক্ষা'),
+      badge: String(item.badge || 'ফ্রি পরীক্ষা'),
+      badge_type: (item.badge_type || 'free') as 'free' | 'daily' | 'weekly' | 'live',
+      subject: String(item.subject || 'সকল বিষয়'),
+      question_count: Number(item.question_count || 25),
+      time_minutes: Number(item.time_minutes || 20),
+      negative_marks: Number(item.negative_marks || 0.5),
+      total_marks: Number(item.total_marks || item.question_count || 25),
+      description: item.description ? String(item.description) : undefined,
+      status: item.status || 'active',
+      created_at: item.created_at,
+    }));
+
+    return {
+      exams: fetchedExams,
+      isFromSupabase: true,
+      error: null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      exams: DEFAULT_EXAM_PRESETS,
+      isFromSupabase: true,
+      error: `Supabase ত্রুটি: ${msg}`,
+    };
+  }
+}
+
+/**
+ * Inserts a new exam into Supabase 'public.exams' table
+ */
+export async function addExamToSupabase(input: Omit<ExamItem, 'id'>): Promise<{ success: boolean; data?: ExamItem; error?: string }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase সংযোগ সেটআপ করা নেই।',
+    };
+  }
+
+  try {
+    const newRecord = {
+      title: input.title.trim(),
+      badge: input.badge.trim(),
+      badge_type: input.badge_type || 'free',
+      subject: input.subject.trim(),
+      question_count: input.question_count,
+      time_minutes: input.time_minutes,
+      negative_marks: input.negative_marks,
+      total_marks: input.total_marks,
+      description: input.description?.trim() || null,
+      status: input.status || 'active',
+      created_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabaseInstance
+      .from('exams')
+      .insert([newRecord])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase add exam error:', error);
+      return {
+        success: false,
+        error: `পরীক্ষা যুক্ত করা যায়নি: ${error.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: String(data.id),
+        title: data.title,
+        badge: data.badge,
+        badge_type: data.badge_type,
+        subject: data.subject,
+        question_count: data.question_count,
+        time_minutes: data.time_minutes,
+        negative_marks: data.negative_marks,
+        total_marks: data.total_marks,
+        description: data.description,
+        status: data.status,
+        created_at: data.created_at,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
+    return {
+      success: false,
+      error: `Supabase ত্রুটি: ${msg}`,
+    };
+  }
+}
+
+/**
+ * Deletes an exam from Supabase table 'public.exams'
+ */
+export async function deleteExamFromSupabase(id: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase সংযোগ নেই।',
+    };
+  }
+
+  try {
+    const { error } = await supabaseInstance
+      .from('exams')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
+    return { success: false, error: msg };
+  }
+}
+
 export interface NewQuestionInput {
   question: string;
   option_a: string;

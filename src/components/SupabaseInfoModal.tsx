@@ -12,7 +12,9 @@ export const SupabaseInfoModal: React.FC<SupabaseInfoModalProps> = ({ isOpen, on
 
   if (!isOpen) return null;
 
-  const sqlSchema = `-- ১. Supabase SQL Editor-এ গিয়ে এই টেবিলটি তৈরি করুন:
+  const sqlSchema = `-- ==========================================
+-- ১. প্রশ্ন ব্যাংক টেবিল (public.questions)
+-- ==========================================
 CREATE TABLE IF NOT EXISTS public.questions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   question TEXT NOT NULL,
@@ -22,25 +24,52 @@ CREATE TABLE IF NOT EXISTS public.questions (
   option_d TEXT NOT NULL,
   correct_answer TEXT NOT NULL, -- 'option_a', 'option_b', 'option_c', বা 'option_d'
   explanation TEXT,
-  subject TEXT, -- যেমন: 'বাংলা ভাষা ও সাহিত্য', 'বাংলাদেশ বিষয়াবলী', 'ইংরেজি ভাষা ও সাহিত্য'
-  topic TEXT, -- যেমন: 'ব্যাকরণ', 'ইতিহাস', 'জ্যোতির্বিজ্ঞান'
-  status TEXT DEFAULT 'published', -- 'published' অথবা 'draft'
+  subject TEXT,
+  topic TEXT,
+  status TEXT DEFAULT 'published',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ২. RLS (Row Level Security) পাবলিক রিড পারমিশন সক্রিয় করুন:
 ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read access for published questions" 
-ON public.questions FOR SELECT 
-USING (status = 'published');
+ON public.questions FOR SELECT USING (status = 'published');
 
--- ৩. নমুনা বিষয ভিত্তিক প্রকাশিত প্রশ্ন যুক্ত করতে এই কোড চালান:
-INSERT INTO public.questions (question, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, status)
+CREATE POLICY "Allow public insert and delete for questions" 
+ON public.questions FOR ALL USING (true);
+
+-- ==========================================
+-- ২. পরীক্ষা ও মডেল টেস্ট টেবিল (public.exams)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.exams (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  badge TEXT NOT NULL, -- যেমন: 'দৈনিক মডেল টেস্ট', 'সাপ্তাহিক মডেল টেস্ট', 'ফ্রি পরীক্ষা', 'লাইভ টেস্ট'
+  badge_type TEXT DEFAULT 'free', -- 'free', 'daily', 'weekly', বা 'live'
+  subject TEXT DEFAULT 'সকল বিষয়',
+  question_count INT DEFAULT 25,
+  time_minutes INT DEFAULT 20,
+  negative_marks NUMERIC DEFAULT 0.50,
+  total_marks INT DEFAULT 25,
+  description TEXT,
+  status TEXT DEFAULT 'active', -- 'active' বা 'draft'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access for active exams" 
+ON public.exams FOR SELECT USING (status = 'active');
+
+CREATE POLICY "Allow public insert and delete for exams" 
+ON public.exams FOR ALL USING (true);
+
+-- ৩. নমুনা পরীক্ষা ডেটা যুক্ত করতে এই কোড ইনসার্ট করতে পারেন:
+INSERT INTO public.exams (title, badge, badge_type, subject, question_count, time_minutes, negative_marks, total_marks, description)
 VALUES 
-('বাংলাদেশের রাজধানীর নাম কী?', 'চট্টগ্রাম', 'ঢাকা', 'খুলনা', 'রাজশাহী', 'option_b', 'ঢাকা বাংলাদেশের রাজধানী ও বৃহত্তম শহর।', 'বাংলাদেশ বিষয়াবলী', 'ভৌগোলিক পরিচিতি', 'published'),
-('‘সোনার তরী’ কাব্যগ্রন্থ কার রচনা?', 'কাজী নজরুল ইসলাম', 'রবীন্দ্রনাথ ঠাকুর', 'জসীমউদ্দীন', 'মাইকেল মধুসূদন দত্ত', 'option_b', 'বিশ্বকবি রবীন্দ্রনাথ ঠাকুর ১৮৯৪ সালে ‘সোনার তরী’ প্রকাশ করেন।', 'বাংলা ভাষা ও সাহিত্য', 'বাংলা সাহিত্য', 'published'),
-('আন্তর্জাতিক মাতৃভাষা দিবস কত তারিখে পালিত হয়?', '২৬ মার্চ', '১৬ ডিসেম্বর', '২১ ফেব্রুয়ারি', '১৪ এপ্রিল', 'option_c', 'ইউনেস্কো ২১ ফেব্রুয়ারিকে আন্তর্জাতিক মাতৃভাষা দিবস ঘোষণা করেছে।', 'আন্তর্জাতিক বিষয়াবলী', 'আন্তর্জাতিক দিবস', 'published');
+('দৈনিক ফ্রি ১০০ মার্কস প্রিলিমিনারি প্রাকটিস মডেল টেস্ট', 'দৈনিক মডেল টেস্ট', 'daily', 'সকল বিষয়', 100, 60, 0.50, 100, '১০০ নম্বরের ১ ঘণ্টার পূর্ণাঙ্গ প্রিলিমিনারি মডেল টেস্ট।'),
+('সাপ্তাহিক স্পেশাল মেগা প্রিলিমিনারি মডেল টেস্ট', 'সাপ্তাহিক মডেল টেস্ট', 'weekly', 'সকল বিষয়', 50, 35, 0.50, 50, 'সপ্তাহের সেরা বাছাইকৃত ৫০টি প্রশ্ন।'),
+('ফ্রি সাধারণ জ্ঞান কুইক টেস্ট', 'ফ্রি পরীক্ষা', 'free', 'বাংলাদেশ বিষয়াবলী', 25, 15, 0.50, 25, 'সাম্প্রতিক ও ইতিহাস ভিত্তিক ফ্রি কুইক টেস্ট।');
 `;
 
   const copyToClipboard = () => {

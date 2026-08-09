@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  FileCheck2, 
   Clock, 
   Target, 
   Play, 
   Sparkles, 
-  Award, 
-  CheckCircle2, 
-  RotateCcw, 
-  BookOpen,
+  PlusCircle,
+  Shield,
+  Layers,
+  Calendar,
   Zap,
-  Check
+  Tag,
+  RefreshCw
 } from 'lucide-react';
-import { SUBJECT_CATEGORIES } from '../lib/subjects';
+import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
+import { ExamAdminModal } from './ExamAdminModal';
 
 interface ExamPageProps {
   onStartExam: (options: {
@@ -24,233 +25,173 @@ interface ExamPageProps {
 }
 
 export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
-  const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
-  const [questionCount, setQuestionCount] = useState<number>(25);
-  const [timeMinutes, setTimeMinutes] = useState<number>(20);
+  const [exams, setExams] = useState<ExamItem[]>(DEFAULT_EXAM_PRESETS);
+  const [filterType, setFilterType] = useState<'all' | 'daily' | 'weekly' | 'free' | 'live'>('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  const examPresets = [
-    {
-      id: 'full_prelim',
-      title: '১৮তম ও ১৯তম NTRCA প্রিলিমিনারি পূর্ণাঙ্গ টেস্ট',
-      subject: 'সকল বিষয়',
-      questionCount: 100,
-      timeMinutes: 60,
-      description: '১০০ নম্বরের পূর্ণাঙ্গ ১০০টি প্রশ্ন। ১০০ মার্কস ও ১ ঘণ্টা নেগেটিভ মার্কিং সহ আসল পরীক্ষার অনুভূতি।',
-      badge: 'অফিসিয়াল ফরম্যাট',
-      icon: Award,
-    },
-    {
-      id: 'madrasa_special',
-      title: 'মাদ্রাসা বিশেষ বিষয় প্রাকটিস টেস্ট',
-      subject: 'আল কুরআন ও তাফসির',
-      questionCount: 30,
-      timeMinutes: 25,
-      description: 'কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ ও আকিদার বিশেষ প্রশ্নাবলি।',
-      badge: 'মাদ্রাসা স্পেশাল',
-      icon: BookOpen,
-    },
-    {
-      id: 'speed_test',
-      title: '১৫ মিনিটে ২৫ নম্বরের কুইক স্পিড টেস্ট',
-      subject: 'সকল বিষয়',
-      questionCount: 25,
-      timeMinutes: 15,
-      description: 'দ্রুত রিভিশন ও সময় সচেতনতার জন্য ২৫ প্রশ্নের দ্রুত কুইজ।',
-      badge: 'কুইক স্পিড',
-      icon: Zap,
-    },
-  ];
+  const loadExams = useCallback(async () => {
+    setIsLoading(true);
+    const res = await fetchExamsFromSupabase();
+    if (res.exams && res.exams.length > 0) {
+      setExams(res.exams);
+    } else {
+      setExams(DEFAULT_EXAM_PRESETS);
+    }
+    setIsLoading(false);
+  }, []);
 
-  const handleLaunchCustom = () => {
-    onStartExam({
-      subject: selectedSubject,
-      questionCount,
-      timeMinutes,
-      examType: 'কাস্টম মডেল টেস্ট',
-    });
-  };
+  useEffect(() => {
+    loadExams();
+  }, [loadExams]);
+
+  const filteredExams = exams.filter((e) => {
+    if (filterType === 'all') return true;
+    return e.badge_type === filterType;
+  });
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 mb-24 space-y-6">
       {/* Banner */}
       <div className="neu-card p-6 sm:p-8 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <span className="text-xs font-black px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full inline-flex items-center gap-1.5 mb-2">
+          <div className="flex flex-col items-start gap-2">
+            <span className="text-xs font-black px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full inline-flex items-center gap-1.5 mb-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               লাইভ কুইজ ও প্রিলিমিনারি মডেল টেস্ট
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-[#0B132B] dark:text-white">
-              পরীক্ষা দিন & প্রস্তুতি যাচাই করুন
+              পরীক্ষা দিন
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-              স্বয়ংক্রিয় টাইমার, নেগেটিভ মার্কিং (-০.৫০) এবং বিস্তারিত সমাধানসহ মডেল টেস্ট
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              ফ্রিতে পরীক্ষার প্রস্তুতি নিন
             </p>
           </div>
 
+          {/* Admin Button */}
           <button
-            onClick={() => onStartExam({
-              subject: 'সকল বিষয়',
-              questionCount: 100,
-              timeMinutes: 60,
-              examType: '১০০ মার্কস লাইভ মডেল টেস্ট'
-            })}
-            className="neu-btn px-6 py-3.5 rounded-2xl bg-[#0B132B] text-white font-black text-sm flex items-center gap-2 cursor-pointer shrink-0 shadow-md transition-all active:scale-95"
+            onClick={() => setIsAdminModalOpen(true)}
+            className="neu-btn px-4 py-2.5 rounded-2xl bg-[#0B132B] text-amber-400 font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 transition-all shrink-0"
           >
-            <Play className="w-5 h-5 text-amber-400 fill-amber-400" />
-            <span>১০০ মার্কস পরীক্ষা শুরু করুন</span>
+            <Shield className="w-4 h-4 text-amber-400" />
+            <span>এডমিন প্যানেল (মডেল টেস্ট যোগ করুন)</span>
           </button>
         </div>
       </div>
 
-      {/* Featured Exam Presets */}
-      <div>
-        <h2 className="text-lg font-black text-[#0B132B] dark:text-white mb-3 flex items-center gap-2">
-          <Target className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
-          পপুলার মডেল টেস্ট সমূহ:
-        </h2>
+      {/* Category Tabs & Filter */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-100 dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
+          {[
+            { id: 'all', label: 'সব টেস্ট', icon: Layers },
+            { id: 'daily', label: '📅 দৈনিক মডেল টেস্ট', icon: Calendar },
+            { id: 'weekly', label: '📆 সাপ্তাহিক টেস্ট', icon: Calendar },
+            { id: 'free', label: '🆓 ফ্রি পরীক্ষা', icon: Tag },
+            { id: 'live', label: '🔴 লাইভ টেস্ট', icon: Zap },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterType(tab.id as 'all' | 'daily' | 'weekly' | 'free' | 'live')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all border ${
+                filterType === tab.id
+                  ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                  : 'text-slate-700 dark:text-slate-300 border-transparent hover:bg-white dark:hover:bg-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {examPresets.map((preset) => {
-            return (
-              <div
-                key={preset.id}
-                className="neu-card p-5 flex flex-col justify-between hover:border-amber-400/60 transition-all group"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[10px] font-black px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full">
-                      {preset.badge}
-                    </span>
-                    <div className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                      <Clock className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
-                      <span>{preset.timeMinutes} মিনিট</span>
+        <button
+          onClick={loadExams}
+          disabled={isLoading}
+          className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors shrink-0"
+          title="রিফ্রেশ করুন"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Featured Model Tests */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-black text-[#0B132B] dark:text-white flex items-center gap-2">
+            <Target className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
+            মডেল টেস্ট তালিকা ({filteredExams.length}টি):
+          </h2>
+        </div>
+
+        {filteredExams.length === 0 ? (
+          <div className="neu-card p-8 text-center text-xs font-bold text-slate-500">
+            এই ক্যাটাগরিতে কোনো মডেল টেস্ট নেই। এডমিন প্যানেল থেকে টেস্ট যুক্ত করুন।
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredExams.map((exam) => {
+              return (
+                <div
+                  key={exam.id}
+                  className="neu-card p-5 flex flex-col justify-between hover:border-amber-400/60 transition-all group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-[10px] font-black px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full">
+                        {exam.badge}
+                      </span>
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                        <Clock className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
+                        <span>{exam.time_minutes} মিনিট</span>
+                      </div>
                     </div>
+
+                    <h3 className="text-base font-black text-[#0B132B] dark:text-white group-hover:text-amber-400 transition-colors leading-snug">
+                      {exam.title}
+                    </h3>
+
+                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">
+                      বিষয়: {exam.subject}
+                    </div>
+
+                    {exam.description && (
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed line-clamp-2">
+                        {exam.description}
+                      </p>
+                    )}
                   </div>
 
-                  <h3 className="text-base font-black text-[#0B132B] dark:text-white group-hover:text-amber-400 transition-colors">
-                    {preset.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
-                    {preset.description}
-                  </p>
+                  <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
+                      {exam.question_count}টি প্রশ্ন ({exam.total_marks || exam.question_count} মার্কস)
+                    </span>
+                    <button
+                      onClick={() => onStartExam({
+                        subject: exam.subject,
+                        questionCount: exam.question_count,
+                        timeMinutes: exam.time_minutes,
+                        examType: exam.title,
+                      })}
+                      className="neu-btn px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                      <span>শুরু করুন</span>
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
-                    {preset.questionCount}টি প্রশ্ন
-                  </span>
-                  <button
-                    onClick={() => onStartExam({
-                      subject: preset.subject,
-                      questionCount: preset.questionCount,
-                      timeMinutes: preset.timeMinutes,
-                      examType: preset.title,
-                    })}
-                    className="neu-btn px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                    <span>শুরু করুন</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Custom Exam Builder */}
-      <div className="neu-card p-6 relative overflow-hidden">
-        <h2 className="text-lg font-black text-[#0B132B] dark:text-white mb-1 flex items-center gap-2">
-          <FileCheck2 className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
-          নিজের পছন্দমতো পরীক্ষা সেটআপ করুন:
-        </h2>
-        <p className="text-xs text-slate-600 dark:text-slate-300 mb-6">
-          আপনার সুবিধামতো বিষয়, প্রশ্ন সংখ্যা ও সময় নির্ধারণ করে কাস্টম টেস্ট তৈরি করুন
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* Subject Select */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
-              বিষয় নির্বাচন করুন:
-            </label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#0D172A] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl p-3 focus:outline-none focus:border-[#0B132B] dark:focus:border-amber-400"
-            >
-              <option value="সকল বিষয়">সকল বিষয় (মডেল টেস্ট)</option>
-              {SUBJECT_CATEGORIES.filter(s => s.id !== 'all').map((s) => (
-                <option key={s.id} value={s.name}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Question Count Select */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
-              প্রশ্ন সংখ্যা:
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[10, 25, 50, 100].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setQuestionCount(num)}
-                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all border ${
-                    questionCount === num
-                      ? 'bg-[#0B132B] border-[#0B132B] text-amber-400 shadow-xs'
-                      : 'neu-btn text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  {num}টি
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Time Select */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
-              সময়সীমা (মিনিট):
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[10, 20, 30, 60].map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => setTimeMinutes(mins)}
-                  className={`py-2.5 rounded-xl text-xs font-black cursor-pointer transition-all border ${
-                    timeMinutes === mins
-                      ? 'bg-[#0B132B] border-[#0B132B] text-amber-400 shadow-xs'
-                      : 'neu-btn text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  {mins}মি
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>প্রতি ভুল উত্তরের জন্য ০.৫০ নম্বর কাটা যাবে</span>
-          </div>
-
-          <button
-            onClick={handleLaunchCustom}
-            className="neu-btn px-8 py-3.5 bg-[#0B132B] text-white rounded-2xl font-black text-sm flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-          >
-            <Play className="w-4 h-4 fill-amber-400 text-amber-400" />
-            <span>কাস্টম পরীক্ষা শুরু করুন</span>
-          </button>
-        </div>
-      </div>
+      {/* Admin Panel Modal */}
+      <ExamAdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        examsList={exams}
+        onExamsUpdated={loadExams}
+      />
     </div>
   );
 };
+

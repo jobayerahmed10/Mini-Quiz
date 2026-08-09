@@ -1,4 +1,22 @@
 /**
+ * Removes Arabic Tashkeel / Harakat (diacritics) from text
+ * Includes: Fathan, Damman, Kasran, Fatha, Damma, Kasra, Sukun, Shadda, Maddah, Dagger Alif, Quranic signs
+ */
+export function removeHarakat(text: string): string {
+  if (!text) return '';
+  return text.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+}
+
+/**
+ * Format text according to harakat display setting
+ */
+export function formatArabicText(text: string, showHarakat: boolean = true): string {
+  if (!text) return '';
+  if (showHarakat) return text;
+  return removeHarakat(text);
+}
+
+/**
  * Converts English digits (0-9) to Bengali digits (০-৯)
  */
 export function toBengaliNumeral(number: number | string): string {

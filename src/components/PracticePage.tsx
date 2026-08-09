@@ -13,7 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Question, SelectedOption, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption } from '../lib/utils';
+import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText } from '../lib/utils';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 
 interface PracticePageProps {
@@ -21,6 +21,7 @@ interface PracticePageProps {
   initialSubject?: string;
   onFinishQuiz: (userAnswers: UserAnswer[]) => void;
   onNavigateHome: () => void;
+  showHarakat?: boolean;
 }
 
 export const PracticePage: React.FC<PracticePageProps> = ({
@@ -28,6 +29,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   initialSubject = 'all',
   onFinishQuiz,
   onNavigateHome,
+  showHarakat = true,
 }) => {
   const [activeSubject, setActiveSubject] = useState<string>(initialSubject);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -192,13 +194,14 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         </div>
 
         <h2 className="text-xl sm:text-2xl font-black text-[#0B132B] dark:text-white leading-relaxed">
-          {currentQuestion.question}
+          {formatArabicText(currentQuestion.question, showHarakat)}
         </h2>
 
         {/* Options List */}
         <div className="space-y-3 pt-2">
           {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-            const optionText = currentQuestion[optionKey];
+            const rawOptionText = currentQuestion[optionKey];
+            const optionText = formatArabicText(rawOptionText, showHarakat);
             const prefix = OPTION_BENGLI_LABEL[optionKey];
             const isSelected = selectedOption === optionKey;
             const isCorrectOption = optionKey === correctOptionKey;
@@ -259,7 +262,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                 <div>
                   <p className="font-bold text-sm text-rose-900">ভুল উত্তর!</p>
                   <p className="text-xs text-rose-800 mt-1">
-                    সঠিক উত্তর হলো: <strong className="font-bold underline">{OPTION_BENGLI_LABEL[correctOptionKey]}) {currentQuestion[correctOptionKey]}</strong>
+                    সঠিক উত্তর হলো: <strong className="font-bold underline">{OPTION_BENGLI_LABEL[correctOptionKey]}) {formatArabicText(currentQuestion[correctOptionKey], showHarakat)}</strong>
                   </p>
                 </div>
               </div>
@@ -275,7 +278,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
               <span>সহজ তথ্য ও ব্যাখ্যা:</span>
             </div>
             <p className="text-xs leading-relaxed text-slate-700 pl-6">
-              {currentQuestion.explanation}
+              {formatArabicText(currentQuestion.explanation, showHarakat)}
             </p>
           </div>
         )}

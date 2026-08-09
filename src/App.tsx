@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Header } from './components/Header';
+import { Header, FontFamilyType } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { PracticePage } from './components/PracticePage';
 import { ResultPage } from './components/ResultPage';
@@ -34,8 +34,12 @@ export default function App() {
     return (localStorage.getItem('miniquiz_fontsize') as 'normal' | 'medium' | 'large') || 'normal';
   });
 
-  const [fontFamily, setFontFamily] = useState<'hind' | 'noto' | 'tiro' | 'anek'>(() => {
-    return (localStorage.getItem('miniquiz_fontfamily') as 'hind' | 'noto' | 'tiro' | 'anek') || 'hind';
+  const [fontFamily, setFontFamily] = useState<FontFamilyType>(() => {
+    return (localStorage.getItem('miniquiz_fontfamily') as FontFamilyType) || 'hind';
+  });
+
+  const [showHarakat, setShowHarakat] = useState<boolean>(() => {
+    return localStorage.getItem('miniquiz_showharakat') !== 'false';
   });
 
   // Apply Dark Mode class to documentElement & body
@@ -50,7 +54,7 @@ export default function App() {
     localStorage.setItem('miniquiz_darkmode', String(isDarkMode));
   }, [isDarkMode]);
 
-  // Persist Font settings
+  // Persist Font & Harakat settings
   useEffect(() => {
     localStorage.setItem('miniquiz_fontsize', fontSize);
   }, [fontSize]);
@@ -58,6 +62,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('miniquiz_fontfamily', fontFamily);
   }, [fontFamily]);
+
+  useEffect(() => {
+    localStorage.setItem('miniquiz_showharakat', String(showHarakat));
+  }, [showHarakat]);
 
   // Load published questions on mount
   const loadQuestions = useCallback(async () => {
@@ -130,6 +138,9 @@ export default function App() {
       case 'noto': return 'font-noto';
       case 'tiro': return 'font-tiro';
       case 'anek': return 'font-anek';
+      case 'amiri': return 'font-amiri';
+      case 'scheherazade': return 'font-scheherazade';
+      case 'cairo': return 'font-cairo';
       default: return 'font-hind';
     }
   };
@@ -157,6 +168,8 @@ export default function App() {
         onChangeFontSize={setFontSize}
         fontFamily={fontFamily}
         onChangeFontFamily={setFontFamily}
+        showHarakat={showHarakat}
+        onChangeShowHarakat={setShowHarakat}
       />
 
       {/* Main Content Router */}
@@ -167,6 +180,7 @@ export default function App() {
             initialSubject={selectedSubject}
             onFinishQuiz={handleFinishQuiz}
             onNavigateHome={handleNavigateHome}
+            showHarakat={showHarakat}
           />
         )}
 
@@ -175,6 +189,7 @@ export default function App() {
             result={quizResult}
             onRetry={handleRetry}
             onNavigateHome={handleNavigateHome}
+            showHarakat={showHarakat}
           />
         )}
 

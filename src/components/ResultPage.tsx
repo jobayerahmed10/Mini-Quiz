@@ -15,18 +15,20 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { QuizResult } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL } from '../lib/utils';
+import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText } from '../lib/utils';
 
 interface ResultPageProps {
   result: QuizResult;
   onRetry: () => void;
   onNavigateHome: () => void;
+  showHarakat?: boolean;
 }
 
 export const ResultPage: React.FC<ResultPageProps> = ({
   result,
   onRetry,
   onNavigateHome,
+  showHarakat = true,
 }) => {
   const [showAnswerSheet, setShowAnswerSheet] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'correct' | 'wrong'>('all');
@@ -280,7 +282,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                         </span>
                       )}
                       <p className="font-bold text-sm sm:text-base text-[#0B132B] dark:text-white leading-relaxed">
-                        {toBengaliNumeral(idx + 1)}. {answer.questionText}
+                        {toBengaliNumeral(idx + 1)}. {formatArabicText(answer.questionText, showHarakat)}
                       </p>
                     </div>
 
@@ -316,7 +318,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                       <span>আপনার প্রদত্ত উত্তর: </span>
                       <strong className="font-bold">
                         {answer.selectedOption
-                          ? `${OPTION_BENGLI_LABEL[answer.selectedOption]}) ${answer.options[answer.selectedOption]}`
+                          ? `${OPTION_BENGLI_LABEL[answer.selectedOption]}) ${formatArabicText(answer.options[answer.selectedOption], showHarakat)}`
                           : 'উত্তর দেয়া হয়নি'}
                       </strong>
                     </div>
@@ -326,7 +328,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                         <span>সঠিক উত্তর: </span>
                         <strong className="font-bold">
                           {OPTION_BENGLI_LABEL[answer.correctOption]}){' '}
-                          {answer.options[answer.correctOption]}
+                          {formatArabicText(answer.options[answer.correctOption], showHarakat)}
                         </strong>
                       </div>
                     )}
@@ -335,7 +337,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   {answer.explanation && (
                     <div className="text-xs text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed">
                       <strong className="text-[#0B132B] dark:text-amber-400 font-bold">ব্যাখ্যা: </strong>
-                      {answer.explanation}
+                      {formatArabicText(answer.explanation, showHarakat)}
                     </div>
                   )}
                 </div>

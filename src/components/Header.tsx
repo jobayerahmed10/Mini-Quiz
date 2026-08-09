@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Home, Sparkles, Sun, Moon, Type, Check, X } from 'lucide-react';
+import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages } from 'lucide-react';
 import { PageRoute } from '../types';
+
+export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
 interface HeaderProps {
   currentPage: PageRoute;
@@ -10,8 +12,10 @@ interface HeaderProps {
   onToggleDarkMode: () => void;
   fontSize: 'normal' | 'medium' | 'large';
   onChangeFontSize: (size: 'normal' | 'medium' | 'large') => void;
-  fontFamily: 'hind' | 'noto' | 'tiro' | 'anek';
-  onChangeFontFamily: (font: 'hind' | 'noto' | 'tiro' | 'anek') => void;
+  fontFamily: FontFamilyType;
+  onChangeFontFamily: (font: FontFamilyType) => void;
+  showHarakat: boolean;
+  onChangeShowHarakat: (show: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,14 +28,22 @@ export const Header: React.FC<HeaderProps> = ({
   onChangeFontSize,
   fontFamily,
   onChangeFontFamily,
+  showHarakat,
+  onChangeShowHarakat,
 }) => {
   const [showFontMenu, setShowFontMenu] = useState(false);
 
-  const fontOptions: { id: 'hind' | 'noto' | 'tiro' | 'anek'; name: string; sample: string }[] = [
-    { id: 'hind', name: 'হিন্দ শিলিগুড়ি', sample: 'Hind Siliguri' },
-    { id: 'noto', name: 'নোটো সান্স', sample: 'Noto Sans' },
-    { id: 'tiro', name: 'তিরো বাংলা', sample: 'Tiro Bangla' },
-    { id: 'anek', name: 'অনেক বাংলা', sample: 'Anek Bangla' },
+  const bengaliFonts: { id: FontFamilyType; name: string; sample: string }[] = [
+    { id: 'hind', name: 'হিন্দ শিলিগুড়ি', sample: 'Bengali Standard' },
+    { id: 'noto', name: 'নোটো সান্স', sample: 'Noto Sans Bengali' },
+    { id: 'tiro', name: 'তিরো বাংলা', sample: 'Tiro Serif Bangla' },
+    { id: 'anek', name: 'অনেক বাংলা', sample: 'Anek Modern' },
+  ];
+
+  const arabicFonts: { id: FontFamilyType; name: string; sample: string; arName: string }[] = [
+    { id: 'amiri', name: 'আমিরি ফন্ট (Amiri)', arName: 'خط أميري', sample: '﴿ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ﴾' },
+    { id: 'scheherazade', name: 'শাহরাজাদ (Scheherazade)', arName: 'خط شهرزاد', sample: '﴿الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ﴾' },
+    { id: 'cairo', name: 'কায়রো (Cairo Arabic)', arName: 'خط القاهرة', sample: 'القرآن والسنة والحديث' },
   ];
 
   const fontSizeOptions: { id: 'normal' | 'medium' | 'large'; label: string; desc: string }[] = [
@@ -85,20 +97,20 @@ export const Header: React.FC<HeaderProps> = ({
               className={`neu-btn p-2.5 rounded-2xl flex items-center justify-center cursor-pointer transition-all ${
                 showFontMenu ? 'neu-btn-active' : ''
               }`}
-              title="ফন্ট স্টাইল ও সাইজ পরিবর্তন করুন"
+              title="ফন্ট স্টাইল, আরবি ফন্ট ও হরকত সেটিং"
             >
-              <Type className="w-4 h-4" />
+              <Type className="w-4 h-4 text-amber-500" />
             </button>
 
             {/* Font Options Popover Dropdown */}
             {showFontMenu && (
-              <div className={`absolute right-0 mt-3 w-72 rounded-3xl p-4 shadow-2xl z-50 border transition-all ${
+              <div className={`absolute right-0 mt-3 w-80 max-h-[85vh] overflow-y-auto rounded-3xl p-4 shadow-2xl z-50 border transition-all ${
                 isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
               }`}>
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-1.5 text-xs font-black">
                     <Type className="w-4 h-4 text-amber-500" />
-                    <span>ফন্ট সাইজ ও স্টাইল</span>
+                    <span>ফন্ট ও আরবি সেটিং</span>
                   </div>
                   <button
                     onClick={() => setShowFontMenu(false)}
@@ -108,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
 
-                {/* Font Size Chooser */}
+                {/* 1. Font Size Chooser */}
                 <div className="mb-4 space-y-1.5">
                   <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400">
                     ফন্ট সাইজ (Font Size):
@@ -131,13 +143,52 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
 
-                {/* Font Family Chooser */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    ফন্ট স্টাইল (Font Family):
+                {/* 2. Arabic Harakat Option (হরকত সহ / ছাড়া) */}
+                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>আরবি হরকত (Tashkeel) সেটিং:</span>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    আরবি প্রশ্নে হরকত/জের-জবর যুক্ত বা মুক্ত রাখুন:
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => onChangeShowHarakat(true)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                        showHarakat
+                          ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                      }`}
+                    >
+                      <span>হরকত সহ</span>
+                      <span className="text-[10px] font-amiri opacity-90">﴿قُلْ هُوَ اللَّهُ﴾</span>
+                    </button>
+
+                    <button
+                      onClick={() => onChangeShowHarakat(false)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                        !showHarakat
+                          ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                      }`}
+                    >
+                      <span>হরকত ছাড়া</span>
+                      <span className="text-[10px] font-amiri opacity-90">﴿قل هو الله﴾</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Bengali Fonts */}
+                <div className="mb-4 space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>বাংলা ফন্ট (Bangla Fonts):</span>
                   </label>
                   <div className="space-y-1">
-                    {fontOptions.map((f) => (
+                    {bengaliFonts.map((f) => (
                       <button
                         key={f.id}
                         onClick={() => onChangeFontFamily(f.id)}
@@ -158,6 +209,39 @@ export const Header: React.FC<HeaderProps> = ({
                     ))}
                   </div>
                 </div>
+
+                {/* 4. Arabic Fonts */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <label className="block text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Languages className="w-3.5 h-3.5" />
+                    <span>আরবি ফন্ট (Arabic Calligraphy Fonts):</span>
+                  </label>
+                  <div className="space-y-1">
+                    {arabicFonts.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => onChangeFontFamily(f.id)}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                          fontFamily === f.id
+                            ? 'bg-[#0B132B] text-white font-bold shadow-xs'
+                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <span className="block font-bold flex items-center gap-1.5">
+                            {f.name}
+                            <span className="text-[10px] text-amber-400 font-normal">({f.arName})</span>
+                          </span>
+                          <span className="text-[11px] text-amber-500/90 font-amiri block mt-0.5" dir="rtl">{f.sample}</span>
+                        </div>
+                        {fontFamily === f.id && (
+                          <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
