@@ -7,7 +7,7 @@ import {
   Check
 } from 'lucide-react';
 import { Question, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText } from '../lib/utils';
+import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText, isArabicText } from '../lib/utils';
 import { detectQuestionSubject } from '../lib/subjects';
 
 interface PracticePageProps {
@@ -219,45 +219,56 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       <div className="max-w-3xl mx-auto px-3 sm:px-4 py-5 space-y-5">
         {filteredQuestions.map((q, index) => {
           const selectedOpt = userSelections[q.id];
+          const isArabic = isArabicText(q.question, q.subject || activeSubject);
 
           return (
             <div
               key={q.id}
-              className="bg-white dark:bg-[#0D172A] rounded-[24px] sm:rounded-[28px] p-5 sm:p-6 shadow-md border-l-4 border-l-[#0b705c] border-y border-r border-slate-200 dark:border-slate-800 space-y-5 transition-all"
+              className={`bg-white dark:bg-[#0D172A] rounded-[24px] sm:rounded-[28px] p-5 sm:p-6 shadow-md border-y border-r border-slate-200 dark:border-slate-800 space-y-5 transition-all ${
+                isArabic ? 'border-r-4 border-r-[#0b705c] border-l-0' : 'border-l-4 border-l-[#0b705c]'
+              }`}
             >
               {/* Question Header (Number Badge + Question Text) */}
-              <div className="flex items-start gap-3">
-                {/* Bengali Question Number Badge */}
+              <div
+                dir={isArabic ? 'rtl' : 'ltr'}
+                className={`flex items-start gap-3 ${isArabic ? 'text-right' : 'text-left'}`}
+              >
+                {/* Question Number Badge */}
                 <div className="w-8 h-8 rounded-full bg-[#0b705c] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
                   {toBengaliNumeral(index + 1)}
                 </div>
 
                 {/* Question Text */}
-                <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed pt-0.5">
+                <h3 className={`text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed pt-0.5 flex-1 ${
+                  isArabic ? 'font-arabic text-right' : 'text-left'
+                }`}>
                   {formatArabicText(q.question, showHarakat)}
                 </h3>
               </div>
 
               {/* Options List (ক, খ, গ, ঘ) */}
-              <div className="space-y-3 pt-1">
+              <div dir={isArabic ? 'rtl' : 'ltr'} className="space-y-3 pt-1">
                 {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
                   const rawOptionText = q[optionKey];
                   const optionText = formatArabicText(rawOptionText, showHarakat);
                   const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
                   const isSelected = selectedOpt === optionKey;
+                  const isOptArabic = isArabic || isArabicText(rawOptionText);
 
                   return (
                     <button
                       key={optionKey}
                       type="button"
                       onClick={() => handleSelectOption(q.id, optionKey)}
-                      className={`w-full text-left p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                      className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                        isArabic ? 'text-right' : 'text-left'
+                      } ${
                         isSelected
                           ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-[#0b705c] text-[#0B132B] dark:text-white font-bold shadow-xs'
                           : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className={`flex items-center gap-3 min-w-0 ${isArabic ? 'flex-row' : 'flex-row'}`}>
                         {/* Option Letter Box */}
                         <div
                           className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 transition-colors ${
@@ -274,7 +285,9 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                         </div>
 
                         {/* Option Text */}
-                        <span className="font-bold text-xs sm:text-sm leading-relaxed">
+                        <span className={`font-bold text-xs sm:text-sm leading-relaxed ${
+                          isOptArabic ? 'font-arabic text-right' : ''
+                        }`}>
                           {optionText}
                         </span>
                       </div>

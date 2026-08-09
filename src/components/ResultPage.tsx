@@ -13,7 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { QuizResult, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText } from '../lib/utils';
+import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText, isArabicText } from '../lib/utils';
 import { LeaderboardModal } from './LeaderboardModal';
 
 interface ResultPageProps {
@@ -298,57 +298,74 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   </div>
 
                   {/* Question Text */}
-                  <h3 className="text-base font-black text-[#0B132B] dark:text-white leading-relaxed">
-                    {formatArabicText(answer.questionText, showHarakat)}
-                  </h3>
-
-                  {/* Options List */}
-                  <div className="space-y-2.5 pt-1">
-                    {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-                      const optionText = formatArabicText(answer.options[optionKey], showHarakat);
-                      const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
-
-                      const isOptionCorrect = optionKey === answer.correctOption;
-                      const isOptionSelected = optionKey === answer.selectedOption;
-
-                      let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
-                      let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
-                      let rightBadge = null;
-
-                      if (isOptionCorrect) {
-                        styleClasses = 'bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold';
-                        letterBg = 'bg-emerald-600 text-white';
-                        rightBadge = (
-                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 rounded-md font-extrabold text-[10px] shrink-0">
-                            ✓ সঠিক উত্তর
-                          </span>
-                        );
-                      } else if (isOptionSelected && !isCorrect) {
-                        styleClasses = 'bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-400 text-rose-950 dark:text-rose-100 font-bold';
-                        letterBg = 'bg-rose-600 text-white';
-                        rightBadge = (
-                          <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200 rounded-md font-extrabold text-[10px] shrink-0">
-                            ✕ আপনার ভুল উত্তর
-                          </span>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={optionKey}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${styleClasses}`}
+                  {(() => {
+                    const isArabic = isArabicText(answer.questionText, answer.subject);
+                    return (
+                      <>
+                        <h3
+                          dir={isArabic ? 'rtl' : 'ltr'}
+                          className={`text-base font-black text-[#0B132B] dark:text-white leading-relaxed ${
+                            isArabic ? 'text-right font-arabic' : 'text-left'
+                          }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
-                              {prefixLabel}
-                            </div>
-                            <span className="font-bold leading-relaxed">{optionText}</span>
-                          </div>
-                          {rightBadge}
+                          {formatArabicText(answer.questionText, showHarakat)}
+                        </h3>
+
+                        {/* Options List */}
+                        <div dir={isArabic ? 'rtl' : 'ltr'} className="space-y-2.5 pt-1">
+                          {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
+                            const optionText = formatArabicText(answer.options[optionKey], showHarakat);
+                            const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
+
+                            const isOptionCorrect = optionKey === answer.correctOption;
+                            const isOptionSelected = optionKey === answer.selectedOption;
+                            const isOptArabic = isArabic || isArabicText(answer.options[optionKey]);
+
+                            let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
+                            let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
+                            let rightBadge = null;
+
+                            if (isOptionCorrect) {
+                              styleClasses = 'bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold';
+                              letterBg = 'bg-emerald-600 text-white';
+                              rightBadge = (
+                                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 rounded-md font-extrabold text-[10px] shrink-0">
+                                  ✓ সঠিক উত্তর
+                                </span>
+                              );
+                            } else if (isOptionSelected && !isCorrect) {
+                              styleClasses = 'bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-400 text-rose-950 dark:text-rose-100 font-bold';
+                              letterBg = 'bg-rose-600 text-white';
+                              rightBadge = (
+                                <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200 rounded-md font-extrabold text-[10px] shrink-0">
+                                  ✕ আপনার ভুল উত্তর
+                                </span>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={optionKey}
+                                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
+                                  isArabic ? 'text-right' : 'text-left'
+                                } ${styleClasses}`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
+                                    {prefixLabel}
+                                  </div>
+                                  <span className={`font-bold leading-relaxed ${isOptArabic ? 'font-arabic text-right' : ''}`}>
+                                    {optionText}
+                                  </span>
+                                </div>
+                                {rightBadge}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </>
+                    );
+                  })()}
 
                   {/* Detailed Explanation Container */}
                   <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200 dark:border-slate-700 space-y-3">

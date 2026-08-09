@@ -221,3 +221,86 @@ export function isExamCompleted(examId: string, examTitle?: string, examSubject?
   return false;
 }
 
+/**
+ * Bookmarked Questions Storage
+ */
+const BOOKMARKS_KEY = 'tamreen_bookmarked_ids';
+
+export function getBookmarkedIds(): string[] {
+  try {
+    const data = localStorage.getItem(BOOKMARKS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function toggleBookmarkId(id: string): boolean {
+  const list = getBookmarkedIds();
+  const idx = list.indexOf(id);
+  let isSaved = false;
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    isSaved = false;
+  } else {
+    list.push(id);
+    isSaved = true;
+  }
+  try {
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+  return isSaved;
+}
+
+/**
+ * User Exam Target / Goal Storage
+ */
+const GOAL_STORAGE_KEY = 'tamreen_user_exam_goal';
+
+export function getUserGoal(): string {
+  try {
+    return localStorage.getItem(GOAL_STORAGE_KEY) || '১৮তম শিক্ষক নিবন্ধন প্রিলি/ভাইভা';
+  } catch {
+    return '১৮তম শিক্ষক নিবন্ধন প্রিলি/ভাইভা';
+  }
+}
+
+export function saveUserGoal(goal: string): void {
+  try {
+    localStorage.setItem(GOAL_STORAGE_KEY, goal);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * User Practice Streak
+ */
+const STREAK_KEY = 'tamreen_user_streak';
+
+export function getUserStreakDays(): number {
+  try {
+    const data = localStorage.getItem(STREAK_KEY);
+    if (!data) return 14; // Default baseline streak for demo
+    return parseInt(data, 10) || 14;
+  } catch {
+    return 14;
+  }
+}
+
+/**
+ * Check if text or subject is Arabic
+ */
+export function isArabicText(text?: string, subject?: string): boolean {
+  if (subject && (subject.includes('আরবি') || subject.toLowerCase().includes('arabic') || subject.includes('কোরআন') || subject.includes('হাদিস'))) {
+    return true;
+  }
+  if (!text) return false;
+  // Match Arabic unicode range
+  const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+  return arabicRegex.test(text);
+}
+
+

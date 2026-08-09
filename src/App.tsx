@@ -10,6 +10,7 @@ import { UstadAiPage } from './components/UstadAiPage';
 import { JobCircularsPage } from './components/JobCircularsPage';
 import { SubjectsPage } from './components/SubjectsPage';
 import { ProfileModal } from './components/ProfileModal';
+import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions } from './lib/supabase';
@@ -230,18 +231,23 @@ export default function App() {
         onChangeFontFamily={setFontFamily}
         showHarakat={showHarakat}
         onChangeShowHarakat={setShowHarakat}
-        onOpenProfile={() => setShowProfileModal(true)}
-        onOpenLeaderboard={handleOpenLeaderboard}
-      />
-
-      <ProfileModal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
+        onOpenProfile={() => setCurrentPage('profile')}
         onOpenLeaderboard={handleOpenLeaderboard}
       />
 
       {/* Main Content Router */}
       <main className="flex-1 pb-12">
+        {currentPage === 'profile' && (
+          <ProfilePage
+            onNavigateHome={handleNavigateHome}
+            onOpenLeaderboard={handleOpenLeaderboard}
+            onOpenCourses={() => {
+              setCurrentPage('home');
+              setActiveTab('subjects');
+            }}
+          />
+        )}
+
         {currentPage === 'practice' && (
           <PracticePage
             questions={questions}

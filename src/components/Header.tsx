@@ -294,7 +294,11 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => {
-                setShowUserMenu(!showUserMenu);
+                if (onOpenProfile) {
+                  onOpenProfile();
+                } else {
+                  setShowUserMenu(!showUserMenu);
+                }
                 setShowFontMenu(false);
               }}
               className={`p-1.5 sm:px-3 sm:py-2 rounded-2xl flex items-center gap-2 cursor-pointer transition-all border shadow-xs active:scale-95 ${
