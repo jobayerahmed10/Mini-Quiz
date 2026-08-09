@@ -57,7 +57,7 @@ export interface QuizResult {
 
 export type TabRoute = 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';
 
-export type PageRoute = 'home' | 'practice' | 'result';
+export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard';
 
 export interface CourseModule {
   id: string;

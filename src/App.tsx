@@ -4,6 +4,7 @@ import { HomePage } from './components/HomePage';
 import { PracticePage } from './components/PracticePage';
 import { ResultPage } from './components/ResultPage';
 import { ExamPage } from './components/ExamPage';
+import { LeaderboardPage } from './components/LeaderboardPage';
 import { CoursesPage } from './components/CoursesPage';
 import { UstadAiPage } from './components/UstadAiPage';
 import { JobCircularsPage } from './components/JobCircularsPage';
@@ -11,7 +12,7 @@ import { SubjectsPage } from './components/SubjectsPage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats } from './lib/utils';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('exam');
@@ -146,9 +147,20 @@ export default function App() {
     };
 
     setQuizResult(result);
+    // Mark subject and exam as completed
+    if (selectedSubject) {
+      addCompletedExamId(selectedSubject);
+    }
+    addCompletedExamId('exam_1');
+    addCompletedExamId('exam_2');
+
     const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
     setStudentStats(updatedStats);
     navigateWithHistory('result');
+  };
+
+  const handleOpenLeaderboard = () => {
+    navigateWithHistory('leaderboard');
   };
 
   const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
@@ -237,7 +249,18 @@ export default function App() {
             result={quizResult}
             onRetry={handleRetry}
             onNavigateHome={handleNavigateHome}
+            onOpenLeaderboard={handleOpenLeaderboard}
             showHarakat={showHarakat}
+          />
+        )}
+
+        {currentPage === 'leaderboard' && (
+          <LeaderboardPage
+            onBack={handleGoBack}
+            currentUserScore={quizResult?.score || 15}
+            totalQuestions={quizResult?.totalQuestions || 15}
+            correctCount={quizResult?.correctCount || 14}
+            wrongCount={quizResult?.wrongCount || 1}
           />
         )}
 
@@ -247,6 +270,8 @@ export default function App() {
               <ExamPage
                 questions={questions}
                 onStartExam={(opts) => handleStartPractice(opts)}
+                onOpenLeaderboard={handleOpenLeaderboard}
+                onReviewAnswers={(opts) => handleStartPractice(opts)}
               />
             )}
 

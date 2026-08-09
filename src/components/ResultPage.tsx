@@ -20,6 +20,7 @@ interface ResultPageProps {
   result: QuizResult;
   onRetry: () => void;
   onNavigateHome: () => void;
+  onOpenLeaderboard?: () => void;
   showHarakat?: boolean;
 }
 
@@ -27,6 +28,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   result,
   onRetry,
   onNavigateHome,
+  onOpenLeaderboard,
   showHarakat = true,
 }) => {
   const [viewMode, setViewMode] = useState<'summary' | 'explanation'>('summary');
@@ -176,7 +178,13 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setShowLeaderboardModal(true)}
+                  onClick={() => {
+                    if (onOpenLeaderboard) {
+                      onOpenLeaderboard();
+                    } else {
+                      setShowLeaderboardModal(true);
+                    }
+                  }}
                   className="py-3.5 px-5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs sm:text-sm rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
                 >
                   <Trophy className="w-4 h-4 text-[#0B132B]" />

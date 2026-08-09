@@ -141,3 +141,80 @@ export function saveQuizResultToStats(correctCount: number, totalQuestions: numb
   }
   return updated;
 }
+
+/**
+ * User Profile interface & Storage Key
+ */
+const PROFILE_STORAGE_KEY = 'tamreen_user_profile';
+
+export interface UserProfile {
+  name: string;
+  phone: string;
+}
+
+export function getUserProfile(): UserProfile | null {
+  try {
+    const data = localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    if (parsed && typeof parsed.name === 'string' && parsed.name.trim().length > 0) {
+      return {
+        name: parsed.name.trim(),
+        phone: parsed.phone ? parsed.phone.trim() : '',
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveUserProfile(name: string, phone: string): UserProfile {
+  const profile: UserProfile = {
+    name: name.trim(),
+    phone: phone.trim(),
+  };
+  try {
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch {
+    // ignore localstorage errors
+  }
+  return profile;
+}
+
+/**
+ * Completed Exam Tracking Storage
+ */
+const COMPLETED_EXAMS_KEY = 'tamreen_completed_exams';
+
+export function getCompletedExamIds(): string[] {
+  try {
+    const data = localStorage.getItem(COMPLETED_EXAMS_KEY);
+    if (!data) return [];
+    return JSON.parse(data) || [];
+  } catch {
+    return [];
+  }
+}
+
+export function addCompletedExamId(examIdentifier: string): void {
+  if (!examIdentifier) return;
+  const current = getCompletedExamIds();
+  if (!current.includes(examIdentifier)) {
+    current.push(examIdentifier);
+    try {
+      localStorage.setItem(COMPLETED_EXAMS_KEY, JSON.stringify(current));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function isExamCompleted(examId: string, examTitle?: string, examSubject?: string): boolean {
+  const completedList = getCompletedExamIds();
+  if (completedList.includes(examId)) return true;
+  if (examTitle && completedList.includes(examTitle)) return true;
+  if (examSubject && completedList.includes(examSubject)) return true;
+  return false;
+}
+

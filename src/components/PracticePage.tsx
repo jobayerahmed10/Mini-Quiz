@@ -62,6 +62,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const unansweredCount = totalQuestions - answeredCount;
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const handleOpenSubmitModal = () => {
     setShowSubmitModal(true);
@@ -71,6 +72,21 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     setShowSubmitModal(false);
     handleSubmitExam();
   };
+
+  // Prevent accidental navigation without confirmation
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      setShowExitModal(true);
+    };
+
+    window.history.pushState({ examInProgress: true }, '');
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -169,13 +185,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           
           {/* Back Button */}
           <button
-            onClick={() => {
-              if (window.history.length > 1) {
-                window.history.back();
-              } else {
-                onNavigateHome();
-              }
-            }}
+            onClick={() => setShowExitModal(true)}
             className="p-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors"
             title="ফিরে যান"
           >
@@ -344,6 +354,44 @@ export const PracticePage: React.FC<PracticePageProps> = ({
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Exit Confirmation Modal */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-sm w-full p-6 text-center space-y-5 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+            <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+              <span className="text-3xl">⚠️</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-[#0B132B] dark:text-white">
+                আপনি কি পরীক্ষা থেকে বের হয়ে যেতে চান?
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+                এখন বের হয়ে গেলে আপনার পরীক্ষাটি বাতিল হবে এবং দেয়া উত্তরগুলো সংরক্ষিত হবে না।
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
+              >
+                পরীক্ষায় থাকুন
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitModal(false);
+                  onNavigateHome();
+                }}
+                className="py-3 px-4 rounded-2xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-black text-xs hover:bg-red-100 cursor-pointer transition-all active:scale-95"
+              >
+                বের হয়ে যান
+              </button>
+            </div>
           </div>
         </div>
       )}

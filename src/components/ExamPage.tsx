@@ -24,20 +24,29 @@ import {
 import { Question } from '../types';
 import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
-import { toBengaliNumeral } from '../lib/utils';
-import { LeaderboardModal } from './LeaderboardModal';
+import { toBengaliNumeral, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
+import { UserRegistrationModal } from './UserRegistrationModal';
+
+interface ExamStartOptions {
+  subject: string;
+  questionCount: number;
+  timeMinutes: number;
+  examType: string;
+}
 
 interface ExamPageProps {
   questions?: Question[];
-  onStartExam: (options: {
-    subject: string;
-    questionCount: number;
-    timeMinutes: number;
-    examType: string;
-  }) => void;
+  onStartExam: (options: ExamStartOptions) => void;
+  onOpenLeaderboard?: () => void;
+  onReviewAnswers?: (options: ExamStartOptions) => void;
 }
 
-export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam }) => {
+export const ExamPage: React.FC<ExamPageProps> = ({
+  questions = [],
+  onStartExam,
+  onOpenLeaderboard,
+  onReviewAnswers,
+}) => {
   const [exams, setExams] = useState<ExamItem[]>(DEFAULT_EXAM_PRESETS);
   const [filterType, setFilterType] = useState<'all' | 'daily' | 'free' | 'weekly' | 'live'>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -45,7 +54,28 @@ export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam 
   const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  
+  // Registration modal for users entering exam
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [pendingStartOpts, setPendingStartOpts] = useState<ExamStartOptions | null>(null);
+
+  const handleAttemptStartExam = (opts: ExamStartOptions) => {
+    const profile = getUserProfile();
+    if (profile && profile.name) {
+      onStartExam(opts);
+    } else {
+      setPendingStartOpts(opts);
+      setShowRegModal(true);
+    }
+  };
+
+  const handleRegSaved = (profile: UserProfile) => {
+    setShowRegModal(false);
+    if (pendingStartOpts) {
+      onStartExam(pendingStartOpts);
+      setPendingStartOpts(null);
+    }
+  };
 
   const loadExams = useCallback(async () => {
     setIsLoading(true);
@@ -320,20 +350,23 @@ export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam 
                     </span>
                   </div>
 
-                  {/* Right Actions: Free Badge + Share Button */}
+                  {/* Right Actions: Free Badge + Share Button (Share hidden for premium/VIP exams) */}
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-400 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
                       <Sparkles className="w-3 h-3 text-emerald-500" />
                       <span>{isVip ? 'ভিআইপি' : 'ফ্রি'}</span>
                     </span>
 
-                    <button
-                      onClick={(e) => handleShare(exam, e)}
-                      className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 text-[11px] font-extrabold rounded-full flex items-center gap-1 cursor-pointer transition-colors border border-emerald-300/80 dark:border-emerald-800"
-                    >
-                      <Share2 className="w-3 h-3" />
-                      <span>শেয়ার</span>
-                    </button>
+                    {/* Hide share button on premium exams */}
+                    {!isVip && (
+                      <button
+                        onClick={(e) => handleShare(exam, e)}
+                        className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 text-[11px] font-extrabold rounded-full flex items-center gap-1 cursor-pointer transition-colors border border-emerald-300/80 dark:border-emerald-800"
+                      >
+                        <Share2 className="w-3 h-3" />
+                        <span>শেয়ার</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -383,23 +416,63 @@ export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam 
                   </span>
                 </div>
 
-                {/* Big Full-width Action Button */}
-                <button
-                  onClick={() => onStartExam({
-                    subject: exam.subject,
-                    questionCount: displayQuestionCount,
-                    timeMinutes: displayTimeMinutes,
-                    examType: exam.title,
-                  })}
-                  className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
-                    isVip
-                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
-                      : 'bg-[#0B132B] hover:bg-slate-900 text-white border border-slate-800'
-                  }`}
-                >
-                  <Play className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
-                  <span>{isVip ? 'প্রিমিয়াম পরীক্ষা দিন' : 'ফ্রি পরীক্ষা দিন'}</span>
-                </button>
+                {/* Action Buttons: 2 buttons if completed, 1 button if not taken */}
+                {isExamCompleted(exam.id, exam.title, exam.subject) ? (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      onClick={() => {
+                        if (onReviewAnswers) {
+                          onReviewAnswers({
+                            subject: exam.subject,
+                            questionCount: displayQuestionCount,
+                            timeMinutes: displayTimeMinutes,
+                            examType: exam.title,
+                          });
+                        } else {
+                          handleAttemptStartExam({
+                            subject: exam.subject,
+                            questionCount: displayQuestionCount,
+                            timeMinutes: displayTimeMinutes,
+                            examType: exam.title,
+                          });
+                        }
+                      }}
+                      className="py-3 px-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300/80 dark:border-emerald-800 text-[#0b705c] dark:text-emerald-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:bg-emerald-100 transition-all active:scale-95"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
+                      <span>ব্যাখ্যা সহ উত্তর</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (onOpenLeaderboard) {
+                          onOpenLeaderboard();
+                        }
+                      }}
+                      className="py-3 px-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:bg-amber-100 transition-all active:scale-95"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span>লিডারবোর্ড</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleAttemptStartExam({
+                      subject: exam.subject,
+                      questionCount: displayQuestionCount,
+                      timeMinutes: displayTimeMinutes,
+                      examType: exam.title,
+                    })}
+                    className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
+                      isVip
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
+                        : 'bg-[#0B132B] hover:bg-slate-900 text-white border border-slate-800'
+                    }`}
+                  >
+                    <Play className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
+                    <span>{isVip ? 'প্রিমিয়াম পরীক্ষা দিন' : 'ফ্রি পরীক্ষা দিন'}</span>
+                  </button>
+                )}
 
               </div>
             );
@@ -407,9 +480,14 @@ export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam 
         )}
       </div>
 
-      <LeaderboardModal
-        isOpen={showLeaderboardModal}
-        onClose={() => setShowLeaderboardModal(false)}
+      {/* User Registration Modal before starting exam */}
+      <UserRegistrationModal
+        isOpen={showRegModal}
+        onClose={() => {
+          setShowRegModal(false);
+          setPendingStartOpts(null);
+        }}
+        onSaveSuccess={handleRegSaved}
       />
     </div>
   );
