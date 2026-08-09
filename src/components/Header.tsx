@@ -57,11 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span className={`font-black text-lg sm:text-2xl tracking-tight ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
-                শিক্ষক নিবন্ধন <span className="text-amber-500 font-extrabold text-xs sm:text-base hidden sm:inline">& প্রস্তুতি</span>
-              </span>
-              <span className="text-[10px] font-black tracking-wider px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-full flex items-center gap-1 shadow-xs">
-                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                ১৯তম NTRCA
+                শিক্ষক নিবন্ধন প্রস্তুতি
               </span>
             </div>
             <p className={`text-[11px] sm:text-xs font-medium tracking-wide hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
