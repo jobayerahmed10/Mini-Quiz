@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages } from 'lucide-react';
+import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft } from 'lucide-react';
 import { PageRoute } from '../types';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
 interface HeaderProps {
   currentPage: PageRoute;
+  activeTab?: string;
   selectedSubject?: string;
   onNavigateHome: () => void;
+  onGoBack?: () => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   fontSize: 'normal' | 'medium' | 'large';
@@ -20,8 +22,10 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentPage,
+  activeTab,
   selectedSubject,
   onNavigateHome,
+  onGoBack,
   isDarkMode,
   onToggleDarkMode,
   fontSize,
@@ -57,26 +61,45 @@ export const Header: React.FC<HeaderProps> = ({
       isDarkMode ? 'bg-[#0B132B]/90 border-slate-800 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xs'
     }`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
-        {/* Brand Logo & Name */}
-        <button
-          onClick={onNavigateHome}
-          className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-hidden cursor-pointer"
-          title="হোম পেজে যান"
-        >
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#0B132B] text-amber-400 font-bold text-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-all shrink-0 border border-amber-500/30">
-            <BookOpenCheck className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className={`font-black text-lg sm:text-2xl tracking-tight ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
-                শিক্ষক নিবন্ধন প্রস্তুতি
-              </span>
+        {/* Top Left Area (Back Button + Brand Logo) */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* Top-Left Back Button when inside sub-page or non-home tab */}
+          {(currentPage !== 'home' || (activeTab && activeTab !== 'exam')) && (
+            <button
+              onClick={onGoBack || onNavigateHome}
+              className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all border shrink-0 active:scale-95 shadow-xs ${
+                isDarkMode
+                  ? 'bg-slate-800 text-amber-400 border-slate-700 hover:bg-slate-700'
+                  : 'bg-slate-100 text-[#0B132B] border-slate-300 hover:bg-slate-200'
+              }`}
+              title="পিছনে ফিরে যান"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="font-extrabold hidden xs:inline">পিছনে</span>
+            </button>
+          )}
+
+          {/* Brand Logo & Name */}
+          <button
+            onClick={onNavigateHome}
+            className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-hidden cursor-pointer min-w-0"
+            title="হোম পেজে যান"
+          >
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-[#0B132B] text-amber-400 font-bold text-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-all shrink-0 border border-amber-500/30">
+              <BookOpenCheck className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
             </div>
-            <p className={`text-[11px] sm:text-xs font-medium tracking-wide hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              মাদ্রাসা, স্কুল, কলেজ নিবন্ধন, বিষয়ভিত্তিক প্রস্তুতি ও মডেল টেস্ট
-            </p>
-          </div>
-        </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className={`font-black text-base sm:text-2xl tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
+                  শিক্ষক নিবন্ধন প্রস্তুতি
+                </span>
+              </div>
+              <p className={`text-[11px] sm:text-xs font-medium tracking-wide hidden sm:block truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                মাদ্রাসা, স্কুল, কলেজ নিবন্ধন, বিষয়ভিত্তিক প্রস্তুতি ও মডেল টেস্ট
+              </p>
+            </div>
+          </button>
+        </div>
 
         {/* Action Controls Header Right */}
         <div className="flex items-center gap-2 sm:gap-3">

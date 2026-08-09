@@ -84,6 +84,47 @@ export default function App() {
     loadQuestions();
   }, [loadQuestions]);
 
+  // History state listener for mobile back button support
+  useEffect(() => {
+    // Set initial history state if not set
+    if (!window.history.state) {
+      window.history.replaceState({ page: 'home', tab: 'exam' }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.page) {
+        setCurrentPage(e.state.page as PageRoute);
+        if (e.state.tab) {
+          setActiveTab(e.state.tab as TabRoute);
+        }
+      } else {
+        setCurrentPage('home');
+        setActiveTab('exam');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateWithHistory = (newPage: PageRoute, newTab?: TabRoute) => {
+    const targetTab = newTab || activeTab;
+    setCurrentPage(newPage);
+    if (newTab) {
+      setActiveTab(newTab);
+    }
+    window.history.pushState({ page: newPage, tab: targetTab }, '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigateWithHistory('home', 'exam');
+    }
+  };
+
   // Handle quiz completion
   const handleFinishQuiz = (userAnswers: UserAnswer[]) => {
     const totalQuestions = userAnswers.length;
@@ -106,8 +147,7 @@ export default function App() {
     setQuizResult(result);
     const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
     setStudentStats(updatedStats);
-    setCurrentPage('result');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateWithHistory('result');
   };
 
   const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
@@ -115,25 +155,20 @@ export default function App() {
     const timeMins = typeof subjectOrOpts === 'object' && subjectOrOpts.timeMinutes ? subjectOrOpts.timeMinutes : 30;
     setSelectedSubject(subjName);
     setExamTimeMinutes(timeMins);
-    setCurrentPage('practice');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateWithHistory('practice');
   };
 
   const handleNavigateHome = () => {
-    setCurrentPage('home');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateWithHistory('home', 'exam');
   };
 
   const handleRetry = () => {
     setQuizResult(null);
-    setCurrentPage('practice');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateWithHistory('practice');
   };
 
   const handleTabChange = (tab: TabRoute) => {
-    setActiveTab(tab);
-    setCurrentPage('home');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateWithHistory('home', tab);
   };
 
   const getFontFamilyClass = () => {
@@ -163,8 +198,10 @@ export default function App() {
       {/* Top Navigation Header */}
       <Header
         currentPage={currentPage}
+        activeTab={activeTab}
         selectedSubject={selectedSubject}
         onNavigateHome={handleNavigateHome}
+        onGoBack={handleGoBack}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         fontSize={fontSize}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, GraduationCap, Clock, Award, CheckCircle2, ChevronRight, FileText, Download, Sparkles, Filter } from 'lucide-react';
+import { BookOpen, GraduationCap, Clock, Award, CheckCircle2, ChevronRight, FileText, Download, Sparkles, Filter, ArrowLeft } from 'lucide-react';
 import { CourseModule } from '../types';
 
 interface CoursesPageProps {
@@ -197,6 +197,18 @@ export const CoursesPage: React.FC<CoursesPageProps> = () => {
       {activeCourseModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 relative border border-slate-300 shadow-2xl space-y-4">
+            
+            {/* Top Left Back Button in Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                onClick={() => setActiveCourseModal(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4 text-amber-500" />
+                <span>পিছনে</span>
+              </button>
+            </div>
+
             <h3 className="text-xl font-black text-[#0B132B]">{activeCourseModal.title}</h3>
             <p className="text-xs text-slate-600">{activeCourseModal.subtitle}</p>
 

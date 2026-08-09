@@ -140,7 +140,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           
           {/* Back Button */}
           <button
-            onClick={onNavigateHome}
+            onClick={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                onNavigateHome();
+              }
+            }}
             className="p-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors"
             title="ফিরে যান"
           >

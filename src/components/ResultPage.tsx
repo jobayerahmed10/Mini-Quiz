@@ -12,7 +12,8 @@ import {
   HelpCircle,
   BarChart3,
   BookOpen,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from 'lucide-react';
 import { QuizResult } from '../types';
 import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText } from '../lib/utils';
@@ -102,8 +103,19 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12 space-y-8 animate-fade-in">
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
       
+      {/* Top Left Navigation Back Bar */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={onNavigateHome}
+          className="px-4 py-2 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[#0B132B] dark:text-amber-400 font-black text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer border border-slate-300 dark:border-slate-700 active:scale-95"
+        >
+          <ArrowLeft className="w-4 h-4 text-amber-500" />
+          <span>হোমে ফিরে যান</span>
+        </button>
+      </div>
+
       {/* Top Trophy Banner */}
       <div className="text-center space-y-4 neu-card p-8 sm:p-10 relative overflow-hidden">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto shadow-xs">

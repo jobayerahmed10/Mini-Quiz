@@ -21,7 +21,8 @@ import {
   Clock,
   ListOrdered,
   X,
-  Check
+  Check,
+  ArrowLeft
 } from 'lucide-react';
 import { SUBJECT_CATEGORIES } from '../lib/subjects';
 
@@ -164,13 +165,22 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) =
       {selectedSubject && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="neu-card max-w-md w-full p-6 relative shadow-2xl space-y-5 bg-white dark:bg-[#121E36]">
-            {/* Close Modal */}
-            <button
-              onClick={() => setSelectedSubject(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 flex items-center justify-center cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Header with Top-Left Back Button and Right Close Button */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
+              <button
+                onClick={() => setSelectedSubject(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1.5 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4 text-amber-500" />
+                <span>পিছনে</span>
+              </button>
+              <button
+                onClick={() => setSelectedSubject(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* Subject Title */}
             <div>

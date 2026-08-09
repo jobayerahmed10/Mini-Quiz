@@ -13,7 +13,8 @@ import {
   ChevronRight,
   X,
   Share2,
-  Bookmark
+  Bookmark,
+  ArrowLeft
 } from 'lucide-react';
 import { JobCircular } from '../types';
 import { JOB_CIRCULARS_DATA } from '../data/jobCircularsData';
@@ -199,12 +200,22 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
       {activeJobModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 space-y-6 shadow-2xl relative">
-            <button
-              onClick={() => setActiveJobModal(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                onClick={() => setActiveJobModal(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4 text-amber-500" />
+                <span>পিছনে</span>
+              </button>
+              <button
+                onClick={() => setActiveJobModal(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="space-y-2">
               <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-200">
