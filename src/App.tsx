@@ -22,6 +22,7 @@ export default function App() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
+  const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
@@ -151,10 +152,15 @@ export default function App() {
   };
 
   const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
-    const subjName = typeof subjectOrOpts === 'string' ? subjectOrOpts : subjectOrOpts.subject;
-    const timeMins = typeof subjectOrOpts === 'object' && subjectOrOpts.timeMinutes ? subjectOrOpts.timeMinutes : 30;
-    setSelectedSubject(subjName);
-    setExamTimeMinutes(timeMins);
+    if (typeof subjectOrOpts === 'string') {
+      setSelectedSubject(subjectOrOpts);
+      setExamQuestionCount(undefined);
+      setExamTimeMinutes(30);
+    } else {
+      setSelectedSubject(subjectOrOpts.subject);
+      setExamQuestionCount(subjectOrOpts.questionCount);
+      setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
+    }
     navigateWithHistory('practice');
   };
 
@@ -218,6 +224,7 @@ export default function App() {
           <PracticePage
             questions={questions}
             initialSubject={selectedSubject}
+            targetQuestionCount={examQuestionCount}
             timeMinutes={examTimeMinutes}
             onFinishQuiz={handleFinishQuiz}
             onNavigateHome={handleNavigateHome}
@@ -238,6 +245,7 @@ export default function App() {
           <>
             {activeTab === 'exam' && (
               <ExamPage
+                questions={questions}
                 onStartExam={(opts) => handleStartPractice(opts)}
               />
             )}

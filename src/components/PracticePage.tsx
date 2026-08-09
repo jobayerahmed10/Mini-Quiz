@@ -13,6 +13,7 @@ import { detectQuestionSubject } from '../lib/subjects';
 interface PracticePageProps {
   questions: Question[];
   initialSubject?: string;
+  targetQuestionCount?: number;
   timeMinutes?: number;
   onFinishQuiz: (userAnswers: UserAnswer[]) => void;
   onNavigateHome: () => void;
@@ -22,6 +23,7 @@ interface PracticePageProps {
 export const PracticePage: React.FC<PracticePageProps> = ({
   questions,
   initialSubject = 'all',
+  targetQuestionCount,
   timeMinutes = 30,
   onFinishQuiz,
   onNavigateHome,
@@ -31,14 +33,29 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const [userSelections, setUserSelections] = useState<Record<string, 'option_a' | 'option_b' | 'option_c' | 'option_d'>>({});
   const [timeLeft, setTimeLeft] = useState<number>(timeMinutes * 60);
 
+  // Sync timer when timeMinutes changes
+  useEffect(() => {
+    setTimeLeft(timeMinutes * 60);
+  }, [timeMinutes]);
+
   // Filter questions based on subject if needed
-  const filteredQuestions = useMemo(() => {
+  const subjectQuestions = useMemo(() => {
     if (!activeSubject || activeSubject === 'all' || activeSubject === 'সকল বিষয়') return questions;
     return questions.filter((q) => {
+      if (q.subject && (q.subject.toLowerCase().includes(activeSubject.toLowerCase()) || activeSubject.toLowerCase().includes(q.subject.toLowerCase()))) {
+        return true;
+      }
       const subj = detectQuestionSubject(q);
-      return subj === activeSubject;
+      return subj === activeSubject || activeSubject.includes(subj) || subj.includes(activeSubject);
     });
   }, [questions, activeSubject]);
+
+  const filteredQuestions = useMemo(() => {
+    if (targetQuestionCount && targetQuestionCount > 0 && subjectQuestions.length > targetQuestionCount) {
+      return subjectQuestions.slice(0, targetQuestionCount);
+    }
+    return subjectQuestions;
+  }, [subjectQuestions, targetQuestionCount]);
 
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;

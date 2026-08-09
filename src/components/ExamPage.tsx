@@ -21,11 +21,14 @@ import {
   FileText,
   Trophy
 } from 'lucide-react';
+import { Question } from '../types';
 import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
-import { SUBJECT_CATEGORIES } from '../lib/subjects';
+import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
+import { toBengaliNumeral } from '../lib/utils';
 import { LeaderboardModal } from './LeaderboardModal';
 
 interface ExamPageProps {
+  questions?: Question[];
   onStartExam: (options: {
     subject: string;
     questionCount: number;
@@ -34,7 +37,7 @@ interface ExamPageProps {
   }) => void;
 }
 
-export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
+export const ExamPage: React.FC<ExamPageProps> = ({ questions = [], onStartExam }) => {
   const [exams, setExams] = useState<ExamItem[]>(DEFAULT_EXAM_PRESETS);
   const [filterType, setFilterType] = useState<'all' | 'daily' | 'free' | 'weekly' | 'live'>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -254,6 +257,32 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
             const isVip = exam.is_premium || exam.badge_type === 'weekly';
             const isLive = exam.badge_type === 'live';
 
+            // Calculate actual available questions for this exam/subject from database
+            const getMatchingQuestionCount = (subjName: string) => {
+              if (!questions || questions.length === 0) return 0;
+              if (!subjName || subjName === 'all' || subjName === 'সকল বিষয়' || subjName.includes('সকল')) {
+                return questions.length;
+              }
+              return questions.filter((q) => {
+                if (q.subject && (q.subject.toLowerCase().includes(subjName.toLowerCase()) || subjName.toLowerCase().includes(q.subject.toLowerCase()))) {
+                  return true;
+                }
+                const detected = detectQuestionSubject(q);
+                return detected === subjName || subjName.includes(detected) || detected.includes(subjName);
+              }).length;
+            };
+
+            const availableCount = getMatchingQuestionCount(exam.subject);
+
+            // Display question count matching database if questions exist, otherwise fallback
+            const displayQuestionCount = availableCount > 0 ? availableCount : (exam.question_count || 15);
+            const displayTotalMarks = displayQuestionCount;
+            
+            let displayTimeMinutes = exam.time_minutes || 20;
+            if (availableCount > 0 && exam.question_count && availableCount !== exam.question_count) {
+              displayTimeMinutes = Math.max(5, Math.round(availableCount * (exam.time_minutes / exam.question_count)));
+            }
+
             return (
               <div
                 key={exam.id}
@@ -323,21 +352,21 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
                   <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
                     <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                      {exam.time_minutes} মি.
+                      {toBengaliNumeral(displayTimeMinutes)} মি.
                     </span>
                   </div>
 
                   <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
                     <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                      {exam.question_count} প্রশ্ন
+                      {toBengaliNumeral(displayQuestionCount)} প্রশ্ন
                     </span>
                   </div>
 
                   <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                      {exam.total_marks || exam.question_count} নম্বর
+                      {toBengaliNumeral(displayTotalMarks)} নম্বর
                     </span>
                   </div>
                 </div>
@@ -358,8 +387,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
                 <button
                   onClick={() => onStartExam({
                     subject: exam.subject,
-                    questionCount: exam.question_count,
-                    timeMinutes: exam.time_minutes,
+                    questionCount: displayQuestionCount,
+                    timeMinutes: displayTimeMinutes,
                     examType: exam.title,
                   })}
                   className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
