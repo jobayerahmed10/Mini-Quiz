@@ -4,15 +4,25 @@ import {
   Target, 
   Play, 
   Sparkles, 
-  PlusCircle,
   Shield,
-  Layers,
-  Calendar,
+  Search,
+  Share2,
+  GraduationCap,
+  BookOpen,
+  Award,
   Zap,
-  Tag,
-  RefreshCw
+  CheckCircle2,
+  Users,
+  Flame,
+  Layers,
+  ChevronDown,
+  RefreshCw,
+  Copy,
+  Crown,
+  FileText
 } from 'lucide-react';
 import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
+import { SUBJECT_CATEGORIES } from '../lib/subjects';
 import { ExamAdminModal } from './ExamAdminModal';
 
 interface ExamPageProps {
@@ -26,9 +36,13 @@ interface ExamPageProps {
 
 export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
   const [exams, setExams] = useState<ExamItem[]>(DEFAULT_EXAM_PRESETS);
-  const [filterType, setFilterType] = useState<'all' | 'daily' | 'weekly' | 'free' | 'live'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'daily' | 'free' | 'weekly' | 'live'>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const [isLoading, setIsLoading] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadExams = useCallback(async () => {
     setIsLoading(true);
@@ -45,142 +59,323 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
     loadExams();
   }, [loadExams]);
 
+  const handleShare = (exam: ExamItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareText = `${exam.title}\nবিষয়: ${exam.subject}\nপ্রশ্ন: ${exam.question_count}টি, সময়: ${exam.time_minutes} মিনিট।\nতামরীন একাডেমিতে এখনই অংশগ্রহণ করুন!`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareText);
+      setCopiedId(exam.id);
+      setTimeout(() => setCopiedId(null), 2500);
+    }
+  };
+
+  // Filtered exams logic
   const filteredExams = exams.filter((e) => {
-    if (filterType === 'all') return true;
-    return e.badge_type === filterType;
+    // Category filter
+    if (filterType !== 'all') {
+      if (filterType === 'daily' && e.badge_type !== 'daily') return false;
+      if (filterType === 'free' && e.badge_type !== 'free') return false;
+      if (filterType === 'weekly' && e.badge_type !== 'weekly') return false;
+      if (filterType === 'live' && e.badge_type !== 'live') return false;
+    }
+
+    // Subject filter
+    if (selectedSubject !== 'all' && e.subject !== selectedSubject) {
+      return false;
+    }
+
+    // Search query filter
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = e.title.toLowerCase().includes(q);
+      const matchSubject = e.subject.toLowerCase().includes(q);
+      const matchBadge = e.badge.toLowerCase().includes(q);
+      return matchTitle || matchSubject || matchBadge;
+    }
+
+    return true;
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 mb-24 space-y-6">
-      {/* Banner */}
-      <div className="neu-card p-6 sm:p-8 relative overflow-hidden">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex flex-col items-start gap-2">
-            <span className="text-xs font-black px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full inline-flex items-center gap-1.5 mb-1">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 mb-24 space-y-5">
+      
+      {/* 1. Top Navy Blue Header Banner Card */}
+      <div className="bg-[#0B132B] dark:bg-[#070D1E] text-white p-6 sm:p-8 rounded-[28px] shadow-xl relative overflow-hidden border border-slate-800">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-black px-3 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 rounded-full inline-flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               লাইভ কুইজ ও প্রিলিমিনারি মডেল টেস্ট
             </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#0B132B] dark:text-white">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
               পরীক্ষা দিন
             </h1>
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <p className="text-xs sm:text-sm font-semibold text-emerald-300/90">
               ফ্রিতে পরীক্ষার প্রস্তুতি নিন
             </p>
           </div>
 
-          {/* Admin Button */}
+          {/* Admin Panel Link */}
           <button
             onClick={() => setIsAdminModalOpen(true)}
-            className="neu-btn px-4 py-2.5 rounded-2xl bg-[#0B132B] text-amber-400 font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 transition-all shrink-0"
+            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-[#0B132B] font-black text-xs rounded-2xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
           >
-            <Shield className="w-4 h-4 text-amber-400" />
-            <span>এডমিন প্যানেল (মডেল টেস্ট যোগ করুন)</span>
+            <Shield className="w-4 h-4 text-[#0B132B]" />
+            <span>এডমিন প্যানেল (মডেল টেস্ট যুক্ত করুন)</span>
           </button>
         </div>
       </div>
 
-      {/* Category Tabs & Filter */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-100 dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { id: 'all', label: 'সব টেস্ট', icon: Layers },
-            { id: 'daily', label: '📅 দৈনিক মডেল টেস্ট', icon: Calendar },
-            { id: 'weekly', label: '📆 সাপ্তাহিক টেস্ট', icon: Calendar },
-            { id: 'free', label: '🆓 ফ্রি পরীক্ষা', icon: Tag },
-            { id: 'live', label: '🔴 লাইভ টেস্ট', icon: Zap },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterType(tab.id as 'all' | 'daily' | 'weekly' | 'free' | 'live')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all border ${
-                filterType === tab.id
-                  ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
-                  : 'text-slate-700 dark:text-slate-300 border-transparent hover:bg-white dark:hover:bg-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* 2. Search & Filters Container (Styled like Tamreen Academy UI) */}
+      <div className="neu-card p-4 sm:p-5 rounded-[24px] space-y-3.5">
+        
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="পরীক্ষার নাম, বিষয় বা প্রশ্নপত্র দিয়ে খুঁজুন (যেমন: আরবি ব্যাকরণ)..."
+            className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#0D172A] border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs font-bold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors"
+          />
         </div>
 
-        <button
-          onClick={loadExams}
-          disabled={isLoading}
-          className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors shrink-0"
-          title="রিফ্রেশ করুন"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
+        {/* Category Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setFilterType('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+              filterType === 'all'
+                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>সবগুলো</span>
+          </button>
+
+          <button
+            onClick={() => setFilterType('daily')}
+            className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+              filterType === 'daily'
+                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-500" />
+            <span>দৈনিক মডেল টেস্ট</span>
+          </button>
+
+          <button
+            onClick={() => setFilterType('free')}
+            className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+              filterType === 'free'
+                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-500" />
+            <span>ফ্রি এক্সাম</span>
+          </button>
+
+          <button
+            onClick={() => setFilterType('weekly')}
+            className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+              filterType === 'weekly'
+                ? 'bg-[#0b705c] text-white border-[#0b705c] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span>সাপ্তাহিক মেগা</span>
+          </button>
+        </div>
+
+        {/* Dropdown Filters (Subject & Sort) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          {/* Subject Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="w-full appearance-none bg-slate-50 dark:bg-[#0D172A] border border-slate-200 dark:border-slate-700/80 rounded-2xl py-2.5 pl-4 pr-10 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="all">📖 সকল বিষয়</option>
+              {SUBJECT_CATEGORIES.filter(s => s.id !== 'all').map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'latest' | 'popular')}
+              className="w-full appearance-none bg-slate-50 dark:bg-[#0D172A] border border-slate-200 dark:border-slate-700/80 rounded-2xl py-2.5 pl-4 pr-10 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="latest">⚡ সর্বশেষ প্রকাশিত</option>
+              <option value="popular">🔥 সর্বাধিক জনপ্রিয়</option>
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
       </div>
 
-      {/* Featured Model Tests */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-black text-[#0B132B] dark:text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
-            মডেল টেস্ট তালিকা ({filteredExams.length}টি):
-          </h2>
+      {/* 3. Copy Notification Toast */}
+      {copiedId && (
+        <div className="fixed top-20 right-4 z-50 bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+          <span>পরীক্ষার লিংক ও তথ্য কপি করা হয়েছে!</span>
         </div>
+      )}
 
+      {/* 4. Exam Cards List (Matches Screenshots 1, 2, 3) */}
+      <div className="space-y-4">
         {filteredExams.length === 0 ? (
-          <div className="neu-card p-8 text-center text-xs font-bold text-slate-500">
-            এই ক্যাটাগরিতে কোনো মডেল টেস্ট নেই। এডমিন প্যানেল থেকে টেস্ট যুক্ত করুন।
+          <div className="neu-card p-10 text-center space-y-2">
+            <FileText className="w-8 h-8 text-slate-400 mx-auto" />
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+              কোনো পরীক্ষা খুঁজে পাওয়া যায়নি।
+            </p>
+            <p className="text-xs text-slate-400">
+              অন্য বিষয় সিলেক্ট করুন অথবা এডমিন প্যানেল থেকে নতুন টেস্ট যুক্ত করুন।
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredExams.map((exam) => {
-              return (
-                <div
-                  key={exam.id}
-                  className="neu-card p-5 flex flex-col justify-between hover:border-amber-400/60 transition-all group"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-[10px] font-black px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-[#0B132B] dark:text-amber-300 border border-slate-300 dark:border-slate-700 rounded-full">
-                        {exam.badge}
-                      </span>
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                        <Clock className="w-3.5 h-3.5 text-[#0B132B] dark:text-amber-400" />
-                        <span>{exam.time_minutes} মিনিট</span>
-                      </div>
+          filteredExams.map((exam) => {
+            const isVip = exam.is_premium || exam.badge_type === 'weekly';
+            const isLive = exam.badge_type === 'live';
+
+            return (
+              <div
+                key={exam.id}
+                className={`neu-card p-5 sm:p-6 rounded-[28px] border-2 transition-all relative overflow-hidden ${
+                  isVip
+                    ? 'border-amber-400/80 dark:border-amber-500/60 bg-gradient-to-br from-amber-50/40 to-white dark:from-[#111A2E] dark:to-[#0D172A]'
+                    : isLive
+                    ? 'border-rose-400/80 dark:border-rose-500/60 bg-gradient-to-br from-rose-50/40 to-white dark:from-[#111A2E] dark:to-[#0D172A]'
+                    : 'border-emerald-500/60 dark:border-emerald-600/50'
+                }`}
+              >
+                {/* Top Row: Icon + Badge Pills + Share Button */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Left Icon Badge */}
+                    <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400">
+                      {isVip ? (
+                        <Crown className="w-4 h-4 text-amber-500" />
+                      ) : isLive ? (
+                        <Zap className="w-4 h-4 text-rose-500" />
+                      ) : (
+                        <GraduationCap className="w-4 h-4" />
+                      )}
                     </div>
 
-                    <h3 className="text-base font-black text-[#0B132B] dark:text-white group-hover:text-amber-400 transition-colors leading-snug">
-                      {exam.title}
-                    </h3>
-
-                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">
-                      বিষয়: {exam.subject}
-                    </div>
-
-                    {exam.description && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed line-clamp-2">
-                        {exam.description}
-                      </p>
-                    )}
+                    {/* Badge Pill */}
+                    <span className={`text-[11px] font-black px-3 py-1 rounded-full border ${
+                      isVip
+                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                        : isLive
+                        ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700'
+                        : 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                    }`}>
+                      {exam.badge || 'দৈনিক মডেল টেস্ট'}
+                    </span>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
-                      {exam.question_count}টি প্রশ্ন ({exam.total_marks || exam.question_count} মার্কস)
+                  {/* Right Actions: Free Badge + Share Button */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-400 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                      <Sparkles className="w-3 h-3 text-emerald-500" />
+                      <span>{isVip ? 'ভিআইপি' : 'ফ্রি'}</span>
                     </span>
+
                     <button
-                      onClick={() => onStartExam({
-                        subject: exam.subject,
-                        questionCount: exam.question_count,
-                        timeMinutes: exam.time_minutes,
-                        examType: exam.title,
-                      })}
-                      className="neu-btn px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                      onClick={(e) => handleShare(exam, e)}
+                      className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 text-[11px] font-extrabold rounded-full flex items-center gap-1 cursor-pointer transition-colors border border-emerald-300/80 dark:border-emerald-800"
                     >
-                      <Play className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      <span>শুরু করুন</span>
+                      <Share2 className="w-3 h-3" />
+                      <span>শেয়ার</span>
                     </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Exam Title */}
+                <h2 className="text-lg sm:text-xl font-black text-[#0B132B] dark:text-white leading-snug mb-1">
+                  {exam.title}
+                </h2>
+
+                {/* Subject Name */}
+                <p className="text-xs sm:text-sm font-extrabold text-slate-600 dark:text-slate-300 mb-4">
+                  বিষয়: <span className="text-[#0B132B] dark:text-amber-300">{exam.subject}</span>
+                </p>
+
+                {/* 3 Stat Badges (Time, Questions, Marks) */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                  <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                      {exam.time_minutes} মি.
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                      {exam.question_count} প্রশ্ন
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-100 dark:bg-slate-800/80 py-2 px-3 rounded-2xl text-center flex items-center justify-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                      {exam.total_marks || exam.question_count} নম্বর
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Examinee Count & Status Tag */}
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-1">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{exam.examinee_count || '২,৫০০+'} পরীক্ষার্থী</span>
+                  </div>
+
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
+                    {exam.examinee_tag || (isVip ? 'বিশেষ ভিআইপি' : 'আজকের টেস্ট')}
+                  </span>
+                </div>
+
+                {/* Big Full-width Action Button */}
+                <button
+                  onClick={() => onStartExam({
+                    subject: exam.subject,
+                    questionCount: exam.question_count,
+                    timeMinutes: exam.time_minutes,
+                    examType: exam.title,
+                  })}
+                  className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
+                    isVip
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
+                      : 'bg-[#0b705c] hover:bg-[#085a4a] text-white'
+                  }`}
+                >
+                  <Play className="w-4 h-4 fill-current shrink-0" />
+                  <span>{isVip ? 'প্রিমিয়াম পরীক্ষা দিন' : 'ফ্রি পরীক্ষা দিন'}</span>
+                </button>
+
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -194,4 +389,3 @@ export const ExamPage: React.FC<ExamPageProps> = ({ onStartExam }) => {
     </div>
   );
 };
-
