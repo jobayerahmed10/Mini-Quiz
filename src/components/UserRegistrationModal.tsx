@@ -80,17 +80,17 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
               <img
                 src={avatar}
                 alt="Profile Preview"
-                className="w-20 h-20 rounded-full object-cover mx-auto ring-4 ring-[#0b705c]/30 shadow-md border-2 border-white dark:border-slate-800"
+                className="w-20 h-20 rounded-full object-cover mx-auto ring-4 ring-[#0B132B]/30 shadow-md border-2 border-white dark:border-slate-800"
               />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-[#0b705c]/10 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner border border-[#0b705c]/20">
+              <div className="w-20 h-20 rounded-full bg-[#0B132B]/10 dark:bg-slate-800 text-[#0B132B] dark:text-amber-400 flex items-center justify-center mx-auto shadow-inner border border-[#0B132B]/20">
                 <User className="w-9 h-9" />
               </div>
             )}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 p-2 bg-[#0b705c] text-white rounded-full shadow-md cursor-pointer hover:bg-[#085a4a] transition-transform active:scale-95 border-2 border-white dark:border-slate-800"
+              className="absolute bottom-0 right-0 p-2 bg-[#0B132B] text-white rounded-full shadow-md cursor-pointer hover:bg-[#121E36] transition-transform active:scale-95 border-2 border-white dark:border-slate-800"
               title="ছবি নির্বাচন করুন"
             >
               <Camera className="w-3.5 h-3.5" />
@@ -112,7 +112,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
                 type="button"
                 onClick={() => setAvatar(url)}
                 className={`w-7 h-7 rounded-full overflow-hidden border transition-all cursor-pointer ${
-                  avatar === url ? 'border-[#0b705c] scale-110 ring-2 ring-[#0b705c]/40' : 'border-transparent'
+                  avatar === url ? 'border-[#0B132B] scale-110 ring-2 ring-[#0B132B]/40' : 'border-transparent'
                 }`}
               >
                 <img src={url} alt={`Preset ${idx}`} className="w-full h-full object-cover" />
@@ -152,7 +152,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="যেমন: মোঃ আব্দুর রহিম"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0b705c]"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0B132B]"
                 required
               />
             </div>
@@ -170,13 +170,13 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="যেমন: 01700000000"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0b705c]"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0B132B]"
                 required
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold text-[#0b705c] dark:text-emerald-300">
+          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-slate-800 rounded-2xl border border-blue-200 dark:border-slate-700 text-[11px] font-bold text-[#0B132B] dark:text-amber-300">
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>আপনার তথ্য ১০০% সুরক্ষিত থাকবে।</span>
           </div>
@@ -184,7 +184,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-3.5 bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98"
+            className="w-full py-3.5 bg-[#0B132B] hover:bg-[#121E36] text-white font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>সেভ করুন ও পরীক্ষা দিন</span>

@@ -62,9 +62,9 @@ export const AtTamreenLogo: React.FC<AtTamreenLogoProps> = ({
         {/* Gradients Definition */}
         <defs>
           <linearGradient id="emeraldGradient" x1="18" y1="16" x2="82" y2="88" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#0B705C" />
-            <stop offset="0.5" stopColor="#0D8A72" />
-            <stop offset="1" stopColor="#085A4A" />
+            <stop stopColor="#0B132B" />
+            <stop offset="0.5" stopColor="#121E36" />
+            <stop offset="1" stopColor="#162444" />
           </linearGradient>
 
           <linearGradient id="goldGradient" x1="40" y1="6" x2="60" y2="88" gradientUnits="userSpaceOnUse">

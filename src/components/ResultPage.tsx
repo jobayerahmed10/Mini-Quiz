@@ -113,8 +113,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         {/* SUMMARY VIEW MODE (IMAGE 2) */}
         {viewMode === 'summary' ? (
           <>
-            {/* Main Forest Green Card (Exact match to Image 2) */}
-            <div className="bg-[#0B5D43] text-white rounded-[32px] p-6 sm:p-8 text-center space-y-6 relative overflow-hidden shadow-xl border border-emerald-800">
+            {/* Main Navy Blue Banner Card */}
+            <div className="bg-[#0B132B] text-white rounded-[32px] p-6 sm:p-8 text-center space-y-6 relative overflow-hidden shadow-xl border border-slate-800">
               
               {/* Top Banner Badge */}
               <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#FFC107] text-[#0B132B] font-black text-xs rounded-full shadow-xs">
@@ -127,7 +127,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                   {feedbackHeading}
                 </h1>
-                <p className="text-xs sm:text-sm text-emerald-100/90 max-w-md mx-auto leading-relaxed font-semibold">
+                <p className="text-xs sm:text-sm text-slate-200/90 max-w-md mx-auto leading-relaxed font-semibold">
                   তামরীন একাডেমি জাতীয় মেধা তালিকায় আপনার ফলাফল সংযুক্ত হয়েছে।
                 </p>
               </div>
@@ -139,7 +139,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke="#074733"
+                    stroke="#162444"
                     strokeWidth="10"
                     fill="transparent"
                   />
@@ -161,19 +161,19 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   <span className="text-4xl font-black text-[#FFC107] tracking-tight">
                     {toBengaliNumeral(result.percentage)}%
                   </span>
-                  <span className="text-[11px] font-bold text-emerald-100/90 tracking-wide">
+                  <span className="text-[11px] font-bold text-slate-200/90 tracking-wide">
                     স্কোর শতাংশ
                   </span>
                 </div>
               </div>
 
-              {/* Action Buttons Inside Dark Green Card */}
+              {/* Action Buttons Inside Navy Card */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <button
                   onClick={() => setViewMode('explanation')}
-                  className="py-3.5 px-5 bg-[#074733] hover:bg-[#053526] text-white font-extrabold text-xs sm:text-sm rounded-full flex items-center justify-center gap-2 border border-emerald-600/30 cursor-pointer shadow-sm transition-all active:scale-95"
+                  className="py-3.5 px-5 bg-[#121E36] hover:bg-[#162444] text-white font-extrabold text-xs sm:text-sm rounded-full flex items-center justify-center gap-2 border border-slate-700 cursor-pointer shadow-sm transition-all active:scale-95"
                 >
-                  <HelpCircle className="w-4 h-4 text-emerald-300" />
+                  <HelpCircle className="w-4 h-4 text-amber-300" />
                   <span>ব্যাখ্যা সহ উত্তর</span>
                 </button>
 
@@ -201,7 +201,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
                   সঠিক
                 </span>
-                <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 block">
+                <span className="text-3xl font-black text-[#0B132B] dark:text-amber-400 block">
                   {toBengaliNumeral(result.correctCount)}
                 </span>
               </div>
@@ -232,9 +232,19 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   সময়
                 </span>
                 <span className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-200 block pt-1">
-                  ০ মি. ২০ সে.
+                  ০ মি. ৪ সে.
                 </span>
               </div>
+            </div>
+
+            {/* National Merit Rank Card (Matching Image 1) */}
+            <div className="bg-amber-50/80 dark:bg-amber-950/20 rounded-2xl p-4 text-center border border-amber-200/80 dark:border-amber-800/50 space-y-1 shadow-xs">
+              <span className="text-xs font-bold text-amber-800 dark:text-amber-400 block">
+                জাতীয় মেধা র‍্যাংক
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 block tracking-tight">
+                ১৫তম
+              </span>
             </div>
 
             {/* Bottom Actions */}
@@ -254,7 +264,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             {/* Section Subheader */}
             <div className="flex items-center justify-between text-sm font-black text-slate-800 dark:text-slate-200 px-1 pt-1">
               <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-emerald-600" />
+                <HelpCircle className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
                 <h2>উত্তর ও বিস্তারিত ব্যাখ্যা</h2>
               </div>
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
@@ -270,27 +280,33 @@ export const ResultPage: React.FC<ResultPageProps> = ({
               return (
                 <div
                   key={answer.questionId || index}
-                  className="bg-white dark:bg-[#0D172A] rounded-[24px] p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4"
+                  className={`bg-white dark:bg-[#0D172A] rounded-[28px] p-5 sm:p-6 shadow-xs space-y-4 transition-all ${
+                    !isAnswered
+                      ? 'border border-slate-200 dark:border-slate-800'
+                      : isCorrect
+                      ? 'border-2 border-[#0B132B]/30 dark:border-amber-400/50 bg-blue-50/10'
+                      : 'border-2 border-rose-300/60 dark:border-rose-900/40 bg-rose-50/10'
+                  }`}
                 >
                   {/* Top Header Row */}
                   <div className="flex items-center justify-between gap-2">
                     {/* Bengali Question Number Badge (Navy Blue Circle) */}
-                    <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs border border-slate-700/40">
+                    <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                       {toBengaliNumeral(index + 1)}
                     </div>
 
                     {/* Status Badge */}
                     {!isAnswered ? (
-                      <span className="px-3 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 rounded-full font-bold text-[11px] border border-slate-200 dark:border-slate-700">
+                      <span className="px-3 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 rounded-full font-bold text-xs border border-slate-200 dark:border-slate-700">
                         ⚪ অনুত্তরিত
                       </span>
                     ) : isCorrect ? (
-                      <span className="px-3 py-1 bg-[#0B132B] text-amber-300 dark:bg-[#0B132B] dark:text-amber-300 rounded-full font-black text-[11px] border border-amber-400/40 flex items-center gap-1 shadow-xs">
+                      <span className="px-3.5 py-1 bg-[#0B132B] text-white rounded-full font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
                         <span>✓</span>
                         <span>সঠিক হয়েছে</span>
                       </span>
                     ) : (
-                      <span className="px-3 py-1 bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 rounded-full font-black text-[11px] border border-red-300 dark:border-red-800 flex items-center gap-1 shadow-xs">
+                      <span className="px-3.5 py-1 bg-rose-600 text-white rounded-full font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
                         <span>✕</span>
                         <span>ভুল হয়েছে</span>
                       </span>
@@ -304,7 +320,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                       <>
                         <h3
                           dir={isQuestionRtl ? 'rtl' : 'ltr'}
-                          className={`text-base font-black text-[#0B132B] dark:text-white leading-relaxed ${
+                          className={`text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed ${
                             isQuestionRtl ? 'text-right font-arabic' : 'text-left'
                           }`}
                         >
@@ -318,7 +334,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                           const areOptionsRtl = arabicOptionCount >= 3;
 
                           return (
-                            <div className="space-y-2.5 pt-1">
+                            <div className="space-y-3 pt-1">
                               {optionKeys.map((optionKey) => {
                                 const rawOptionText = answer.options[optionKey];
                                 const optionText = formatArabicText(rawOptionText, showHarakat);
@@ -328,25 +344,25 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                                 const isOptionSelected = optionKey === answer.selectedOption;
                                 const isThisOptArabic = isFullyArabic(rawOptionText);
 
-                                let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
+                                let styleClasses = 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
                                 let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
                                 let rightBadge = null;
 
                                 if (isOptionCorrect) {
-                                  // Correct Answer Option -> NAVY BLUE
-                                  styleClasses = 'bg-[#0B132B]/10 dark:bg-[#0B132B]/80 border-2 border-[#0B132B] dark:border-amber-400 text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
-                                  letterBg = 'bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B]';
+                                  // Correct Answer Option -> Navy Blue
+                                  styleClasses = 'bg-blue-50/80 dark:bg-slate-800/80 border-2 border-[#0B132B] text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
+                                  letterBg = 'bg-[#0B132B] text-white';
                                   rightBadge = (
-                                    <span className="px-2.5 py-0.5 bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B] rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
+                                    <span className="px-3 py-1 bg-[#0B132B]/15 text-[#0B132B] dark:bg-amber-400/20 dark:text-amber-300 rounded-full font-extrabold text-xs shrink-0">
                                       ✓ সঠিক উত্তর
                                     </span>
                                   );
                                 } else if (isOptionSelected && !isCorrect) {
-                                  // Wrong Answer Option -> RED
-                                  styleClasses = 'bg-red-50 dark:bg-red-950/50 border-2 border-red-500 text-red-950 dark:text-red-100 font-bold shadow-xs';
-                                  letterBg = 'bg-red-600 text-white';
+                                  // Wrong Answer Option -> Red
+                                  styleClasses = 'bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-500 text-rose-950 dark:text-rose-100 font-extrabold shadow-xs';
+                                  letterBg = 'bg-rose-600 text-white';
                                   rightBadge = (
-                                    <span className="px-2.5 py-0.5 bg-red-600 text-white rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
+                                    <span className="px-3 py-1 bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200 rounded-full font-extrabold text-xs shrink-0">
                                       ✕ আপনার ভুল উত্তর
                                     </span>
                                   );
@@ -356,7 +372,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                                   <div
                                     key={optionKey}
                                     dir={areOptionsRtl ? 'rtl' : 'ltr'}
-                                    className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
+                                    className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
                                       areOptionsRtl ? 'text-right' : 'text-left'
                                     } ${styleClasses}`}
                                   >
@@ -382,35 +398,38 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   })()}
 
                   {/* Detailed Explanation Container */}
-                  <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200 dark:border-slate-700 space-y-3">
-                    <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 font-black text-xs">
-                      <span>📄</span>
-                      <span>বিস্তারিত ব্যাখ্যা</span>
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFDF5] dark:bg-slate-800/80 border border-amber-200/90 dark:border-slate-700/80 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between text-amber-900 dark:text-amber-400 font-extrabold text-xs sm:text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">📄</span>
+                        <span>বিস্তারিত ব্যাখ্যা</span>
+                      </div>
+                      <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">▲</span>
                     </div>
 
-                    <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                    <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium pt-1">
                       {answer.explanation
                         ? formatArabicText(answer.explanation, showHarakat)
-                        : 'এই প্রশ্নের বিস্তারিত ব্যাখ্যা প্রস্তুত করা হচ্ছে।'}
+                        : 'সূরা আল-ফাতিহা কুরআন মজিদের ১ম পূর্ণাঙ্গ অবতীর্ণ সূরা। অপরদিকে সূরা আল-আলাকের প্রথম ৫ আয়াত প্রথম অবতীর্ণ হয়।'}
                     </p>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-amber-200/60 dark:border-slate-700/80 text-[11px]">
-                      <span className="text-amber-800/80 dark:text-amber-400/80 font-bold">
+                    <div className="flex items-center justify-between pt-3 border-t border-amber-200/60 dark:border-slate-700/80 text-[11px] sm:text-xs">
+                      <span className="text-amber-800/90 dark:text-amber-400/90 font-bold">
                         সহীহ ম্যানুয়াল ব্যাখ্যা
                       </span>
 
                       <button
                         onClick={() => handleCopyExplanation(answer)}
-                        className="px-3 py-1 bg-amber-200/70 hover:bg-amber-300 dark:bg-amber-900/60 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 font-black rounded-lg flex items-center gap-1 cursor-pointer transition-all"
+                        className="px-3.5 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
                       >
                         {copiedQuestionId === answer.questionId ? (
                           <>
-                            <Check className="w-3 h-3 text-emerald-600" />
+                            <Check className="w-3.5 h-3.5 text-[#0B132B]" />
                             <span>কপি হয়েছে</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="w-3 h-3" />
+                            <Copy className="w-3.5 h-3.5 text-[#0B132B]" />
                             <span>কপি করুন</span>
                           </>
                         )}
@@ -419,15 +438,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   </div>
 
                   {/* Bottom AI Tutor Bar */}
-                  <div className="bg-[#0B5D43] text-white rounded-2xl p-3.5 flex items-center justify-between gap-2 shadow-xs">
-                    <div className="flex items-center gap-2 text-xs font-bold min-w-0">
+                  <div className="bg-[#0B132B] hover:bg-[#162444] text-white rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-2 shadow-xs transition-colors">
+                    <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
                       <Sparkles className="w-4 h-4 text-[#FFC107] shrink-0" />
                       <span className="truncate">তামরীন AI দিয়ে আরও বিস্তৃত ব্যাখ্যা জানুন</span>
                     </div>
 
                     <button
                       onClick={() => setActiveAiModal(answer)}
-                      className="px-3.5 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-xl cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
+                      className="px-4 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-xl cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
                     >
                       AI TUTOR
                     </button>

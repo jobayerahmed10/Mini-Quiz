@@ -146,11 +146,11 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
         <div className="px-3 sm:px-5 space-y-5">
           
-          {/* Top Forest Green Banner Card (Exact match to Image 1) */}
-          <div className="bg-[#0B5D43] text-white rounded-[32px] p-5 sm:p-7 text-center space-y-4 shadow-xl border border-emerald-800 relative overflow-hidden">
+          {/* Top Navy Blue Banner Card */}
+          <div className="bg-[#0B132B] text-white rounded-[32px] p-5 sm:p-7 text-center space-y-4 shadow-xl border border-slate-800 relative overflow-hidden">
             
             {/* Top Pill Tag */}
-            <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/50 bg-[#074733]/80 text-amber-300 font-black text-xs shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/50 bg-[#121E36]/80 text-amber-300 font-black text-xs shadow-xs">
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span>লাইভ মেধা তালিকা</span>
             </div>
@@ -160,21 +160,21 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
                 ফ্রি পরীক্ষায় অংশগ্রহণকারীদের মেধা তালিকা
               </h2>
-              <p className="text-xs sm:text-sm text-emerald-100/90 font-semibold max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-slate-200/90 font-semibold max-w-md mx-auto">
                 বিষয়ভিত্তিক ও মডেল টেস্ট পরীক্ষার সেরা পরীক্ষার্থীদের তালিকা
               </p>
             </div>
 
             {/* Center Pill Badge */}
             <div className="pt-1">
-              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#10B981] text-[#0B132B] font-black text-xs sm:text-sm shadow-md">
-                <Trophy className="w-4 h-4 text-[#0B132B]" />
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#162444] text-amber-300 border border-slate-700 font-black text-xs sm:text-sm shadow-md">
+                <Trophy className="w-4 h-4 text-amber-400" />
                 <span>ফ্রি মেধা তালিকা</span>
               </div>
             </div>
 
             {/* Filter Tab Pills Container */}
-            <div className="bg-[#074733]/90 rounded-2xl p-1.5 grid grid-cols-4 gap-1 border border-emerald-700/50 pt-1">
+            <div className="bg-[#121E36]/90 rounded-2xl p-1.5 grid grid-cols-4 gap-1 border border-slate-700/50 pt-1">
               {[
                 { id: 'current', label: 'এই পরীক্ষা' },
                 { id: 'week', label: 'এই সপ্তাহে' },
@@ -189,7 +189,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                     className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       isActive
                         ? 'bg-[#FFC107] text-[#0B132B] shadow-md scale-102'
-                        : 'text-emerald-100/80 hover:text-white hover:bg-emerald-800/50'
+                        : 'text-slate-200/80 hover:text-white hover:bg-slate-800/50'
                     }`}
                   >
                     {tab.label}
@@ -329,10 +329,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
           </div>
 
-          {/* Current User Card (Highlighted Green Card - Image 2) */}
-          <div className="bg-emerald-50/90 dark:bg-emerald-950/40 rounded-[24px] p-4 sm:p-5 border-2 border-emerald-500 flex items-center justify-between gap-3 shadow-md">
+          {/* Current User Card (Highlighted Navy Card) */}
+          <div className="bg-blue-50/90 dark:bg-slate-800/80 rounded-[24px] p-4 sm:p-5 border-2 border-[#0B132B] flex items-center justify-between gap-3 shadow-md">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-lg font-black text-emerald-800 dark:text-emerald-300 shrink-0">
+              <span className="text-lg font-black text-[#0B132B] dark:text-amber-300 shrink-0">
                 36.
               </span>
               <div className="relative shrink-0">
@@ -340,14 +340,14 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                   <img
                     src={userAvatar}
                     alt={userName}
-                    className="w-11 h-11 rounded-full object-cover border-2 border-emerald-500"
+                    className="w-11 h-11 rounded-full object-cover border-2 border-[#0B132B]"
                   />
                 ) : (
-                  <div className="w-11 h-11 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-black text-xs border-2 border-emerald-500">
+                  <div className="w-11 h-11 rounded-full bg-[#0B132B] text-white flex items-center justify-center font-black text-xs border-2 border-[#0B132B]">
                     <User className="w-6 h-6 text-amber-300" />
                   </div>
                 )}
-                <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-emerald-600 text-white text-[9px] font-black rounded-full border border-white">
+                <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-[#0B132B] text-white text-[9px] font-black rounded-full border border-white">
                   আপনি
                 </span>
               </div>
@@ -356,7 +356,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                   <h4 className="text-sm font-black text-[#0B132B] dark:text-white truncate">
                     {userName}
                   </h4>
-                  <span className="px-2 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-full shrink-0">
+                  <span className="px-2 py-0.5 bg-[#0B132B] text-white font-black text-[10px] rounded-full shrink-0">
                     আপনি
                   </span>
                 </div>
@@ -370,7 +370,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
             <div className="flex items-center gap-3 shrink-0 text-center text-xs font-bold">
               <div>
                 <span className="text-[10px] text-slate-500 block">সঠিক</span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-black">
+                <span className="text-[#0B132B] dark:text-amber-400 font-black">
                   {toBengaliNumeral(correctCount)}টি
                 </span>
               </div>
@@ -431,7 +431,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                   <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-center text-xs font-bold">
                     <div>
                       <span className="text-[10px] text-slate-400 block hidden sm:block">সঠিক</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                      <span className="text-[#0B132B] dark:text-amber-400 font-black">
                         {toBengaliNumeral(item.correct)}টি
                       </span>
                     </div>

@@ -194,7 +194,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
           {/* Countdown Timer */}
           <div className="flex items-center gap-1.5 text-base sm:text-lg font-black text-[#0B132B] dark:text-amber-400">
-            <Clock className="w-4 h-4 text-emerald-600 dark:text-amber-400" />
+            <Clock className="w-4 h-4 text-[#0B132B] dark:text-amber-400" />
             <span>{formatTimerBengali(timeLeft)}</span>
           </div>
 
@@ -206,7 +206,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           {/* Top Submit Button */}
           <button
             onClick={handleOpenSubmitModal}
-            className="px-4 py-2 bg-[#0b705c] hover:bg-[#085a4a] text-white font-extrabold text-xs rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+            className="px-4 py-2 bg-[#0B132B] hover:bg-[#162444] text-white font-extrabold text-xs rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
           >
             <span>🧺</span>
             <span>জমা দিন</span>
@@ -225,7 +225,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             <div
               key={q.id}
               className={`bg-white dark:bg-[#0D172A] rounded-[24px] sm:rounded-[28px] p-5 sm:p-6 shadow-md border-y border-r border-slate-200 dark:border-slate-800 space-y-5 transition-all ${
-                isQuestionRtl ? 'border-r-4 border-r-[#0B132B] border-l-0' : 'border-l-4 border-l-[#0b705c]'
+                isQuestionRtl ? 'border-r-4 border-r-[#0B132B] border-l-0' : 'border-l-4 border-l-[#0B132B]'
               }`}
             >
               {/* Question Header (Number Badge + Question Text) */}
@@ -271,7 +271,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                             areOptionsRtl ? 'text-right' : 'text-left'
                           } ${
                             isSelected
-                              ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-[#0b705c] text-[#0B132B] dark:text-white font-bold shadow-xs'
+                              ? 'bg-blue-50/80 dark:bg-slate-800/80 border-2 border-[#0B132B] text-[#0B132B] dark:text-white font-bold shadow-xs'
                               : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
                           }`}
                         >
@@ -301,7 +301,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
                           {/* Right Selected Check Indicator */}
                           {isSelected && (
-                            <CheckCircle2 className="w-5 h-5 text-[#0b705c] shrink-0" />
+                            <CheckCircle2 className="w-5 h-5 text-[#0B132B] shrink-0" />
                           )}
                         </button>
                       );
@@ -326,7 +326,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
           <button
             onClick={handleOpenSubmitModal}
-            className="w-full sm:w-auto px-8 py-3.5 bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-sm rounded-2xl inline-flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+            className="w-full sm:w-auto px-8 py-3.5 bg-[#0B132B] hover:bg-[#162444] text-white font-black text-sm rounded-2xl inline-flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
           >
             <span>🧺</span>
             <span>পরীক্ষা সাবমিট করুন</span>
@@ -370,7 +370,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
               </button>
               <button
                 onClick={handleConfirmSubmit}
-                className="py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
+                className="py-3 px-4 rounded-2xl bg-[#0B132B] hover:bg-[#162444] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
               >
                 সাবমিট
               </button>
@@ -400,7 +400,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={() => setShowExitModal(false)}
-                className="py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
+                className="py-3 px-4 rounded-2xl bg-[#0B132B] hover:bg-[#162444] text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95"
               >
                 পরীক্ষায় থাকুন
               </button>

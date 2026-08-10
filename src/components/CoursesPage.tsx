@@ -170,7 +170,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = () => {
               <div className="mt-4 space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 {course.topics.map((topic, idx) => (
                   <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-[#0B132B] shrink-0 mt-0.5" />
                     <span>{topic}</span>
                   </div>
                 ))}
@@ -216,7 +216,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = () => {
               <p className="font-bold text-[#0B132B] mb-2">কোর্স আউটলাইন & কন্টেন্ট:</p>
               {activeCourseModal.topics.map((t, idx) => (
                 <p key={idx} className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#0B132B] shrink-0" />
                   {t}
                 </p>
               ))}

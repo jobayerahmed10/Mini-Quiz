@@ -483,7 +483,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs cursor-pointer shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    className="py-3 px-4 rounded-2xl bg-[#0B132B] hover:bg-[#121E36] text-white font-black text-xs cursor-pointer shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
                     <span>সেভ করুন</span>
@@ -498,14 +498,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/80 space-y-3">
                 <h4 className="text-sm font-black text-[#0B132B] dark:text-white flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-[#0b705c]" />
+                  <BarChart3 className="w-4 h-4 text-[#0B132B] dark:text-amber-400" />
                   <span>সামগ্রিক পারফরম্যান্স রিক্যাপ</span>
                 </h4>
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-center">
                     <span className="text-[10px] font-bold text-slate-500 block">মোট সম্পন্ন পরীক্ষা</span>
-                    <span className="text-lg font-black text-[#0b705c] dark:text-emerald-400 mt-0.5 block">
+                    <span className="text-lg font-black text-[#0B132B] dark:text-amber-400 mt-0.5 block">
                       {toBengaliNumeral(studentStats.todayPracticeCount ? Math.max(12, studentStats.todayPracticeCount) : 12)}টি
                     </span>
                   </div>
@@ -518,7 +518,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 text-center">
+                <div className="bg-blue-50 dark:bg-slate-800 p-3 rounded-2xl border border-blue-200 dark:border-slate-700 text-xs font-bold text-[#0B132B] dark:text-amber-300 text-center">
                   🌟 মাশাআল্লাহ্‌! আপনার এনটিআরসিএ শিক্ষক নিবন্ধন প্রস্তুতি সন্তোষজনক পর্যায়ে রয়েছে।
                 </div>
               </div>

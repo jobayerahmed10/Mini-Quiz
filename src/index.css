@@ -107,7 +107,7 @@ body.dark input, body.dark select, body.dark textarea {
   font-family: 'Anek Bangla', sans-serif !important;
 }
 .typo-gradient-brand {
-  background: linear-gradient(135deg, #0b705c 0%, #10B981 50%, #047857 100%);
+  background: linear-gradient(135deg, #0B132B 0%, #162444 50%, #233760 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -117,7 +117,7 @@ body.dark input, body.dark select, body.dark textarea {
   -webkit-text-fill-color: transparent;
 }
 .typo-shadow-sm {
-  filter: drop-shadow(0 2px 4px rgba(11, 112, 92, 0.25));
+  filter: drop-shadow(0 2px 4px rgba(11, 19, 43, 0.25));
 }
 
 /* Font Size Scaling Classes */
