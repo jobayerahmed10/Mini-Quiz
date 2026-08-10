@@ -291,7 +291,21 @@ export function getUserStreakDays(): number {
 }
 
 /**
- * Check if text or subject is Arabic
+ * Determines if text is FULLY Arabic (has Arabic letters and NO Bengali or English letters).
+ * If a question/option starts with 1 or 2 Arabic words but is followed by Bengali or English text, returns false.
+ */
+export function isFullyArabic(text?: string): boolean {
+  if (!text) return false;
+  // If text contains any Bengali character or English/Latin character, it's NOT fully Arabic
+  if (/[\u0980-\u09FFa-zA-Z]/.test(text)) {
+    return false;
+  }
+  // Must contain Arabic characters
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+}
+
+/**
+ * Check if text or subject has Arabic characters
  */
 export function isArabicText(text?: string, subject?: string): boolean {
   if (subject && (subject.includes('আরবি') || subject.toLowerCase().includes('arabic') || subject.includes('কোরআন') || subject.includes('হাদিস'))) {

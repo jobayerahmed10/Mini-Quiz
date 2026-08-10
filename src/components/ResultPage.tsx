@@ -13,7 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { QuizResult, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText, isArabicText } from '../lib/utils';
+import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText, isArabicText, isFullyArabic } from '../lib/utils';
 import { LeaderboardModal } from './LeaderboardModal';
 
 interface ResultPageProps {
@@ -274,8 +274,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                 >
                   {/* Top Header Row */}
                   <div className="flex items-center justify-between gap-2">
-                    {/* Bengali Question Number Badge */}
-                    <div className="w-7 h-7 rounded-full bg-[#0b705c] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    {/* Bengali Question Number Badge (Navy Blue Circle) */}
+                    <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs border border-slate-700/40">
                       {toBengaliNumeral(index + 1)}
                     </div>
 
@@ -285,12 +285,12 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                         ⚪ অনুত্তরিত
                       </span>
                     ) : isCorrect ? (
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 rounded-full font-black text-[11px] border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                      <span className="px-3 py-1 bg-[#0B132B] text-amber-300 dark:bg-[#0B132B] dark:text-amber-300 rounded-full font-black text-[11px] border border-amber-400/40 flex items-center gap-1 shadow-xs">
                         <span>✓</span>
                         <span>সঠিক হয়েছে</span>
                       </span>
                     ) : (
-                      <span className="px-3 py-1 bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 rounded-full font-black text-[11px] border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                      <span className="px-3 py-1 bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 rounded-full font-black text-[11px] border border-red-300 dark:border-red-800 flex items-center gap-1 shadow-xs">
                         <span>✕</span>
                         <span>ভুল হয়েছে</span>
                       </span>
@@ -299,45 +299,48 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
                   {/* Question Text */}
                   {(() => {
-                    const isArabic = isArabicText(answer.questionText, answer.subject);
+                    const isQuestionRtl = isFullyArabic(answer.questionText);
                     return (
                       <>
                         <h3
-                          dir={isArabic ? 'rtl' : 'ltr'}
+                          dir={isQuestionRtl ? 'rtl' : 'ltr'}
                           className={`text-base font-black text-[#0B132B] dark:text-white leading-relaxed ${
-                            isArabic ? 'text-right font-arabic' : 'text-left'
+                            isQuestionRtl ? 'text-right font-arabic' : 'text-left'
                           }`}
                         >
                           {formatArabicText(answer.questionText, showHarakat)}
                         </h3>
 
                         {/* Options List */}
-                        <div dir={isArabic ? 'rtl' : 'ltr'} className="space-y-2.5 pt-1">
+                        <div className="space-y-2.5 pt-1">
                           {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-                            const optionText = formatArabicText(answer.options[optionKey], showHarakat);
+                            const rawOptionText = answer.options[optionKey];
+                            const optionText = formatArabicText(rawOptionText, showHarakat);
                             const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
 
                             const isOptionCorrect = optionKey === answer.correctOption;
                             const isOptionSelected = optionKey === answer.selectedOption;
-                            const isOptArabic = isArabic || isArabicText(answer.options[optionKey]);
+                            const isOptRtl = isFullyArabic(rawOptionText);
 
                             let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
                             let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
                             let rightBadge = null;
 
                             if (isOptionCorrect) {
-                              styleClasses = 'bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold';
-                              letterBg = 'bg-emerald-600 text-white';
+                              // Correct Answer Option -> NAVY BLUE
+                              styleClasses = 'bg-[#0B132B]/10 dark:bg-[#0B132B]/80 border-2 border-[#0B132B] dark:border-amber-400 text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
+                              letterBg = 'bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B]';
                               rightBadge = (
-                                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 rounded-md font-extrabold text-[10px] shrink-0">
+                                <span className="px-2.5 py-0.5 bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B] rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
                                   ✓ সঠিক উত্তর
                                 </span>
                               );
                             } else if (isOptionSelected && !isCorrect) {
-                              styleClasses = 'bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-400 text-rose-950 dark:text-rose-100 font-bold';
-                              letterBg = 'bg-rose-600 text-white';
+                              // Wrong Answer Option -> RED
+                              styleClasses = 'bg-red-50 dark:bg-red-950/50 border-2 border-red-500 text-red-950 dark:text-red-100 font-bold shadow-xs';
+                              letterBg = 'bg-red-600 text-white';
                               rightBadge = (
-                                <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200 rounded-md font-extrabold text-[10px] shrink-0">
+                                <span className="px-2.5 py-0.5 bg-red-600 text-white rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
                                   ✕ আপনার ভুল উত্তর
                                 </span>
                               );
@@ -346,15 +349,16 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                             return (
                               <div
                                 key={optionKey}
+                                dir={isOptRtl ? 'rtl' : 'ltr'}
                                 className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
-                                  isArabic ? 'text-right' : 'text-left'
+                                  isOptRtl ? 'text-right' : 'text-left'
                                 } ${styleClasses}`}
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
                                     {prefixLabel}
                                   </div>
-                                  <span className={`font-bold leading-relaxed ${isOptArabic ? 'font-arabic text-right' : ''}`}>
+                                  <span className={`font-bold leading-relaxed ${isOptRtl ? 'font-arabic text-right' : 'text-left'}`}>
                                     {optionText}
                                   </span>
                                 </div>
