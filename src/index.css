@@ -98,6 +98,28 @@ body.dark input, body.dark select, body.dark textarea {
   font-family: 'Cairo', 'Hind Siliguri', sans-serif !important;
 }
 
+/* Typography Custom Styling */
+.typo-title {
+  font-family: 'Tiro Bangla', serif !important;
+  letter-spacing: 0.01em;
+}
+.typo-anek {
+  font-family: 'Anek Bangla', sans-serif !important;
+}
+.typo-gradient-brand {
+  background: linear-gradient(135deg, #0b705c 0%, #10B981 50%, #047857 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.typo-gradient-gold {
+  background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 50%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.typo-shadow-sm {
+  filter: drop-shadow(0 2px 4px rgba(11, 112, 92, 0.25));
+}
+
 /* Font Size Scaling Classes */
 .font-scale-normal {
   font-size: 100%;

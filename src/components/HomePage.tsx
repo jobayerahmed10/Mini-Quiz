@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { AtTamreenLogo } from './AtTamreenLogo';
 import { 
   Play, 
   HelpCircle, 
@@ -83,14 +84,21 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 space-y-5 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-inner">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>১৯তম NTRCA & মাদ্রাসা শিক্ষক নিবন্ধনের সেরা প্ল্যাটফর্ম</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="p-2 bg-white/10 dark:bg-white/5 border border-amber-400/40 rounded-2xl shadow-md">
+              <AtTamreenLogo size={52} className="w-12 h-12 sm:w-14 sm:h-14" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>১৯তম NTRCA & মাদ্রাসা শিক্ষক নিবন্ধনের সেরা প্ল্যাটফর্ম</span>
+              </div>
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight font-tiro tracking-wide py-1">
+                <span className="text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.4)]">আত-তামরীন</span>{' '}
+                <span className="typo-gradient-gold drop-shadow-[0_0_25px_rgba(245,158,11,0.6)]">একাডেমি</span>
+              </h1>
+            </div>
           </div>
-
-          <h1 className="text-3xl sm:text-5xl font-black text-white leading-tight">
-            শিক্ষক নিবন্ধন <span className="text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]">& জব প্রস্তুতি</span>
-          </h1>
 
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal">
             মাদ্রাসা (কুরআন, হাদিস, ফিকহ, আরবি), স্কুল ও কলেজের জন্য পূর্ণাঙ্গ প্রিলিমিনারি মডেল টেস্ট, ১৫টি বিষয়ভিত্তিক প্রস্তুতি, জব সার্কুলার এবং উস্তাদ এআই টিউটর।

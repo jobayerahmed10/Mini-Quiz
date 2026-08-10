@@ -131,16 +131,19 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
             </div>
 
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl sm:text-2xl font-black text-white truncate leading-tight">
+            <div className="min-w-0 flex-1 space-y-1">
+              <span className="inline-block text-[10px] font-black px-2.5 py-0.5 bg-amber-400/20 border border-amber-400/30 text-amber-300 rounded-md tracking-wider uppercase font-anek">
+                শিক্ষক নিবন্ধন পরীক্ষার্থী
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-black font-tiro text-amber-300 tracking-wide truncate leading-tight drop-shadow-md">
                 {name || 'জোবায়ের আহমদ'}
               </h1>
-              <p className="text-xs sm:text-sm font-semibold text-emerald-200/90 truncate mt-0.5">
+              <p className="text-xs sm:text-sm font-semibold text-emerald-100/90 truncate">
                 {phone ? `${phone} • tamreen.app` : 'jobayer.tamreen@gmail.com'}
               </p>
               <button
                 onClick={() => setActiveTab('edit_profile')}
-                className="mt-2.5 inline-flex items-center gap-1 text-xs font-extrabold text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                className="mt-1.5 inline-flex items-center gap-1 text-xs font-extrabold text-amber-300 hover:text-amber-200 underline cursor-pointer"
               >
                 <span>প্রোফাইল সংশোধন করুন</span>
                 <ChevronRight className="w-3.5 h-3.5" />

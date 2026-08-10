@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3 } from 'lucide-react';
 import { PageRoute } from '../types';
 import { getUserProfile } from '../lib/utils';
+import { AtTamreenLogo } from './AtTamreenLogo';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
@@ -90,20 +91,23 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Brand Logo & Name */}
           <button
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-hidden cursor-pointer min-w-0"
+            className="flex items-center gap-2.5 sm:gap-3.5 text-left group focus:outline-hidden cursor-pointer min-w-0"
             title="হোম পেজে যান"
           >
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-[#0B132B] text-amber-400 font-bold text-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-all shrink-0 border border-amber-500/30">
-              <BookOpenCheck className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
+            <div className="p-1.5 sm:p-2 rounded-2xl bg-gradient-to-br from-[#0b705c]/15 to-amber-500/15 dark:from-[#0b705c]/35 dark:to-amber-500/25 border border-emerald-600/40 dark:border-amber-400/40 shadow-md group-hover:scale-105 transition-all shrink-0">
+              <AtTamreenLogo size={48} className="w-10 h-10 sm:w-13 sm:h-13" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={`font-black text-base sm:text-2xl tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
-                  শিক্ষক নিবন্ধন প্রস্তুতি
+              <div className="flex items-center gap-2">
+                <span className={`font-tiro font-black text-lg sm:text-2xl lg:text-3xl tracking-wide truncate leading-snug drop-shadow-xs ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
+                  <span className="typo-gradient-brand">আত-তামরীন</span>{' '}
+                  <span className="typo-gradient-gold font-anek font-bold text-sm sm:text-xl px-2 py-0.5 rounded-lg bg-amber-500/10 dark:bg-amber-400/20 border border-amber-500/30 inline-block align-middle ml-1">
+                    একাডেমি
+                  </span>
                 </span>
               </div>
-              <p className={`text-[11px] sm:text-xs font-medium tracking-wide hidden sm:block truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                মাদ্রাসা, স্কুল, কলেজ নিবন্ধন, বিষয়ভিত্তিক প্রস্তুতি ও মডেল টেস্ট
+              <p className={`text-xs sm:text-sm font-semibold tracking-wide hidden sm:block truncate mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                শিক্ষক নিবন্ধন ও বিষয়ভিত্তিক জব প্রস্তুতি প্ল্যাটফর্ম
               </p>
             </div>
           </button>
@@ -321,8 +325,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <User className="w-4 h-4" />
                 </div>
               )}
-              <div className="text-left hidden md:block min-w-0 max-w-[100px]">
-                <span className="block text-xs font-black truncate leading-tight">
+              <div className="text-left hidden md:block min-w-0 max-w-[110px]">
+                <span className="block text-xs font-black truncate leading-tight font-tiro text-emerald-800 dark:text-emerald-300">
                   {userProfile?.name || 'প্রোফাইল'}
                 </span>
                 <span className="block text-[9px] opacity-75 font-bold truncate">
@@ -338,7 +342,7 @@ export const Header: React.FC<HeaderProps> = ({
                 isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
               }`}>
                 {/* User Header Profile Card */}
-                <div className="p-3 bg-gradient-to-r from-[#0b705c] to-[#0B132B] text-white rounded-2xl mb-3 flex items-center gap-3 relative overflow-hidden shadow-xs">
+                <div className="p-3.5 bg-gradient-to-r from-[#0b705c] via-[#085a4a] to-[#0B132B] text-white rounded-2xl mb-3 flex items-center gap-3 relative overflow-hidden shadow-xs border border-amber-400/30">
                   {userProfile?.avatar ? (
                     <img
                       src={userProfile.avatar}
@@ -351,7 +355,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs sm:text-sm font-black truncate text-white">
+                    <h4 className="text-sm sm:text-base font-black truncate text-amber-300 font-tiro tracking-wide drop-shadow-xs">
                       {userProfile?.name || 'ব্যবহারকারীর নাম নেই'}
                     </h4>
                     <p className="text-[11px] font-bold text-amber-200 truncate">
