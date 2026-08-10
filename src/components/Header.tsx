@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Home, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3 } from 'lucide-react';
+import { BookOpenCheck, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3 } from 'lucide-react';
 import { PageRoute } from '../types';
 import { getUserProfile } from '../lib/utils';
 import { AtTamreenLogo } from './AtTamreenLogo';
@@ -442,17 +442,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          {/* Home Link if not on Home Page */}
-          {currentPage !== 'home' && (
-            <button
-              onClick={onNavigateHome}
-              className="neu-btn px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            >
-              <Home className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline">হোম</span>
-            </button>
-          )}
         </div>
       </div>
     </header>
