@@ -213,11 +213,10 @@ export function addCompletedExamId(examIdentifier: string): void {
   }
 }
 
-export function isExamCompleted(examId: string, examTitle?: string, examSubject?: string): boolean {
+export function isExamCompleted(examId: string, examTitle?: string): boolean {
   const completedList = getCompletedExamIds();
-  if (completedList.includes(examId)) return true;
+  if (examId && completedList.includes(examId)) return true;
   if (examTitle && completedList.includes(examTitle)) return true;
-  if (examSubject && completedList.includes(examSubject)) return true;
   return false;
 }
 

@@ -28,6 +28,7 @@ import { toBengaliNumeral, isExamCompleted, getUserProfile, UserProfile } from '
 import { UserRegistrationModal } from './UserRegistrationModal';
 
 interface ExamStartOptions {
+  examId?: string;
   subject: string;
   questionCount: number;
   timeMinutes: number;
@@ -304,14 +305,13 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
             const availableCount = getMatchingQuestionCount(exam.subject);
 
-            // Display question count matching database if questions exist, otherwise fallback
-            const displayQuestionCount = availableCount > 0 ? availableCount : (exam.question_count || 15);
+            // Display question count matching specified exam.question_count if set, else availableCount
+            const displayQuestionCount = exam.question_count && Number(exam.question_count) > 0
+              ? (availableCount > 0 ? Math.min(Number(exam.question_count), availableCount) : Number(exam.question_count))
+              : (availableCount > 0 ? availableCount : 15);
             const displayTotalMarks = displayQuestionCount;
             
-            let displayTimeMinutes = exam.time_minutes || 20;
-            if (availableCount > 0 && exam.question_count && availableCount !== exam.question_count) {
-              displayTimeMinutes = Math.max(5, Math.round(availableCount * (exam.time_minutes / exam.question_count)));
-            }
+            const displayTimeMinutes = exam.time_minutes || Math.max(5, Math.round(displayQuestionCount * 0.7));
 
             return (
               <div
@@ -417,12 +417,13 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                 </div>
 
                 {/* Action Buttons: 2 buttons if completed, 1 button if not taken */}
-                {isExamCompleted(exam.id, exam.title, exam.subject) ? (
+                {isExamCompleted(exam.id, exam.title) ? (
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => {
                         if (onReviewAnswers) {
                           onReviewAnswers({
+                            examId: exam.id,
                             subject: exam.subject,
                             questionCount: displayQuestionCount,
                             timeMinutes: displayTimeMinutes,
@@ -430,6 +431,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                           });
                         } else {
                           handleAttemptStartExam({
+                            examId: exam.id,
                             subject: exam.subject,
                             questionCount: displayQuestionCount,
                             timeMinutes: displayTimeMinutes,
@@ -458,6 +460,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                 ) : (
                   <button
                     onClick={() => handleAttemptStartExam({
+                      examId: exam.id,
                       subject: exam.subject,
                       questionCount: displayQuestionCount,
                       timeMinutes: displayTimeMinutes,

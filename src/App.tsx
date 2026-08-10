@@ -27,6 +27,7 @@ export default function App() {
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
+  const [activeExamId, setActiveExamId] = useState<string | undefined>(undefined);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
@@ -150,12 +151,10 @@ export default function App() {
     };
 
     setQuizResult(result);
-    // Mark subject and exam as completed
-    if (selectedSubject) {
-      addCompletedExamId(selectedSubject);
+    // Mark specific active exam as completed
+    if (activeExamId) {
+      addCompletedExamId(activeExamId);
     }
-    addCompletedExamId('exam_1');
-    addCompletedExamId('exam_2');
 
     const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
     setStudentStats(updatedStats);
@@ -166,15 +165,17 @@ export default function App() {
     navigateWithHistory('leaderboard');
   };
 
-  const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number } = 'সকল বিষয়') => {
+  const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string } = 'সকল বিষয়') => {
     if (typeof subjectOrOpts === 'string') {
       setSelectedSubject(subjectOrOpts);
       setExamQuestionCount(undefined);
       setExamTimeMinutes(30);
+      setActiveExamId(undefined);
     } else {
       setSelectedSubject(subjectOrOpts.subject);
       setExamQuestionCount(subjectOrOpts.questionCount);
       setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
+      setActiveExamId(subjectOrOpts.examId || subjectOrOpts.examType);
     }
     navigateWithHistory('practice');
   };
