@@ -62,45 +62,69 @@ export interface FetchQuestionsResult {
   error?: string | null;
 }
 
+async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs = 6000, fallbackVal: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`Supabase network request timed out after ${timeoutMs}ms`);
+      resolve(fallbackVal);
+    }, timeoutMs);
+  });
+
+  return Promise.race([promisePromise, timeoutPromise]).then((res) => {
+    clearTimeout(timer);
+    return res;
+  });
+}
+
 /**
  * Fetches published questions from Supabase table 'public.questions'
  * Only fetches rows where status = 'published'
  */
 export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
+  let cachedQuestions: Question[] = [];
+  try {
+    const raw = localStorage.getItem('miniquiz_questions_cache');
+    if (raw) cachedQuestions = JSON.parse(raw);
+  } catch {}
+
   if (!supabaseInstance) {
     return {
-      questions: [],
+      questions: cachedQuestions,
       isFromSupabase: false,
-      error: 'Supabase এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা নেই। VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY আপনার .env ফাইলে প্রদান করুন।',
+      error: cachedQuestions.length > 0 ? null : 'Supabase এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা নেই।',
     };
   }
 
   try {
-    const { data, error } = await supabaseInstance
+    const queryPromise = supabaseInstance
       .from('questions')
       .select('*')
       .eq('status', 'published')
       .order('created_at', { ascending: false });
 
+    const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
+    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+
     if (error) {
       console.error('Supabase fetch error:', error);
       return {
-        questions: [],
+        questions: cachedQuestions,
         isFromSupabase: true,
-        error: `Supabase কুয়েরি ত্রুটি: ${error.message} (Code: ${error.code || 'N/A'})`,
+        error: cachedQuestions.length > 0 ? null : `Supabase কুয়েরি ত্রুটি: ${error.message}`,
       };
     }
 
     if (!data || data.length === 0) {
       return {
-        questions: [],
+        questions: cachedQuestions,
         isFromSupabase: true,
         error: null,
       };
     }
 
     // Cast & format fetched items from public.questions with subject auto-detection fallback
-    const questionsList: Question[] = data.map((item) => {
+    const questionsList: Question[] = data.map((item: any) => {
       const qObj: Question = {
         id: String(item.id),
         question: String(item.question || ''),
@@ -121,6 +145,10 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
       return qObj;
     });
 
+    try {
+      localStorage.setItem('miniquiz_questions_cache', JSON.stringify(questionsList));
+    } catch {}
+
     return {
       questions: questionsList,
       isFromSupabase: true,
@@ -129,9 +157,9 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown database error';
     return {
-      questions: [],
+      questions: cachedQuestions,
       isFromSupabase: true,
-      error: `Supabase সংযোগ ত্রুটি: ${errorMsg}`,
+      error: cachedQuestions.length > 0 ? null : `Supabase সংযোগ ত্রুটি: ${errorMsg}`,
     };
   }
 }
@@ -234,26 +262,38 @@ export const DEFAULT_EXAM_PRESETS: ExamItem[] = [
  * Fetches exams/model tests from Supabase table 'public.exams'
  */
 export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
+  let cachedExams: ExamItem[] = DEFAULT_EXAM_PRESETS;
+  try {
+    const raw = localStorage.getItem('miniquiz_exams_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) cachedExams = parsed;
+    }
+  } catch {}
+
   if (!supabaseInstance) {
     return {
-      exams: DEFAULT_EXAM_PRESETS,
+      exams: cachedExams,
       isFromSupabase: false,
       error: null,
     };
   }
 
   try {
-    const { data, error } = await supabaseInstance
+    const queryPromise = supabaseInstance
       .from('exams')
       .select('*')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
+    const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
+    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+
     if (error) {
       console.warn('Supabase fetch exams error:', error);
-      // Fallback to default presets if table doesn't exist yet
+      // Fallback to default presets or cached exams
       return {
-        exams: DEFAULT_EXAM_PRESETS,
+        exams: cachedExams,
         isFromSupabase: true,
         error: `Supabase Table 'exams' পাওয়া যায়নি। ডেমো লিস্ট দেখানো হচ্ছে। (ত্রুটি: ${error.message})`,
       };
@@ -261,13 +301,13 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
 
     if (!data || data.length === 0) {
       return {
-        exams: DEFAULT_EXAM_PRESETS,
+        exams: cachedExams,
         isFromSupabase: true,
         error: null,
       };
     }
 
-    const fetchedExams: ExamItem[] = data.map((item) => ({
+    const fetchedExams: ExamItem[] = data.map((item: any) => ({
       id: String(item.id),
       title: String(item.title || 'পরীক্ষা'),
       badge: String(item.badge || 'ফ্রি পরীক্ষা'),
@@ -285,6 +325,10 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
       created_at: item.created_at,
     }));
 
+    try {
+      localStorage.setItem('miniquiz_exams_cache', JSON.stringify(fetchedExams));
+    } catch {}
+
     return {
       exams: fetchedExams,
       isFromSupabase: true,
@@ -293,7 +337,7 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     return {
-      exams: DEFAULT_EXAM_PRESETS,
+      exams: cachedExams,
       isFromSupabase: true,
       error: `Supabase ত্রুটি: ${msg}`,
     };

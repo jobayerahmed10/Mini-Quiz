@@ -19,8 +19,20 @@ import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamI
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('exam');
   const [currentPage, setCurrentPage] = useState<PageRoute>('home');
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    try {
+      const raw = localStorage.getItem('miniquiz_questions_cache');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('miniquiz_questions_cache');
+    } catch {
+      return true;
+    }
+  });
   const [isFromSupabase, setIsFromSupabase] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   
