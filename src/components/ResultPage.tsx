@@ -22,6 +22,7 @@ interface ResultPageProps {
   onNavigateHome: () => void;
   onOpenLeaderboard?: () => void;
   showHarakat?: boolean;
+  initialViewMode?: 'summary' | 'explanation';
 }
 
 export const ResultPage: React.FC<ResultPageProps> = ({
@@ -30,8 +31,13 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   onNavigateHome,
   onOpenLeaderboard,
   showHarakat = true,
+  initialViewMode = 'summary',
 }) => {
-  const [viewMode, setViewMode] = useState<'summary' | 'explanation'>('summary');
+  const [viewMode, setViewMode] = useState<'summary' | 'explanation'>(initialViewMode);
+
+  useEffect(() => {
+    setViewMode(initialViewMode);
+  }, [initialViewMode, result]);
   const [copiedQuestionId, setCopiedQuestionId] = useState<string | null>(null);
   const [activeAiModal, setActiveAiModal] = useState<UserAnswer | null>(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);

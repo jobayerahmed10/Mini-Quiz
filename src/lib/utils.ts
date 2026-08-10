@@ -1,3 +1,5 @@
+import { QuizResult } from '../types';
+
 /**
  * Removes Arabic Tashkeel / Harakat (diacritics) from text
  * Includes: Fathan, Damman, Kasran, Fatha, Damma, Kasra, Sukun, Shadda, Maddah, Dagger Alif, Quranic signs
@@ -218,6 +220,43 @@ export function isExamCompleted(examId: string, examTitle?: string): boolean {
   if (examId && completedList.includes(examId)) return true;
   if (examTitle && completedList.includes(examTitle)) return true;
   return false;
+}
+
+/**
+ * Saved Exam Results Storage
+ */
+const SAVED_EXAM_RESULTS_KEY = 'tamreen_saved_exam_results';
+
+export function saveExamResult(examIdentifier: string, result: QuizResult): void {
+  if (!result) return;
+  try {
+    const raw = localStorage.getItem(SAVED_EXAM_RESULTS_KEY);
+    const map: Record<string, QuizResult> = raw ? JSON.parse(raw) : {};
+    if (examIdentifier) {
+      map[examIdentifier] = result;
+    }
+    if (result.selectedSubject) {
+      map[result.selectedSubject] = result;
+    }
+    map['latest_exam_result'] = result;
+    localStorage.setItem(SAVED_EXAM_RESULTS_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+export function getExamResult(examIdentifier?: string): QuizResult | null {
+  try {
+    const raw = localStorage.getItem(SAVED_EXAM_RESULTS_KEY);
+    if (!raw) return null;
+    const map: Record<string, QuizResult> = JSON.parse(raw);
+    if (examIdentifier && map[examIdentifier]) {
+      return map[examIdentifier];
+    }
+    return map['latest_exam_result'] || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

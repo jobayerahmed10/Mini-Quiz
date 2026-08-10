@@ -14,7 +14,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId } from './lib/utils';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('exam');
@@ -40,7 +40,10 @@ export default function App() {
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [activeExamId, setActiveExamId] = useState<string | undefined>(undefined);
-  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(() => {
+    return getExamResult('latest_exam_result');
+  });
+  const [resultViewMode, setResultViewMode] = useState<'summary' | 'explanation'>('summary');
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
 
@@ -163,14 +166,48 @@ export default function App() {
     };
 
     setQuizResult(result);
-    // Mark specific active exam as completed
+    setResultViewMode('summary');
+
+    // Mark specific active exam as completed and persist result
     if (activeExamId) {
       addCompletedExamId(activeExamId);
+      saveExamResult(activeExamId, result);
     }
+    if (selectedSubject) {
+      saveExamResult(selectedSubject, result);
+    }
+    saveExamResult('latest_exam_result', result);
 
     const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
     setStudentStats(updatedStats);
     navigateWithHistory('result');
+  };
+
+  const handleReviewAnswers = (opts: { examId?: string; subject?: string; examType?: string; questionCount?: number; timeMinutes?: number }) => {
+    let saved = opts.examId ? getExamResult(opts.examId) : null;
+    if (!saved && opts.examType) {
+      saved = getExamResult(opts.examType);
+    }
+    if (!saved && opts.subject) {
+      saved = getExamResult(opts.subject);
+    }
+    if (!saved) {
+      saved = getExamResult('latest_exam_result');
+    }
+
+    if (saved) {
+      setQuizResult(saved);
+      setResultViewMode('explanation');
+      navigateWithHistory('result');
+    } else {
+      handleStartPractice({
+        subject: opts.subject || 'সকল বিষয়',
+        questionCount: opts.questionCount,
+        timeMinutes: opts.timeMinutes,
+        examId: opts.examId,
+        examType: opts.examType,
+      });
+    }
   };
 
   const handleOpenLeaderboard = () => {
@@ -280,6 +317,7 @@ export default function App() {
             onNavigateHome={handleNavigateHome}
             onOpenLeaderboard={handleOpenLeaderboard}
             showHarakat={showHarakat}
+            initialViewMode={resultViewMode}
           />
         )}
 
@@ -300,7 +338,7 @@ export default function App() {
                 questions={questions}
                 onStartExam={(opts) => handleStartPractice(opts)}
                 onOpenLeaderboard={handleOpenLeaderboard}
-                onReviewAnswers={(opts) => handleStartPractice(opts)}
+                onReviewAnswers={(opts) => handleReviewAnswers(opts)}
               />
             )}
 

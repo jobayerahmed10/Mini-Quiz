@@ -97,11 +97,11 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   }
 
   try {
-    const queryPromise = supabaseInstance
+    const queryPromise = Promise.resolve(supabaseInstance
       .from('questions')
       .select('*')
       .eq('status', 'published')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
     const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
@@ -280,11 +280,11 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
   }
 
   try {
-    const queryPromise = supabaseInstance
+    const queryPromise = Promise.resolve(supabaseInstance
       .from('exams')
       .select('*')
       .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
     const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);

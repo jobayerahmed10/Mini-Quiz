@@ -205,7 +205,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
           </div>
 
           <button
-            onClick={() => setShowLeaderboardModal(true)}
+            onClick={() => onOpenLeaderboard && onOpenLeaderboard()}
             className="px-5 py-2.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-2xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
           >
             <Trophy className="w-4 h-4 text-[#0B132B]" />
