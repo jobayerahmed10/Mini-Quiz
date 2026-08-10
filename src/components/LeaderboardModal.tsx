@@ -26,45 +26,155 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Mock Top 3 Winners Data
-  const topWinners = [
+  // Candidate pool
+  const baseCandidates = [
     {
-      rank: 1,
-      title: '১ম স্থান',
-      label: 'চ্যাম্পিয়ন',
+      id: 'c1',
       name: 'মাওলানা হাফেজ আব্দুল মালেক',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      tests: '28টি পরীক্ষা',
-      avg: 'গড় 28.5',
-      points: '16 পয়েন্ট',
+      isCurrentUser: false,
+      marks: 15,
+      correct: 15,
+      wrong: 0,
+      tests: '২৮টি পরীক্ষা',
+      avg: 'গড় ২৯.৫',
+    },
+    {
+      id: 'c2',
+      name: 'মুফতি তানভীর আহমেদ',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+      isCurrentUser: false,
+      marks: 14,
+      correct: 14,
+      wrong: 1,
+      tests: '২৮টি পরীক্ষা',
+      avg: 'গড় ২৮.৩',
+    },
+    {
+      id: 'c3',
+      name: 'কারি মোশতাক মাহমুদ',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+      isCurrentUser: false,
+      marks: 14,
+      correct: 14,
+      wrong: 1,
+      tests: '২৭টি পরীক্ষা',
+      avg: 'গড় ২৮.১',
+    },
+    {
+      id: 'c4',
+      name: 'হাফেজ মাওলানা ওবায়দুল্লাহ',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 13,
+      correct: 13,
+      wrong: 2,
+      tests: '২৫টি পরীক্ষা',
+      avg: 'গড় ২৭.০',
+    },
+    {
+      id: 'c5',
+      name: 'মাওলানা উবায়দুল হক',
+      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 12,
+      correct: 12,
+      wrong: 3,
+      tests: '২৪টি পরীক্ষা',
+      avg: 'গড় ২৬.৫',
+    },
+    {
+      id: 'c6',
+      name: 'মুফতি আব্দুল কাইয়ুম',
+      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 11,
+      correct: 11,
+      wrong: 4,
+      tests: '২২টি পরীক্ষা',
+      avg: 'গড় ২৫.০',
+    },
+    {
+      id: 'c7',
+      name: 'এনটিআরসিএ পরীক্ষার্থী (চট্টগ্রাম)',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 10,
+      correct: 10,
+      wrong: 5,
+      tests: '২০টি পরীক্ষা',
+      avg: 'গড় ২৩.০',
+    },
+    {
+      id: 'c8',
+      name: 'মোঃ জসিম উদ্দিন (রাজশাহী)',
+      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 8,
+      correct: 8,
+      wrong: 7,
+      tests: '১৮টি পরীক্ষা',
+      avg: 'গড় ২০.৫',
+    },
+  ];
+
+  const userCandidate = {
+    id: 'user_current',
+    name: userName === 'আপনার স্থান' ? 'আপনি (পরীক্ষার্থী)' : userName,
+    avatar: userAvatar || '',
+    isCurrentUser: true,
+    marks: correctCount,
+    correct: correctCount,
+    wrong: wrongCount,
+    tests: '১টি পরীক্ষা',
+    avg: `গড় ${correctCount}`,
+  };
+
+  // Combine & Sort strictly by Marks (Descending), then Correct count
+  const allCandidates = [...baseCandidates, userCandidate].sort((a, b) => {
+    if (b.marks !== a.marks) return b.marks - a.marks;
+    if (b.correct !== a.correct) return b.correct - a.correct;
+    return a.wrong - b.wrong;
+  });
+
+  // Assign ranks
+  const rankedList = allCandidates.map((c, index) => {
+    const rank = index + 1;
+    const accuracy = totalQuestions > 0 ? `${Math.round((c.marks / totalQuestions) * 100)}%` : '১০০%';
+    return {
+      ...c,
+      rank,
+      accuracy,
+      points: `${c.marks} পয়েন্ট`,
+    };
+  });
+
+  const userRankItem = rankedList.find((item) => item.isCurrentUser);
+  const userRank = userRankItem ? userRankItem.rank : 1;
+
+  const topWinners = [
+    {
+      ...rankedList[0],
+      title: '১ম স্থান',
+      label: 'চ্যাম্পিয়ন',
       badgeBg: 'bg-[#FFC107] text-[#0B132B]',
       podiumBg: 'bg-amber-100 dark:bg-amber-950/60 border-2 border-amber-400',
       numColor: 'text-amber-600',
       ringColor: 'ring-4 ring-amber-400',
     },
     {
-      rank: 2,
+      ...rankedList[1],
       title: '২য় স্থান',
       label: 'রানার-আপ',
-      name: 'মুফতি তানভীর আহমেদ',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-      tests: '28টি পরীক্ষা',
-      avg: 'গড় 28.3',
-      points: '16 পয়েন্ট',
       badgeBg: 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100',
       podiumBg: 'bg-slate-100 dark:bg-slate-800/80 border-2 border-slate-300 dark:border-slate-600',
       numColor: 'text-slate-600 dark:text-slate-300',
       ringColor: 'ring-4 ring-slate-300',
     },
     {
-      rank: 3,
+      ...rankedList[2],
       title: '৩য় স্থান',
       label: '৩য় স্থান',
-      name: 'কারি মোশতাক মাহমুদ',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
-      tests: '27টি পরীক্ষা',
-      avg: 'গড় 28.1',
-      points: '16 পয়েন্ট',
       badgeBg: 'bg-amber-800/20 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
       podiumBg: 'bg-orange-100/70 dark:bg-amber-950/40 border-2 border-amber-300/60',
       numColor: 'text-amber-800 dark:text-amber-300',
@@ -72,54 +182,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     },
   ];
 
-  // Mock Other Rankings
-  const otherRankings = [
-    {
-      rank: 4,
-      name: 'হাফেজ মাওলানা ওবায়দুল্লাহ',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
-      accuracy: '100%',
-      correct: 16,
-      wrong: 0,
-      marks: 16,
-    },
-    {
-      rank: 5,
-      name: 'মাওলানা উবায়দুল হক',
-      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
-      accuracy: '94%',
-      correct: 15,
-      wrong: 1,
-      marks: 15,
-    },
-    {
-      rank: 6,
-      name: 'মুফতি আব্দুল কাইয়ুম',
-      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
-      accuracy: '94%',
-      correct: 15,
-      wrong: 1,
-      marks: 15,
-    },
-    {
-      rank: 7,
-      name: 'মাওলানা আব্দুল আলিম',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-      accuracy: '88%',
-      correct: 14,
-      wrong: 2,
-      marks: 14,
-    },
-    {
-      rank: 8,
-      name: 'হাফেজ ইউসুফ জামিল',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=150',
-      accuracy: '81%',
-      correct: 13,
-      wrong: 3,
-      marks: 13,
-    },
-  ];
+  const otherRankings = rankedList.slice(3);
 
   const accuracyPct = Math.round((correctCount / (totalQuestions || 1)) * 100);
 
@@ -333,7 +396,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
           <div className="bg-blue-50/90 dark:bg-slate-800/80 rounded-[24px] p-4 sm:p-5 border-2 border-[#0B132B] flex items-center justify-between gap-3 shadow-md">
             <div className="flex items-center gap-3 min-w-0">
               <span className="text-lg font-black text-[#0B132B] dark:text-amber-300 shrink-0">
-                36.
+                {toBengaliNumeral(userRank)}.
               </span>
               <div className="relative shrink-0">
                 {userAvatar ? (

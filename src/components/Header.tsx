@@ -88,25 +88,22 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Brand Logo & Name */}
+          {/* Brand Name (Logo removed as requested, text enlarged) */}
           <button
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 sm:gap-3.5 text-left group focus:outline-hidden cursor-pointer min-w-0"
+            className="flex items-center text-left group focus:outline-hidden cursor-pointer min-w-0"
             title="হোম পেজে যান"
           >
-            <div className="p-1.5 sm:p-2 rounded-2xl bg-gradient-to-br from-[#0b705c]/15 to-amber-500/15 dark:from-[#0b705c]/35 dark:to-amber-500/25 border border-emerald-600/40 dark:border-amber-400/40 shadow-md group-hover:scale-105 transition-all shrink-0">
-              <AtTamreenLogo size={48} className="w-10 h-10 sm:w-13 sm:h-13" />
-            </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`font-tiro font-black text-lg sm:text-2xl lg:text-3xl tracking-wide truncate leading-snug drop-shadow-xs ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
+                <span className={`font-tiro font-black text-2xl sm:text-3xl lg:text-4xl tracking-wide truncate leading-snug drop-shadow-xs ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
                   <span className="typo-gradient-brand">আত-তামরীন</span>{' '}
-                  <span className="typo-gradient-gold font-anek font-bold text-sm sm:text-xl px-2 py-0.5 rounded-lg bg-amber-500/10 dark:bg-amber-400/20 border border-amber-500/30 inline-block align-middle ml-1">
+                  <span className="typo-gradient-gold font-anek font-extrabold text-base sm:text-2xl px-2.5 py-0.5 rounded-xl bg-amber-500/10 dark:bg-amber-400/20 border border-amber-500/30 inline-block align-middle ml-1">
                     একাডেমি
                   </span>
                 </span>
               </div>
-              <p className={`text-xs sm:text-sm font-semibold tracking-wide hidden sm:block truncate mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <p className={`text-xs sm:text-sm font-bold tracking-wide hidden sm:block truncate mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                 শিক্ষক নিবন্ধন ও বিষয়ভিত্তিক জব প্রস্তুতি প্ল্যাটফর্ম
               </p>
             </div>

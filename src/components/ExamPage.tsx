@@ -19,7 +19,12 @@ import {
   Copy,
   Crown,
   FileText,
-  Trophy
+  Trophy,
+  X,
+  ExternalLink,
+  MessageSquare,
+  Check,
+  Send
 } from 'lucide-react';
 import { Question } from '../types';
 import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
@@ -56,6 +61,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
+  // Share Modal state
+  const [activeShareExam, setActiveShareExam] = useState<ExamItem | null>(null);
+  const [shareToast, setShareToast] = useState(false);
+
   // Registration modal for users entering exam
   const [showRegModal, setShowRegModal] = useState(false);
   const [pendingStartOpts, setPendingStartOpts] = useState<ExamStartOptions | null>(null);
@@ -95,12 +104,54 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
   const handleShare = (exam: ExamItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const shareText = `${exam.title}\nবিষয়: ${exam.subject}\nপ্রশ্ন: ${exam.question_count}টি, সময়: ${exam.time_minutes} মিনিট।\nতামরীন একাডেমিতে এখনই অংশগ্রহণ করুন!`;
-    
+    setActiveShareExam(exam);
+  };
+
+  const getExamShareUrl = (exam: ExamItem) => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?exam=${encodeURIComponent(exam.id)}`;
+  };
+
+  const getExamShareText = (exam: ExamItem) => {
+    return `📝 ${exam.title}\nবিষয়: ${exam.subject}\n⏱️ সময়: ${exam.time_minutes} মিনিট | ❓ প্রশ্ন: ${exam.question_count}টি\n\nআত-তামরীন একাডেমিতে বিনামূল্যে এই পরীক্ষা দিন!`;
+  };
+
+  const handleCopyLink = (exam: ExamItem) => {
+    const text = `${getExamShareText(exam)}\n🔗 ${getExamShareUrl(exam)}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareText);
-      setCopiedId(exam.id);
-      setTimeout(() => setCopiedId(null), 2500);
+      navigator.clipboard.writeText(text);
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 3000);
+    }
+  };
+
+  const handleFacebookShare = (exam: ExamItem) => {
+    const shareUrl = getExamShareUrl(exam);
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    window.open(fbUrl, '_blank', 'width=600,height=500');
+  };
+
+  const handleWhatsAppShare = (exam: ExamItem) => {
+    const text = `${getExamShareText(exam)}\n\nলিংক: ${getExamShareUrl(exam)}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
+
+  const handleNativeShare = async (exam: ExamItem) => {
+    const shareData = {
+      title: exam.title,
+      text: getExamShareText(exam),
+      url: getExamShareUrl(exam),
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.log('Share error:', err);
+      }
+    } else {
+      handleCopyLink(exam);
     }
   };
 
@@ -492,6 +543,103 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         }}
         onSaveSuccess={handleRegSaved}
       />
+
+      {/* Social Share Modal */}
+      {activeShareExam && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] max-w-md w-full rounded-[32px] p-6 border border-slate-200 dark:border-slate-800 shadow-2xl relative space-y-5">
+            <button
+              onClick={() => setActiveShareExam(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 rounded-2xl text-[#0b705c] dark:text-emerald-400">
+                <Share2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-[#0B132B] dark:text-white">
+                  পরীক্ষা শেয়ার করুন
+                </h3>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  বন্ধুদের সাথে শেয়ার করে মেধা তালিকায় প্রতিযোগিতা করুন!
+                </p>
+              </div>
+            </div>
+
+            {/* Exam Card Preview */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60 space-y-1">
+              <p className="font-black text-sm text-[#0B132B] dark:text-white">
+                {activeShareExam.title}
+              </p>
+              <p className="text-xs font-extrabold text-[#0b705c] dark:text-amber-300">
+                বিষয়: {activeShareExam.subject}
+              </p>
+              <div className="flex items-center gap-3 pt-1 text-xs font-bold text-slate-500">
+                <span>⏱️ {toBengaliNumeral(activeShareExam.time_minutes)} মিনিট</span>
+                <span>•</span>
+                <span>❓ {toBengaliNumeral(activeShareExam.question_count)}টি প্রশ্ন</span>
+              </div>
+            </div>
+
+            {/* Share Options Grid */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              {/* Facebook Share */}
+              <button
+                onClick={() => handleFacebookShare(activeShareExam)}
+                className="py-3 px-4 rounded-2xl bg-[#1877F2] text-white font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-[#166fe5] transition-all cursor-pointer shadow-xs"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>ফেসবুকে শেয়ার</span>
+              </button>
+
+              {/* WhatsApp Share */}
+              <button
+                onClick={() => handleWhatsAppShare(activeShareExam)}
+                className="py-3 px-4 rounded-2xl bg-[#25D366] text-white font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-[#22bf5b] transition-all cursor-pointer shadow-xs"
+              >
+                <Send className="w-4 h-4" />
+                <span>হোয়াটসঅ্যাপ</span>
+              </button>
+
+              {/* Native Mobile Share */}
+              <button
+                onClick={() => handleNativeShare(activeShareExam)}
+                className="py-3 px-4 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-slate-800 transition-all cursor-pointer shadow-xs col-span-2 sm:col-span-1"
+              >
+                <ExternalLink className="w-4 h-4 text-amber-400" />
+                <span>অন্যান্য অ্যাপস</span>
+              </button>
+
+              {/* Copy Link */}
+              <button
+                onClick={() => handleCopyLink(activeShareExam)}
+                className="py-3 px-4 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 font-extrabold text-xs flex items-center justify-center gap-2 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 transition-all cursor-pointer col-span-2 sm:col-span-1"
+              >
+                {shareToast ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>কপি হয়েছে!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>লিংক কপি করুন</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {shareToast && (
+              <div className="p-2.5 rounded-xl bg-emerald-500 text-white text-center text-xs font-black animate-fade-in shadow-md">
+                ✓ শেয়ারিং বিবরণ ও লিংক ক্লিপবোর্ডে কপি হয়েছে!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

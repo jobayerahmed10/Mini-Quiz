@@ -19,49 +19,150 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<'current' | 'week' | 'month'>('current');
   const userProfile = getUserProfile();
-  const userName = userProfile?.name || 'আপনার স্থান';
+  const userName = userProfile?.name || 'আপনি (পরীক্ষার্থী)';
 
-  const userPercentage = Math.round((currentUserScore / (totalQuestions || 1)) * 100);
-
-  // Mock Top 3 Winners Data
-  const topWinners = [
+  // Pool of mock candidates to compete with
+  const baseCandidates = [
     {
-      rank: 1,
-      title: '১ম স্থান',
-      label: 'চ্যাম্পিয়ন',
+      id: 'c1',
       name: 'মাওলানা হাফেজ আব্দুল মালেক',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      tests: '২৮টি পরীক্ষা',
-      avg: 'গড় ২৯.৫',
-      points: '১০০% মার্কস',
+      isCurrentUser: false,
+      marks: 15,
+      correct: 15,
+      wrong: 0,
+      pointsText: '১৫ নম্বর',
+    },
+    {
+      id: 'c2',
+      name: 'মুফতি তানভীর আহমেদ',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+      isCurrentUser: false,
+      marks: 14,
+      correct: 14,
+      wrong: 1,
+      pointsText: '১৪ নম্বর',
+    },
+    {
+      id: 'c3',
+      name: 'কারি মোশতাক মাহমুদ',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+      isCurrentUser: false,
+      marks: 14,
+      correct: 14,
+      wrong: 1,
+      pointsText: '১৪ নম্বর',
+    },
+    {
+      id: 'c4',
+      name: 'হাফেজ মাওলানা ওবায়দুল্লাহ',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 13,
+      correct: 13,
+      wrong: 2,
+      pointsText: '১৩ নম্বর',
+    },
+    {
+      id: 'c5',
+      name: 'মাওলানা উবায়দুল হক',
+      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 12,
+      correct: 12,
+      wrong: 3,
+      pointsText: '১২ নম্বর',
+    },
+    {
+      id: 'c6',
+      name: 'মুফতি আব্দুল কাইয়ুম',
+      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 11,
+      correct: 11,
+      wrong: 4,
+      pointsText: '১১ নম্বর',
+    },
+    {
+      id: 'c7',
+      name: 'এনটিআরসিএ পরীক্ষার্থী (চট্টগ্রাম)',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 10,
+      correct: 10,
+      wrong: 5,
+      pointsText: '১০ নম্বর',
+    },
+    {
+      id: 'c8',
+      name: 'মোঃ জসিম উদ্দিন (রাজশাহী)',
+      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=150',
+      isCurrentUser: false,
+      marks: 8,
+      correct: 8,
+      wrong: 7,
+      pointsText: '৮ নম্বর',
+    },
+  ];
+
+  // User Candidate Object
+  const userCandidate = {
+    id: 'user_current',
+    name: userProfile?.name ? `${userProfile.name} (আপনি)` : 'আপনি (পরীক্ষার্থী)',
+    avatar: userProfile?.avatar || '',
+    isCurrentUser: true,
+    marks: currentUserScore,
+    correct: correctCount,
+    wrong: wrongCount,
+    pointsText: `${currentUserScore} নম্বর`,
+  };
+
+  // Combine & Sort strictly by Marks (Descending), then Correct count
+  const allCandidates = [...baseCandidates, userCandidate].sort((a, b) => {
+    if (b.marks !== a.marks) return b.marks - a.marks;
+    if (b.correct !== a.correct) return b.correct - a.correct;
+    return a.wrong - b.wrong;
+  });
+
+  // Assign ranks sequentially based on marks order
+  const rankedList = allCandidates.map((c, index) => {
+    const rank = index + 1;
+    const accuracy = totalQuestions > 0 ? `${Math.round((c.marks / totalQuestions) * 100)}%` : '১০০%';
+    return {
+      ...c,
+      rank,
+      accuracy,
+    };
+  });
+
+  // Find user's exact rank
+  const userRankItem = rankedList.find((item) => item.isCurrentUser);
+  const userRank = userRankItem ? userRankItem.rank : 1;
+
+  // Podium (Top 3) vs Other Rankings (4th+)
+  const topWinners = [
+    {
+      ...rankedList[0],
+      title: '১ম স্থান',
+      label: 'চ্যাম্পিয়ন',
       badgeBg: 'bg-[#FFC107] text-[#0B132B]',
       podiumBg: 'bg-amber-100 dark:bg-amber-950/60 border-2 border-amber-400',
       numColor: 'text-amber-600',
       ringColor: 'ring-4 ring-amber-400',
     },
     {
-      rank: 2,
+      ...rankedList[1],
       title: '২য় স্থান',
       label: 'রানার-আপ',
-      name: 'মুফতি তানভীর আহমেদ',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-      tests: '২৮টি পরীক্ষা',
-      avg: 'গড় ২৮.৩',
-      points: '৯৫% মার্কস',
       badgeBg: 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100',
       podiumBg: 'bg-slate-100 dark:bg-slate-800/80 border-2 border-slate-300 dark:border-slate-600',
       numColor: 'text-slate-600 dark:text-slate-300',
       ringColor: 'ring-4 ring-slate-300',
     },
     {
-      rank: 3,
+      ...rankedList[2],
       title: '৩য় স্থান',
       label: '৩য় স্থান',
-      name: 'কারি মোশতাক মাহমুদ',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
-      tests: '২৭টি পরীক্ষা',
-      avg: 'গড় ২৮.১',
-      points: '৯৩% মার্কস',
       badgeBg: 'bg-amber-800/20 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
       podiumBg: 'bg-orange-100/70 dark:bg-amber-950/40 border-2 border-amber-300/60',
       numColor: 'text-amber-800 dark:text-amber-300',
@@ -69,59 +170,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
     },
   ];
 
-  // Mock Other Rankings
-  const otherRankings = [
-    {
-      rank: 4,
-      name: userProfile?.name ? `${userProfile.name} (আপনি)` : 'তামরীন শিক্ষার্থী (ঢাকা)',
-      avatar: userProfile?.avatar || '',
-      isCurrentUser: true,
-      accuracy: `${userPercentage}%`,
-      correct: correctCount,
-      wrong: wrongCount,
-      marks: currentUserScore,
-    },
-    {
-      rank: 5,
-      name: 'হাফেজ মাওলানা ওবায়দুল্লাহ',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
-      isCurrentUser: false,
-      accuracy: '১০০%',
-      correct: 15,
-      wrong: 0,
-      marks: 15,
-    },
-    {
-      rank: 6,
-      name: 'মাওলানা উবায়দুল হক',
-      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
-      isCurrentUser: false,
-      accuracy: '৯৪%',
-      correct: 14,
-      wrong: 1,
-      marks: 14,
-    },
-    {
-      rank: 7,
-      name: 'মুফতি আব্দুল কাইয়ুম',
-      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
-      isCurrentUser: false,
-      accuracy: '৯৩%',
-      correct: 14,
-      wrong: 1,
-      marks: 14,
-    },
-    {
-      rank: 8,
-      name: 'এনটিআরসিএ পরীক্ষার্থী (চট্টগ্রাম)',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-      isCurrentUser: false,
-      accuracy: '৮৭%',
-      correct: 13,
-      wrong: 2,
-      marks: 13,
-    },
-  ];
+  const otherRankings = rankedList.slice(3);
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#070D1E] pb-24 animate-fade-in">
@@ -172,7 +221,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                   {userName}
                 </h3>
                 <p className="text-[11px] font-bold text-amber-200">
-                  আপনার অর্জিত অবস্থান: ৪র্থ স্থান
+                  আপনার মেধা অবস্থান: {toBengaliNumeral(userRank)}ম স্থান
                 </p>
               </div>
             </div>
@@ -225,11 +274,17 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
           {/* 2nd Place */}
           <div className={`rounded-3xl p-3 sm:p-4 text-center space-y-2 ${topWinners[1].podiumBg} shadow-sm`}>
             <div className="relative inline-block">
-              <img
-                src={topWinners[1].avatar}
-                alt={topWinners[1].name}
-                className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ${topWinners[1].ringColor}`}
-              />
+              {topWinners[1].avatar ? (
+                <img
+                  src={topWinners[1].avatar}
+                  alt={topWinners[1].name}
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ${topWinners[1].ringColor}`}
+                />
+              ) : (
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-black mx-auto ${topWinners[1].ringColor}`}>
+                  <User className="w-6 h-6" />
+                </div>
+              )}
               <span className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-2 py-0.5 rounded-full ${topWinners[1].badgeBg}`}>
                 ২য়
               </span>
@@ -239,7 +294,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 {topWinners[1].name}
               </h4>
               <p className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                {topWinners[1].points}
+                {toBengaliNumeral(topWinners[1].marks)} মার্কস
               </p>
             </div>
           </div>
@@ -247,11 +302,17 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
           {/* 1st Place (Center / Taller) */}
           <div className={`rounded-3xl p-3.5 sm:p-5 text-center space-y-2.5 ${topWinners[0].podiumBg} shadow-md border-amber-400 -translate-y-2`}>
             <div className="relative inline-block">
-              <img
-                src={topWinners[0].avatar}
-                alt={topWinners[0].name}
-                className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full object-cover mx-auto ${topWinners[0].ringColor}`}
-              />
+              {topWinners[0].avatar ? (
+                <img
+                  src={topWinners[0].avatar}
+                  alt={topWinners[0].name}
+                  className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full object-cover mx-auto ${topWinners[0].ringColor}`}
+                />
+              ) : (
+                <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-black mx-auto ${topWinners[0].ringColor}`}>
+                  <User className="w-8 h-8" />
+                </div>
+              )}
               <span className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-xs font-black px-2.5 py-0.5 rounded-full ${topWinners[0].badgeBg} flex items-center gap-0.5 shadow-xs`}>
                 🏆 ১ম
               </span>
@@ -261,7 +322,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 {topWinners[0].name}
               </h4>
               <p className="text-[11px] font-black text-amber-600 dark:text-amber-400">
-                {topWinners[0].points}
+                {toBengaliNumeral(topWinners[0].marks)} মার্কস
               </p>
             </div>
           </div>
@@ -269,11 +330,17 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
           {/* 3rd Place */}
           <div className={`rounded-3xl p-3 sm:p-4 text-center space-y-2 ${topWinners[2].podiumBg} shadow-sm`}>
             <div className="relative inline-block">
-              <img
-                src={topWinners[2].avatar}
-                alt={topWinners[2].name}
-                className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ${topWinners[2].ringColor}`}
-              />
+              {topWinners[2].avatar ? (
+                <img
+                  src={topWinners[2].avatar}
+                  alt={topWinners[2].name}
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ${topWinners[2].ringColor}`}
+                />
+              ) : (
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-black mx-auto ${topWinners[2].ringColor}`}>
+                  <User className="w-6 h-6" />
+                </div>
+              )}
               <span className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-2 py-0.5 rounded-full ${topWinners[2].badgeBg}`}>
                 ৩য়
               </span>
@@ -283,7 +350,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 {topWinners[2].name}
               </h4>
               <p className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                {topWinners[2].points}
+                {toBengaliNumeral(topWinners[2].marks)} মার্কস
               </p>
             </div>
           </div>
@@ -292,21 +359,21 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
         {/* Full Rankings Table List */}
         <div className="bg-white dark:bg-[#0D172A] rounded-[28px] border border-slate-200 dark:border-slate-800 shadow-md divide-y divide-slate-100 dark:divide-slate-800/60 overflow-hidden">
           <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between text-xs font-black text-slate-500 dark:text-slate-400">
-            <span>পরীক্ষার্থী</span>
+            <span>মেধা অবস্থান & পরীক্ষার্থী</span>
             <span>স্কোর & নির্ভুলতা</span>
           </div>
 
           {otherRankings.map((item) => (
             <div
-              key={item.rank}
+              key={item.id}
               className={`p-4 flex items-center justify-between gap-3 transition-colors ${
                 item.isCurrentUser
-                  ? 'bg-amber-50/80 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
+                  ? 'bg-amber-50/90 dark:bg-amber-950/40 border-l-4 border-l-amber-500'
                   : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-6 text-center font-black text-xs text-slate-400 shrink-0">
+                <span className="w-7 text-center font-black text-xs sm:text-sm text-slate-500 dark:text-slate-400 shrink-0">
                   #{toBengaliNumeral(item.rank)}
                 </span>
 
