@@ -247,60 +247,68 @@ export const PracticePage: React.FC<PracticePageProps> = ({
               </div>
 
               {/* Options List (ক, খ, গ, ঘ) */}
-              <div className="space-y-3 pt-1">
-                {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-                  const rawOptionText = q[optionKey];
-                  const optionText = formatArabicText(rawOptionText, showHarakat);
-                  const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
-                  const isSelected = selectedOpt === optionKey;
-                  const isOptRtl = isFullyArabic(rawOptionText);
+              {(() => {
+                const optionKeys = ['option_a', 'option_b', 'option_c', 'option_d'] as const;
+                const arabicOptionCount = optionKeys.filter((k) => isFullyArabic(q[k])).length;
+                const areOptionsRtl = arabicOptionCount >= 3;
 
-                  return (
-                    <button
-                      key={optionKey}
-                      type="button"
-                      onClick={() => handleSelectOption(q.id, optionKey)}
-                      dir={isOptRtl ? 'rtl' : 'ltr'}
-                      className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
-                        isOptRtl ? 'text-right' : 'text-left'
-                      } ${
-                        isSelected
-                          ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-[#0b705c] text-[#0B132B] dark:text-white font-bold shadow-xs'
-                          : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Option Letter Box */}
-                        <div
-                          className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 transition-colors ${
+                return (
+                  <div className="space-y-3 pt-1">
+                    {optionKeys.map((optionKey) => {
+                      const rawOptionText = q[optionKey];
+                      const optionText = formatArabicText(rawOptionText, showHarakat);
+                      const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
+                      const isSelected = selectedOpt === optionKey;
+                      const isThisOptArabic = isFullyArabic(rawOptionText);
+
+                      return (
+                        <button
+                          key={optionKey}
+                          type="button"
+                          onClick={() => handleSelectOption(q.id, optionKey)}
+                          dir={areOptionsRtl ? 'rtl' : 'ltr'}
+                          className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                            areOptionsRtl ? 'text-right' : 'text-left'
+                          } ${
                             isSelected
-                              ? 'bg-[#0B132B] text-white'
-                              : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                              ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-[#0b705c] text-[#0B132B] dark:text-white font-bold shadow-xs'
+                              : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
                           }`}
                         >
-                          {isSelected ? (
-                            <Check className="w-4 h-4 text-white stroke-[3]" />
-                          ) : (
-                            prefixLabel
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Option Letter Box */}
+                            <div
+                              className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 transition-colors ${
+                                isSelected
+                                  ? 'bg-[#0B132B] text-white'
+                                  : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                              }`}
+                            >
+                              {isSelected ? (
+                                <Check className="w-4 h-4 text-white stroke-[3]" />
+                              ) : (
+                                prefixLabel
+                              )}
+                            </div>
+
+                            {/* Option Text */}
+                            <span className={`font-bold text-xs sm:text-sm leading-relaxed ${
+                              isThisOptArabic ? 'font-arabic' : ''
+                            } ${areOptionsRtl ? 'text-right' : 'text-left'}`}>
+                              {optionText}
+                            </span>
+                          </div>
+
+                          {/* Right Selected Check Indicator */}
+                          {isSelected && (
+                            <CheckCircle2 className="w-5 h-5 text-[#0b705c] shrink-0" />
                           )}
-                        </div>
-
-                        {/* Option Text */}
-                        <span className={`font-bold text-xs sm:text-sm leading-relaxed ${
-                          isOptRtl ? 'font-arabic text-right' : 'text-left'
-                        }`}>
-                          {optionText}
-                        </span>
-                      </div>
-
-                      {/* Right Selected Check Indicator */}
-                      {isSelected && (
-                        <CheckCircle2 className="w-5 h-5 text-[#0b705c] shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}

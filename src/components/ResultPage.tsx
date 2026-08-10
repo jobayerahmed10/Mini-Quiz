@@ -312,61 +312,71 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                         </h3>
 
                         {/* Options List */}
-                        <div className="space-y-2.5 pt-1">
-                          {(['option_a', 'option_b', 'option_c', 'option_d'] as const).map((optionKey) => {
-                            const rawOptionText = answer.options[optionKey];
-                            const optionText = formatArabicText(rawOptionText, showHarakat);
-                            const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
+                        {(() => {
+                          const optionKeys = ['option_a', 'option_b', 'option_c', 'option_d'] as const;
+                          const arabicOptionCount = optionKeys.filter((k) => isFullyArabic(answer.options[k])).length;
+                          const areOptionsRtl = arabicOptionCount >= 3;
 
-                            const isOptionCorrect = optionKey === answer.correctOption;
-                            const isOptionSelected = optionKey === answer.selectedOption;
-                            const isOptRtl = isFullyArabic(rawOptionText);
+                          return (
+                            <div className="space-y-2.5 pt-1">
+                              {optionKeys.map((optionKey) => {
+                                const rawOptionText = answer.options[optionKey];
+                                const optionText = formatArabicText(rawOptionText, showHarakat);
+                                const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
 
-                            let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
-                            let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
-                            let rightBadge = null;
+                                const isOptionCorrect = optionKey === answer.correctOption;
+                                const isOptionSelected = optionKey === answer.selectedOption;
+                                const isThisOptArabic = isFullyArabic(rawOptionText);
 
-                            if (isOptionCorrect) {
-                              // Correct Answer Option -> NAVY BLUE
-                              styleClasses = 'bg-[#0B132B]/10 dark:bg-[#0B132B]/80 border-2 border-[#0B132B] dark:border-amber-400 text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
-                              letterBg = 'bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B]';
-                              rightBadge = (
-                                <span className="px-2.5 py-0.5 bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B] rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
-                                  ✓ সঠিক উত্তর
-                                </span>
-                              );
-                            } else if (isOptionSelected && !isCorrect) {
-                              // Wrong Answer Option -> RED
-                              styleClasses = 'bg-red-50 dark:bg-red-950/50 border-2 border-red-500 text-red-950 dark:text-red-100 font-bold shadow-xs';
-                              letterBg = 'bg-red-600 text-white';
-                              rightBadge = (
-                                <span className="px-2.5 py-0.5 bg-red-600 text-white rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
-                                  ✕ আপনার ভুল উত্তর
-                                </span>
-                              );
-                            }
+                                let styleClasses = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
+                                let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
+                                let rightBadge = null;
 
-                            return (
-                              <div
-                                key={optionKey}
-                                dir={isOptRtl ? 'rtl' : 'ltr'}
-                                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
-                                  isOptRtl ? 'text-right' : 'text-left'
-                                } ${styleClasses}`}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
-                                    {prefixLabel}
+                                if (isOptionCorrect) {
+                                  // Correct Answer Option -> NAVY BLUE
+                                  styleClasses = 'bg-[#0B132B]/10 dark:bg-[#0B132B]/80 border-2 border-[#0B132B] dark:border-amber-400 text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
+                                  letterBg = 'bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B]';
+                                  rightBadge = (
+                                    <span className="px-2.5 py-0.5 bg-[#0B132B] text-amber-300 dark:bg-amber-400 dark:text-[#0B132B] rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
+                                      ✓ সঠিক উত্তর
+                                    </span>
+                                  );
+                                } else if (isOptionSelected && !isCorrect) {
+                                  // Wrong Answer Option -> RED
+                                  styleClasses = 'bg-red-50 dark:bg-red-950/50 border-2 border-red-500 text-red-950 dark:text-red-100 font-bold shadow-xs';
+                                  letterBg = 'bg-red-600 text-white';
+                                  rightBadge = (
+                                    <span className="px-2.5 py-0.5 bg-red-600 text-white rounded-md font-extrabold text-[10px] shrink-0 shadow-xs">
+                                      ✕ আপনার ভুল উত্তর
+                                    </span>
+                                  );
+                                }
+
+                                return (
+                                  <div
+                                    key={optionKey}
+                                    dir={areOptionsRtl ? 'rtl' : 'ltr'}
+                                    className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
+                                      areOptionsRtl ? 'text-right' : 'text-left'
+                                    } ${styleClasses}`}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
+                                        {prefixLabel}
+                                      </div>
+                                      <span className={`font-bold leading-relaxed ${
+                                        isThisOptArabic ? 'font-arabic' : ''
+                                      } ${areOptionsRtl ? 'text-right' : 'text-left'}`}>
+                                        {optionText}
+                                      </span>
+                                    </div>
+                                    {rightBadge}
                                   </div>
-                                  <span className={`font-bold leading-relaxed ${isOptRtl ? 'font-arabic text-right' : 'text-left'}`}>
-                                    {optionText}
-                                  </span>
-                                </div>
-                                {rightBadge}
-                              </div>
-                            );
-                          })}
-                        </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </>
                     );
                   })()}
