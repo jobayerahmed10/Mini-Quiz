@@ -198,6 +198,9 @@ export function getUserProfile(): UserProfile | null {
 }
 
 export function saveUserProfile(name: string, phone: string, avatar?: string): UserProfile {
+  const previousProfile = getUserProfile();
+  const oldName = previousProfile?.name?.trim()?.toLowerCase();
+
   const profile: UserProfile = {
     name: name.trim(),
     phone: phone.trim(),
@@ -208,6 +211,44 @@ export function saveUserProfile(name: string, phone: string, avatar?: string): U
   } catch {
     // ignore localstorage errors
   }
+
+  // Also update existing local leaderboard entries for this user
+  try {
+    const rawLb = localStorage.getItem('tamreen_leaderboard_entries');
+    if (rawLb) {
+      const entries: any[] = JSON.parse(rawLb);
+      let updated = false;
+      const newNameClean = name.trim();
+      const newAvatarClean = avatar || '';
+
+      entries.forEach((entry) => {
+        const eName = (entry.user_name || '').trim().toLowerCase();
+        // Match old profile name or current name
+        if (!oldName || eName === oldName || eName === newNameClean.toLowerCase()) {
+          entry.user_name = newNameClean;
+          entry.user_avatar = newAvatarClean;
+          updated = true;
+        }
+      });
+
+      if (updated) {
+        localStorage.setItem('tamreen_leaderboard_entries', JSON.stringify(entries));
+      }
+    }
+  } catch {}
+
+  // Broadcast events for real-time UI refresh across windows/components
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tamreen_profile_updated', { detail: profile }));
+    if ('BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('tamreen_leaderboard_channel');
+        bc.postMessage({ type: 'PROFILE_UPDATED', profile });
+        bc.close();
+      } catch {}
+    }
+  }
+
   return profile;
 }
 

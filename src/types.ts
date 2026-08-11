@@ -53,6 +53,7 @@ export interface QuizResult {
   userAnswers: UserAnswer[];
   completedAt: string;
   selectedSubject?: string | null;
+  examId?: string | null;
 }
 
 export type TabRoute = 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';

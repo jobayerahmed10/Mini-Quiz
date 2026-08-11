@@ -527,8 +527,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         totalQuestions={result.totalQuestions}
         correctCount={result.correctCount}
         wrongCount={result.wrongCount}
-        examId={result.selectedSubject}
-        examTitle={result.selectedSubject}
+        examId={result.examId || result.selectedSubject || 'all'}
+        examTitle={result.selectedSubject || undefined}
       />
 
     </div>

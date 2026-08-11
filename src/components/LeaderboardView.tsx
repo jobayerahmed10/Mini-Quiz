@@ -19,6 +19,7 @@ export interface LeaderboardDisplayItem {
   correctCount: number;
   wrongCount: number;
   score: number;
+  examTitle?: string;
   
   createdAt: string;
 }
@@ -27,7 +28,8 @@ export function computeLeaderboard(
   entries: LeaderboardEntry[],
   filterType: LeaderboardFilterType,
   selectedExamId: string,
-  currentUserName: string
+  currentUserName: string,
+  currentUserAvatar?: string
 ): LeaderboardDisplayItem[] {
   const normalizedCurrentUserName = currentUserName.toLowerCase().trim();
 
@@ -40,21 +42,24 @@ export function computeLeaderboard(
       );
     }
 
-    // Group or select best entry per user for this exam
+    // Group or select best entry per user per exam
     const userBestMap = new Map<string, LeaderboardEntry>();
     for (const item of filtered) {
       const uKey = item.user_name.toLowerCase().trim();
-      const existing = userBestMap.get(uKey);
+      const examKey = item.exam_id || item.exam_title || 'default';
+      const mapKey = selectedExamId === 'all' ? `${uKey}_${examKey}` : uKey;
+
+      const existing = userBestMap.get(mapKey);
       if (!existing) {
-        userBestMap.set(uKey, item);
+        userBestMap.set(mapKey, item);
       } else {
         if (item.score > existing.score) {
-          userBestMap.set(uKey, item);
+          userBestMap.set(mapKey, item);
         } else if (item.score === existing.score) {
           if (item.accuracy > existing.accuracy) {
-            userBestMap.set(uKey, item);
+            userBestMap.set(mapKey, item);
           } else if (new Date(item.created_at).getTime() < new Date(existing.created_at).getTime()) {
-            userBestMap.set(uKey, item);
+            userBestMap.set(mapKey, item);
           }
         }
       }
@@ -62,18 +67,21 @@ export function computeLeaderboard(
 
     const itemsList: LeaderboardDisplayItem[] = Array.from(userBestMap.values()).map((e) => {
       const uKey = e.user_name.toLowerCase().trim();
+      const isCurr = Boolean(normalizedCurrentUserName && (uKey === normalizedCurrentUserName || uKey === 'আপনি (পরীক্ষার্থী)'));
+
       return {
         id: e.id,
         rank: 0,
-        userName: e.user_name,
-        userAvatar: e.user_avatar,
-        isCurrentUser: Boolean(normalizedCurrentUserName && uKey === normalizedCurrentUserName),
+        userName: isCurr ? (currentUserName || e.user_name) : e.user_name,
+        userAvatar: isCurr ? (currentUserAvatar || e.user_avatar) : e.user_avatar,
+        isCurrentUser: isCurr,
         testCount: 1,
         avgAccuracy: Math.round(e.accuracy || 0),
         points: Number(e.score || e.correct_count || 0),
         correctCount: Number(e.correct_count || e.score || 0),
         wrongCount: Number(e.wrong_count || 0),
         score: Number(e.score || 0),
+        examTitle: e.exam_title || 'মডেল টেস্ট',
         createdAt: e.created_at,
       };
     });
@@ -121,6 +129,7 @@ export function computeLeaderboard(
     for (const [uKey, userEntries] of userGroupMap.entries()) {
       const firstEntry = userEntries[0];
       const testCount = userEntries.length;
+      const isCurr = Boolean(normalizedCurrentUserName && (uKey === normalizedCurrentUserName || uKey === 'আপনি (পরীক্ষার্থী)'));
 
       let totalCorrect = 0;
       let totalQuestions = 0;
@@ -151,9 +160,9 @@ export function computeLeaderboard(
       itemsList.push({
         id: `user_agg_${uKey}`,
         rank: 0,
-        userName: firstEntry.user_name,
-        userAvatar: latestAvatar,
-        isCurrentUser: Boolean(normalizedCurrentUserName && uKey === normalizedCurrentUserName),
+        userName: isCurr ? (currentUserName || firstEntry.user_name) : firstEntry.user_name,
+        userAvatar: isCurr ? (currentUserAvatar || latestAvatar) : latestAvatar,
+        isCurrentUser: isCurr,
         testCount,
         avgAccuracy,
         points,
@@ -203,6 +212,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
   const userProfile = getUserProfile();
   const userName = userProfile?.name?.trim() || 'আপনি (পরীক্ষার্থী)';
+  const userAvatar = userProfile?.avatar || '';
 
   // Load Exam List
   useEffect(() => {
@@ -233,6 +243,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   useEffect(() => {
     loadLeaderboardData();
 
+    const handleProfileUpdate = () => {
+      loadLeaderboardData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tamreen_profile_updated', handleProfileUpdate);
+    }
+
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
@@ -244,12 +261,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     }
 
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tamreen_profile_updated', handleProfileUpdate);
+      }
       if (bc) bc.close();
     };
   }, []);
 
   // Compute ranked list based on current filter & selected exam
-  const rankedList = computeLeaderboard(entries, filterType, selectedExamId, userName);
+  const rankedList = computeLeaderboard(entries, filterType, selectedExamId, userName, userAvatar);
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
 
@@ -522,8 +542,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </div>
 
                   {filterType === 'this_exam' ? (
-                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                      আপনার মেধা অবস্থান • একুরেসি {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
+                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px] sm:max-w-xs">
+                      {currentUserRankItem.examTitle ? `${currentUserRankItem.examTitle} • ` : ''}একুরেসি {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
                     </p>
                   ) : (
                     <div className="flex items-center gap-1.5 pt-0.5">
@@ -618,8 +638,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       </div>
 
                       {filterType === 'this_exam' ? (
-                        <p className="text-[10px] font-bold text-slate-500">
-                          একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
+                        <p className="text-[10px] font-bold text-slate-500 truncate max-w-[180px] sm:max-w-xs">
+                          {item.examTitle ? `${item.examTitle} • ` : ''}একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
                         </p>
                       ) : (
                         <div className="flex items-center gap-1.5">

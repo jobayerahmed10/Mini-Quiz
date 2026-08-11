@@ -164,6 +164,7 @@ export default function App() {
       userAnswers,
       completedAt: new Date().toISOString(),
       selectedSubject: selectedSubject,
+      examId: activeExamId || selectedSubject,
     };
 
     setQuizResult(result);
