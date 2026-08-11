@@ -118,21 +118,19 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
     if (!queryText) setInputQuery('');
     setIsTyping(true);
 
-    // Check knowledge base or simulate intelligent tutor response
-    setTimeout(() => {
-      let replyText = '';
+    try {
+      const res = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: textToSend,
+          systemInstruction:
+            'আপনি আত-তামরীন একাডেমির "উস্তাদ এআই" টিউটর। বাংলাদেশ শিক্ষক নিবন্ধন (NTRCA), প্রাথমিক বিদ্যালয় নিয়োগ ও বিসিএস পরীক্ষার জন্য শিক্ষার্থীকে উত্তর ও সঠিক তথ্য প্রদান করুন। উত্তর দেওয়ার সময় প্রয়োজনীয় ক্ষেত্রে কুরআন-হাদিস, আরবি ব্যাকরণ বা সাধারণ জ্ঞান ও শর্টকাট টেকনিক বিস্তারিত ও সুন্দর মার্কডাউন লিস্ট আকারে বুঝিয়ে বলুন।',
+        }),
+      });
 
-      if (KNOWLEDGE_BASE[textToSend]) {
-        replyText = KNOWLEDGE_BASE[textToSend];
-      } else if (textToSend.includes('কুরআন') || textToSend.includes('সূরা')) {
-        replyText = `**আল-কুরআন সংক্রান্ত এআই ব্যাখ্যা:**\n\nআপনি "${textToSend}" নিয়ে জানতে চেয়েছেন।\n\n- **মূল্যবান তথ্য:** পবিত্র কুরআনে মোট ১১৪টি সূরা, ৬২৩৬টি আয়াত (মতান্তরে ৬৬৬৬টি) এবং ৩০টি পারা রয়েছে।\n- **পরীক্ষার টিপস:** NTRCA ও মাদ্রাসা নিবন্ধন পরীক্ষায় সূরার মাক্কী-মাদানী শ্রেণীবিভাগ, প্রথম অবতীর্ণ আয়াত (সূরা আলাকের ৫টি আয়াত) এবং বৃহত্তম সূরা (বাকারা) থেকে প্রায়ই প্রশ্ন আসে।\n\nআরো নির্দিষ্ট বিস্তারিত জানতে চাইলে আমাকে নাম বা বিষয়টি স্পষ্টভাবে জিজ্ঞেস করুন!`;
-      } else if (textToSend.includes('হাদিস') || textToSend.includes('বুখারী')) {
-        replyText = `**আল-হাদিস ও আসমাউর রিজাল সংক্ষিপ্ত নোট:**\n\nহাদিস শাস্ত্রের মৌলিক ভিত্তি সংকলিত হয়েছে সিহাহ সিত্তা (৬টি বিশুদ্ধ হাদিস গ্রন্থ)-এর মাধ্যমে।\n১. সহীহ বুখারী (ইমাম বুখারী রহ.)\n২. সহীহ মুসলিম (ইমাম মুসলিম রহ.)\n৩. সুনানে আবু দাউদ\n৪. জামে আত-তিরমিজী\n৫. সুনানে নাসাঈ\n৬. সুনানে ইবনে মাজাহ\n\n**সহীহাইন:** বুখারী ও মুসলিমকে একত্রে 'সহীহাইন' বলা হয়।`;
-      } else if (textToSend.includes('গণিত') || textToSend.includes('অংক') || textToSend.includes('সমীকরণ')) {
-        replyText = `**গণিত ও শর্টকাট সমাধান টিউটোরিয়াল:**\n\nNTRCA নিবন্ধনে বীজগণিত (a+b)^2 সূত্রাবলী, সূচক-লগারিদম, লাভ-ক্ষতি, লসাগু-গসাগু ও জ্যামিতি থেকে ২৫ মার্কস থাকবে।\n\n**শর্টকাট রিভিশন:**\n- সমকোণী ত্রিভুজের বাহুর অনুপাত: ৩ : ৪ : ৫, ৫ : ১২ : ১৩, ৮ : ১৫ : ১৭।\n- লসাগু × গসাগু = সংখ্যা দুটির গুণফল।\n\nকোন নির্দিষ্ট অংকের টেকনিক জানতে চান? লিখে জানান!`;
-      } else {
-        replyText = `**উস্তাদ এআই উত্তর:**\n\nধন্যবাদ আপনার চমৎকার প্রশ্নের জন্য: *" ${textToSend} "*\n\nNTRCA শিক্ষক নিবন্ধন ও মাদ্রাসা স্পেশাল পরীক্ষার প্রস্তুতিতে এই বিষয়টি খুবই গুরুত্বপূর্ণ।\n\n১. **মূল ধারণা:** প্রশ্নটির মূল বিষয়বস্তু সরাসরি বিগত ১৭তম ও ১৮তম NTRCA প্রশ্নব্যাংকের অনুরূপ।\n২. **পরামর্শ:** আপনার প্রস্তুতির সুবিধার্থে নিয়মিত বিষয়ভিত্তিক মডেল টেস্ট দিন এবং প্রতিদিন ১টি করে অধ্যায় রিভিশন করুন।\n\nআপনাকে সাহায্য করতে আমি সর্বদা প্রস্তুত। অন্য কোনো টপিক বা ব্যাকরণের জটিল বিষয় জানতে চাইলে নির্দ্বিধায় লিখুন!`;
-      }
+      const data = await res.json();
+      let replyText = data.text || data.error || 'দুঃখিত, কোনো উত্তর পাওয়া যায়নি। পুনরায় চেষ্টা করুন।';
 
       const ustadMsg: UstadAiMessage = {
         id: `ustad-${Date.now()}`,
@@ -142,8 +140,21 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
       };
 
       setMessages((prev) => [...prev, ustadMsg]);
+    } catch (err) {
+      console.error('Error fetching from Gemini API:', err);
+      // Local fallback in case server or network is offline
+      let replyText = KNOWLEDGE_BASE[textToSend] || `**উস্তাদ এআই উত্তর:**\n\n"${textToSend}" প্রশ্নটির জন্য উত্তর তৈরি করা হচ্ছে। শিক্ষক নিবন্ধন পরীক্ষার জন্য এই বিষয়টি গুরুত্বপূর্ণ।`;
+      
+      const ustadMsg: UstadAiMessage = {
+        id: `ustad-${Date.now()}`,
+        sender: 'ustad',
+        text: replyText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, ustadMsg]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   };
 
   const handleCopy = (id: string, text: string) => {

@@ -39,8 +39,44 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     setViewMode(initialViewMode);
   }, [initialViewMode, result]);
   const [copiedQuestionId, setCopiedQuestionId] = useState<string | null>(null);
-  const [activeAiModal, setActiveAiModal] = useState<UserAnswer | null>(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+
+  // Inline AI Explanation state
+  const [expandedAiIds, setExpandedAiIds] = useState<string[]>([]);
+  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
+  const [aiLoadingIds, setAiLoadingIds] = useState<string[]>([]);
+
+  const toggleAiExplanation = async (ans: UserAnswer) => {
+    const qId = ans.questionId;
+    if (expandedAiIds.includes(qId)) {
+      setExpandedAiIds((prev) => prev.filter((id) => id !== qId));
+      return;
+    }
+
+    setExpandedAiIds((prev) => [...prev, qId]);
+
+    if (!aiExplanations[qId]) {
+      setAiLoadingIds((prev) => [...prev, qId]);
+      try {
+        const prompt = `প্রশ্ন: ${ans.questionText}\nবিকল্পসমূহ:\nক) ${ans.options.option_a}\nখ) ${ans.options.option_b}\nগ) ${ans.options.option_c}\nঘ) ${ans.options.option_d}\nসঠিক উত্তর: ${OPTION_BENGLI_LABEL[ans.correctOption]}\n\nএই প্রশ্নটির সঠিক উত্তর ও বিস্তারিত শিক্ষণীয় ব্যাখ্যা বাংলায় প্রদান করুন।`;
+        const res = await fetch('/api/gemini/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+        const data = await res.json();
+        const text = data.text || 'কোনো এআই ব্যাখ্যা পাওয়া যায়নি।';
+        setAiExplanations((prev) => ({ ...prev, [qId]: text }));
+      } catch (err) {
+        setAiExplanations((prev) => ({
+          ...prev,
+          [qId]: 'এআই ব্যাখ্যা সংযোগে ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।',
+        }));
+      } finally {
+        setAiLoadingIds((prev) => prev.filter((id) => id !== qId));
+      }
+    }
+  };
 
   const unansweredCount = Math.max(
     0,
@@ -403,59 +439,87 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     );
                   })()}
 
-                  {/* Detailed Explanation Container */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFDF5] dark:bg-slate-800/80 border border-amber-200/90 dark:border-slate-700/80 space-y-3 shadow-xs">
-                    <div className="flex items-center justify-between text-amber-900 dark:text-amber-400 font-extrabold text-xs sm:text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">📄</span>
-                        <span>বিস্তারিত ব্যাখ্যা</span>
+                  {/* Detailed Manual Explanation Container (Only rendered if admin provided explanation) */}
+                  {answer.explanation && answer.explanation.trim() !== '' && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFDF5] dark:bg-slate-800/80 border border-amber-200/90 dark:border-slate-700/80 space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between text-amber-900 dark:text-amber-400 font-extrabold text-xs sm:text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">📄</span>
+                          <span>বিস্তারিত ব্যাখ্যা</span>
+                        </div>
+                        <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">▲</span>
                       </div>
-                      <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">▲</span>
+
+                      <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium pt-1">
+                        {formatArabicText(answer.explanation, showHarakat)}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-amber-200/60 dark:border-slate-700/80 text-[11px] sm:text-xs">
+                        <span className="text-amber-800/90 dark:text-amber-400/90 font-bold">
+                          সহীহ ম্যানুয়াল ব্যাখ্যা
+                        </span>
+
+                        <button
+                          onClick={() => handleCopyExplanation(answer)}
+                          className="px-3.5 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+                        >
+                          {copiedQuestionId === answer.questionId ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-[#0B132B]" />
+                              <span>কপি হয়েছে</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-[#0B132B]" />
+                              <span>কপি করুন</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
+                  )}
 
-                    <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium pt-1">
-                      {answer.explanation
-                        ? formatArabicText(answer.explanation, showHarakat)
-                        : 'সূরা আল-ফাতিহা কুরআন মজিদের ১ম পূর্ণাঙ্গ অবতীর্ণ সূরা। অপরদিকে সূরা আল-আলাকের প্রথম ৫ আয়াত প্রথম অবতীর্ণ হয়।'}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-amber-200/60 dark:border-slate-700/80 text-[11px] sm:text-xs">
-                      <span className="text-amber-800/90 dark:text-amber-400/90 font-bold">
-                        সহীহ ম্যানুয়াল ব্যাখ্যা
-                      </span>
+                  {/* Bottom AI Tutor Bar & Inline Expandable Menu */}
+                  <div className="space-y-2">
+                    <div className="bg-[#0B132B] hover:bg-[#162444] text-white rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-2 shadow-xs transition-colors">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
+                        <Sparkles className="w-4 h-4 text-[#FFC107] shrink-0" />
+                        <span className="truncate">তামরীন AI দিয়ে আরও বিস্তৃত ব্যাখ্যা জানুন</span>
+                      </div>
 
                       <button
-                        onClick={() => handleCopyExplanation(answer)}
-                        className="px-3.5 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+                        onClick={() => toggleAiExplanation(answer)}
+                        className="px-4 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-xl cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs flex items-center gap-1"
                       >
-                        {copiedQuestionId === answer.questionId ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-[#0B132B]" />
-                            <span>কপি হয়েছে</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 text-[#0B132B]" />
-                            <span>কপি করুন</span>
-                          </>
-                        )}
+                        <span>{expandedAiIds.includes(answer.questionId) ? 'বন্ধ করুন ▲' : 'AI TUTOR ▼'}</span>
                       </button>
                     </div>
-                  </div>
 
-                  {/* Bottom AI Tutor Bar */}
-                  <div className="bg-[#0B132B] hover:bg-[#162444] text-white rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-2 shadow-xs transition-colors">
-                    <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
-                      <Sparkles className="w-4 h-4 text-[#FFC107] shrink-0" />
-                      <span className="truncate">তামরীন AI দিয়ে আরও বিস্তৃত ব্যাখ্যা জানুন</span>
-                    </div>
+                    {/* Inline Expandable Dropdown Menu for Tamreen AI Explanation */}
+                    {expandedAiIds.includes(answer.questionId) && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-[#0F172A] text-white border border-amber-400/30 space-y-3 shadow-md animate-fade-in">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="flex items-center gap-2 text-[#FFC107] font-extrabold text-xs sm:text-sm">
+                            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                            <span>তামরীন AI টিউটর সমাধান</span>
+                          </div>
+                          <span className="text-[11px] text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md font-bold">
+                            লাইভ জেমিনাই AI
+                          </span>
+                        </div>
 
-                    <button
-                      onClick={() => setActiveAiModal(answer)}
-                      className="px-4 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-xl cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
-                    >
-                      AI TUTOR
-                    </button>
+                        {aiLoadingIds.includes(answer.questionId) ? (
+                          <div className="flex items-center gap-2.5 py-4 text-amber-300 text-xs font-bold">
+                            <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
+                            <span>উস্তাদ এআই প্রশ্নটির নিখুঁত ব্যাখ্যা তৈরি করছেন...</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal whitespace-pre-line pt-1">
+                            {aiExplanations[answer.questionId] || 'কোনো ব্যাখ্যা তৈরি করা সম্ভব হয়নি।'}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -474,45 +538,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         )}
 
       </div>
-
-      {/* AI Tutor Explanation Modal */}
-      {activeAiModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-lg w-full p-6 space-y-4 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
-            <button
-              onClick={() => setActiveAiModal(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-full transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 text-[#0B5D43] dark:text-amber-400 font-black text-lg">
-              <Sparkles className="w-5 h-5 text-[#FFC107]" />
-              <h3>তামরীন AI টিউটর বিশ্লেষণ</h3>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-              প্রশ্ন: {activeAiModal.questionText}
-            </div>
-
-            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-slate-700 dark:text-slate-200 leading-relaxed space-y-2">
-              <p className="font-extrabold text-[#0B5D43] dark:text-emerald-300">
-                💡 এআই শিক্ষকের পরামর্শ ও গভীর সমাধান:
-              </p>
-              <p>
-                {activeAiModal.explanation || 'এই প্রশ্নটি পরীক্ষা প্রস্তুতির জন্য অত্যন্ত গুরুত্বপূর্ণ। উত্তরটি মনে রাখতে মূল বিষয়বস্তু বারবার রিভিশন করুন।'}
-              </p>
-            </div>
-
-            <button
-              onClick={() => setActiveAiModal(null)}
-              className="w-full py-3 bg-[#0B5D43] text-white font-black text-xs rounded-2xl cursor-pointer hover:bg-[#084733] transition-all"
-            >
-              ঠিক আছে
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Leaderboard Modal */}
       <LeaderboardModal

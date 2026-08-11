@@ -27,9 +27,9 @@ import {
   Send
 } from 'lucide-react';
 import { Question } from '../types';
-import { ExamItem, fetchExamsFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
-import { toBengaliNumeral, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
+import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
 
 interface ExamStartOptions {
@@ -59,6 +59,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const [isLoading, setIsLoading] = useState(false);
+  const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
   // Share Modal state
@@ -89,12 +90,30 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
   const loadExams = useCallback(async () => {
     setIsLoading(true);
-    const res = await fetchExamsFromSupabase();
+    const [res, leaderboardEntries] = await Promise.all([
+      fetchExamsFromSupabase(),
+      fetchLeaderboardEntriesFromSupabase('all'),
+    ]);
+
     if (res.exams && res.exams.length > 0) {
       setExams(res.exams);
     } else {
       setExams(DEFAULT_EXAM_PRESETS);
     }
+
+    // Calculate actual participant count per exam from leaderboard
+    const countsMap: Record<string, number> = {};
+    if (Array.isArray(leaderboardEntries)) {
+      leaderboardEntries.forEach((entry) => {
+        if (entry.exam_id) {
+          countsMap[entry.exam_id] = (countsMap[entry.exam_id] || 0) + 1;
+        }
+        if (entry.exam_title && entry.exam_title !== entry.exam_id) {
+          countsMap[entry.exam_title] = (countsMap[entry.exam_title] || 0) + 1;
+        }
+      });
+    }
+    setExamineeCounts(countsMap);
     setIsLoading(false);
   }, []);
 
@@ -455,17 +474,22 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   </div>
                 </div>
 
-                {/* Bottom Examinee Count & Status Tag */}
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-1">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{exam.examinee_count || '২,৫০০+'} পরীক্ষার্থী</span>
-                  </div>
+                {/* Bottom Examinee Count & Publication Date/Day */}
+                {(() => {
+                  const actualCount = examineeCounts[exam.id] || examineeCounts[exam.title] || 0;
+                  return (
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-1">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{toBengaliNumeral(actualCount)} জন পরীক্ষার্থী</span>
+                      </div>
 
-                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
-                    {exam.examinee_tag || (isVip ? 'বিশেষ ভিআইপি' : 'আজকের টেস্ট')}
-                  </span>
-                </div>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] sm:text-xs">
+                        {formatBengaliDateWithDay(exam.created_at)}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Action Buttons: 2 buttons if completed, 1 button if not taken */}
                 {isExamCompleted(exam.id, exam.title) ? (

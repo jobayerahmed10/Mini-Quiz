@@ -29,6 +29,30 @@ export function toBengaliNumeral(number: number | string): string {
 }
 
 /**
+ * Formats a date string into Bengali date with day of the week, e.g. "১১ আগস্ট ২০২৬, মঙ্গলবার"
+ */
+export function formatBengaliDateWithDay(dateStr?: string): string {
+  const date = dateStr ? new Date(dateStr) : new Date();
+  if (isNaN(date.getTime())) {
+    return 'আজকের মডেল টেস্ট';
+  }
+  const bengaliMonths = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+  const bengaliDays = [
+    'রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'
+  ];
+
+  const dayNum = toBengaliNumeral(date.getDate());
+  const monthName = bengaliMonths[date.getMonth()];
+  const yearNum = toBengaliNumeral(date.getFullYear());
+  const dayName = bengaliDays[date.getDay()];
+
+  return `${dayNum} ${monthName} ${yearNum}, ${dayName}`;
+}
+
+/**
  * Option key to Bengali Prefix mapping
  */
 export const OPTION_BENGLI_LABEL: Record<string, string> = {
