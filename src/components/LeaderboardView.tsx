@@ -16,6 +16,7 @@ export interface LeaderboardDisplayItem {
   avgAccuracy: number;    // e.g., 6% or 1%
   points: number;         // sum of correct answers (1 correct = 1 point)
   
+  totalQuestions: number; // total questions in the test (e.g., 30 or 10)
   correctCount: number;
   wrongCount: number;
   score: number;
@@ -68,6 +69,7 @@ export function computeLeaderboard(
     const itemsList: LeaderboardDisplayItem[] = Array.from(userBestMap.values()).map((e) => {
       const uKey = e.user_name.toLowerCase().trim();
       const isCurr = Boolean(normalizedCurrentUserName && (uKey === normalizedCurrentUserName || uKey === 'আপনি (পরীক্ষার্থী)'));
+      const totalQ = Number(e.total_questions || (e.correct_count + e.wrong_count) || 0);
 
       return {
         id: e.id,
@@ -78,6 +80,7 @@ export function computeLeaderboard(
         testCount: 1,
         avgAccuracy: Math.round(e.accuracy || 0),
         points: Number(e.score || e.correct_count || 0),
+        totalQuestions: totalQ,
         correctCount: Number(e.correct_count || e.score || 0),
         wrongCount: Number(e.wrong_count || 0),
         score: Number(e.score || 0),
@@ -166,6 +169,7 @@ export function computeLeaderboard(
         testCount,
         avgAccuracy,
         points,
+        totalQuestions: totalQuestions,
         correctCount: totalCorrect,
         wrongCount: Math.max(0, totalQuestions - totalCorrect),
         score: totalScore,
@@ -487,11 +491,23 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </div>
 
                   <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300 pt-0.5">
-                    {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা • গড় {toBengaliNumeral(topOneItem.avgAccuracy)}
+                    {filterType === 'this_exam' ? (
+                      <>
+                        {topOneItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(topOneItem.totalQuestions)}টি • ` : ''}একুরেসি {toBengaliNumeral(topOneItem.avgAccuracy)}%
+                      </>
+                    ) : (
+                      <>
+                        {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা • গড় {toBengaliNumeral(topOneItem.avgAccuracy)}%
+                      </>
+                    )}
                   </p>
 
                   <p className="text-sm font-black text-amber-600 dark:text-amber-400">
-                    {toBengaliNumeral(topOneItem.points)} পয়েন্ট
+                    {filterType === 'this_exam' ? (
+                      <>নম্বর: {toBengaliNumeral(topOneItem.score)}{topOneItem.totalQuestions > 0 ? ` / ${toBengaliNumeral(topOneItem.totalQuestions)}` : ''}</>
+                    ) : (
+                      <>{toBengaliNumeral(topOneItem.points)} পয়েন্ট</>
+                    )}
                   </p>
                 </div>
 
@@ -543,7 +559,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                   {filterType === 'this_exam' ? (
                     <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px] sm:max-w-xs">
-                      {currentUserRankItem.examTitle ? `${currentUserRankItem.examTitle} • ` : ''}একুরেসি {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
+                      {currentUserRankItem.examTitle ? `${currentUserRankItem.examTitle} • ` : ''}
+                      {currentUserRankItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(currentUserRankItem.totalQuestions)}টি • ` : ''}
+                      একুরেসি {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
                     </p>
                   ) : (
                     <div className="flex items-center gap-1.5 pt-0.5">
@@ -577,6 +595,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     <span className="text-[10px] text-slate-500 block">নাম্বার</span>
                     <span className="text-amber-600 dark:text-amber-400 font-black text-sm">
                       {toBengaliNumeral(currentUserRankItem.score)}
+                      {currentUserRankItem.totalQuestions > 0 ? ` / ${toBengaliNumeral(currentUserRankItem.totalQuestions)}` : ''}
                     </span>
                   </div>
                 </div>
@@ -639,7 +658,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                       {filterType === 'this_exam' ? (
                         <p className="text-[10px] font-bold text-slate-500 truncate max-w-[180px] sm:max-w-xs">
-                          {item.examTitle ? `${item.examTitle} • ` : ''}একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
+                          {item.examTitle ? `${item.examTitle} • ` : ''}
+                          {item.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(item.totalQuestions)}টি • ` : ''}
+                          একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
                         </p>
                       ) : (
                         <div className="flex items-center gap-1.5">
@@ -672,6 +693,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         <span className="text-[9px] text-slate-400 block">নাম্বার</span>
                         <span className="text-amber-600 font-black text-sm">
                           {toBengaliNumeral(item.score)}
+                          {item.totalQuestions > 0 ? ` / ${toBengaliNumeral(item.totalQuestions)}` : ''}
                         </span>
                       </div>
                     </div>
