@@ -43,7 +43,7 @@ interface ExamStartOptions {
 interface ExamPageProps {
   questions?: Question[];
   onStartExam: (options: ExamStartOptions) => void;
-  onOpenLeaderboard?: () => void;
+  onOpenLeaderboard?: (examId?: string) => void;
   onReviewAnswers?: (options: ExamStartOptions) => void;
 }
 
@@ -491,9 +491,9 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   );
                 })()}
 
-                {/* Action Buttons: 2 buttons if completed, 1 button if not taken */}
-                {isExamCompleted(exam.id, exam.title) ? (
-                  <div className="grid grid-cols-2 gap-2.5">
+                {/* Action Buttons: 2 buttons (Exam/Answers + Leaderboard) */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  {isExamCompleted(exam.id, exam.title) ? (
                     <button
                       onClick={() => {
                         if (onReviewAnswers) {
@@ -519,38 +519,38 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                       <BookOpen className="w-3.5 h-3.5 text-[#0b705c] dark:text-emerald-400 shrink-0" />
                       <span>ব্যাখ্যা সহ উত্তর</span>
                     </button>
-
+                  ) : (
                     <button
-                      onClick={() => {
-                        if (onOpenLeaderboard) {
-                          onOpenLeaderboard();
-                        }
-                      }}
-                      className="py-3 px-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:bg-amber-100 transition-all active:scale-95"
+                      onClick={() => handleAttemptStartExam({
+                        examId: exam.id,
+                        subject: exam.subject,
+                        questionCount: displayQuestionCount,
+                        timeMinutes: displayTimeMinutes,
+                        examType: exam.title,
+                      })}
+                      className={`py-3 px-3 rounded-2xl font-black text-xs text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-98 ${
+                        isVip
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
+                          : 'bg-[#0B132B] hover:bg-slate-900 text-white border border-slate-800'
+                      }`}
                     >
-                      <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <span>লিডারবোর্ড</span>
+                      <Play className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                      <span>{isVip ? 'প্রিমিয়াম পরীক্ষা' : 'ফ্রি পরীক্ষা দিন'}</span>
                     </button>
-                  </div>
-                ) : (
+                  )}
+
                   <button
-                    onClick={() => handleAttemptStartExam({
-                      examId: exam.id,
-                      subject: exam.subject,
-                      questionCount: displayQuestionCount,
-                      timeMinutes: displayTimeMinutes,
-                      examType: exam.title,
-                    })}
-                    className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 ${
-                      isVip
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#0B132B]'
-                        : 'bg-[#0B132B] hover:bg-slate-900 text-white border border-slate-800'
-                    }`}
+                    onClick={() => {
+                      if (onOpenLeaderboard) {
+                        onOpenLeaderboard(exam.id);
+                      }
+                    }}
+                    className="py-3 px-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:bg-amber-100 transition-all active:scale-95"
                   >
-                    <Play className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
-                    <span>{isVip ? 'প্রিমিয়াম পরীক্ষা দিন' : 'ফ্রি পরীক্ষা দিন'}</span>
+                    <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>মেধাতালিকা</span>
                   </button>
-                )}
+                </div>
 
               </div>
             );

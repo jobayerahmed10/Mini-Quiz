@@ -223,10 +223,24 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   isExamOnlyMode = false,
   exams: propsExams,
 }) => {
-  const [filterType, setFilterType] = useState<LeaderboardFilterType>(
-    isExamOnlyMode ? 'this_exam' : 'today'
-  );
   const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId);
+  
+  useEffect(() => {
+    setSelectedExamId(initialExamId);
+  }, [initialExamId]);
+
+  const effectiveExamOnlyMode = isExamOnlyMode || (selectedExamId !== 'all');
+
+  const [filterType, setFilterType] = useState<LeaderboardFilterType>(
+    effectiveExamOnlyMode ? 'this_exam' : 'today'
+  );
+
+  useEffect(() => {
+    if (effectiveExamOnlyMode) {
+      setFilterType('this_exam');
+    }
+  }, [effectiveExamOnlyMode, selectedExamId]);
+
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [examList, setExamList] = useState<ExamItem[]>(propsExams || []);
@@ -289,8 +303,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     };
   }, []);
 
+  const currentFilter = effectiveExamOnlyMode ? 'this_exam' : filterType;
+
   // Compute ranked list based on current filter & selected exam
-  const rankedList = computeLeaderboard(entries, filterType, selectedExamId, userName, userAvatar);
+  const rankedList = computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar);
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
 
@@ -339,13 +355,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         {/* Top Badge */}
         <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-[#074D33] text-amber-300 font-extrabold text-xs shadow-xs mx-auto text-center">
           <Trophy className="w-4 h-4 text-amber-400" />
-          <span>{isExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
+          <span>{effectiveExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
         </div>
 
         {/* Title */}
         <div className="space-y-1.5 max-w-xl mx-auto text-center">
           <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
-            {isExamOnlyMode
+            {effectiveExamOnlyMode
               ? `${selectedExamTitle} - এর মেধা তালিকা`
               : 'ফ্রি পরীক্ষায় অংশগ্রহণকারীদের লিডারবোর্ড'}
           </h1>
@@ -364,7 +380,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
           <button
             onClick={() => {
-              if (isExamOnlyMode) {
+              if (effectiveExamOnlyMode) {
                 setFilterType('this_exam');
               } else {
                 setFilterType('today');
@@ -373,12 +389,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             className="px-5 py-2.5 rounded-full bg-[#00E676] hover:bg-[#00C853] text-[#05402A] font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
           >
             <Trophy className="w-4 h-4 text-[#05402A]" />
-            <span>{isExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
+            <span>{effectiveExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
           </button>
         </div>
 
         {/* 4 Filter Tabs (Only in General Leaderboard) */}
-        {!isExamOnlyMode && (
+        {!effectiveExamOnlyMode && (
           <div className="pt-2">
             <div className="bg-[#032E1E] p-1.5 rounded-full border border-emerald-900/60 flex items-center justify-between gap-1 max-w-md mx-auto">
               <button
@@ -501,7 +517,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </div>
 
                   <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300 pt-0.5">
-                    {filterType === 'this_exam' ? (
+                    {currentFilter === 'this_exam' ? (
                       <>
                         {topOneItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(topOneItem.totalQuestions)}টি • ` : ''}একুরেসি {toBengaliNumeral(topOneItem.avgAccuracy)}%
                       </>
@@ -513,7 +529,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </p>
 
                   <p className="text-sm font-black text-amber-600 dark:text-amber-400">
-                    {filterType === 'this_exam' ? (
+                    {currentFilter === 'this_exam' ? (
                       <>নম্বর: {toBengaliNumeral(topOneItem.score)}{topOneItem.totalQuestions > 0 ? ` / ${toBengaliNumeral(topOneItem.totalQuestions)}` : ''}</>
                     ) : (
                       <>{toBengaliNumeral(topOneItem.points)} পয়েন্ট</>
@@ -567,7 +583,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </span>
                   </div>
 
-                  {filterType === 'this_exam' ? (
+                  {currentFilter === 'this_exam' ? (
                     <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px] sm:max-w-xs">
                       {currentUserRankItem.examTitle ? `${currentUserRankItem.examTitle} • ` : ''}
                       {currentUserRankItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(currentUserRankItem.totalQuestions)}টি • ` : ''}
@@ -587,7 +603,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               </div>
 
               {/* Right Side Stats */}
-              {filterType === 'this_exam' ? (
+              {currentFilter === 'this_exam' ? (
                 <div className="flex items-center gap-3 shrink-0 text-right text-xs font-bold">
                   <div>
                     <span className="text-[10px] text-slate-500 block">সঠিক</span>
@@ -666,7 +682,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         )}
                       </div>
 
-                      {filterType === 'this_exam' ? (
+                      {currentFilter === 'this_exam' ? (
                         <p className="text-[10px] font-bold text-slate-500 truncate max-w-[180px] sm:max-w-xs">
                           {item.examTitle ? `${item.examTitle} • ` : ''}
                           {item.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(item.totalQuestions)}টি • ` : ''}
@@ -685,7 +701,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </div>
                   </div>
 
-                  {filterType === 'this_exam' ? (
+                  {currentFilter === 'this_exam' ? (
                     <div className="flex items-center gap-2.5 text-right text-xs shrink-0">
                       <div>
                         <span className="text-[9px] text-slate-400 block">সঠিক</span>
