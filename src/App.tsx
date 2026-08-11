@@ -13,8 +13,8 @@ import { ProfileModal } from './components/ProfileModal';
 import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
-import { fetchPublishedQuestions } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult } from './lib/utils';
+import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, LeaderboardEntry } from './lib/supabase';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('exam');
@@ -40,6 +40,7 @@ export default function App() {
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [activeExamId, setActiveExamId] = useState<string | undefined>(undefined);
+  const [selectedLeaderboardExamId, setSelectedLeaderboardExamId] = useState<string>('all');
   const [quizResult, setQuizResult] = useState<QuizResult | null>(() => {
     return getExamResult('latest_exam_result');
   });
@@ -147,7 +148,7 @@ export default function App() {
   };
 
   // Handle quiz completion
-  const handleFinishQuiz = (userAnswers: UserAnswer[]) => {
+  const handleFinishQuiz = async (userAnswers: UserAnswer[]) => {
     const totalQuestions = userAnswers.length;
     const correctCount = userAnswers.filter((a) => a.isCorrect).length;
     const wrongCount = totalQuestions - correctCount;
@@ -167,6 +168,28 @@ export default function App() {
 
     setQuizResult(result);
     setResultViewMode('summary');
+
+    // Create & save Leaderboard Entry
+    const userProfile = getUserProfile();
+    const userName = userProfile?.name?.trim() || 'পরীক্ষার্থী';
+    const userAvatar = userProfile?.avatar;
+
+    const examId = activeExamId || selectedSubject || 'general';
+    const entry: LeaderboardEntry = {
+      id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      exam_id: examId,
+      exam_title: selectedSubject || 'মডেল টেস্ট',
+      user_name: userName,
+      user_avatar: userAvatar,
+      score: correctCount,
+      total_questions: totalQuestions,
+      correct_count: correctCount,
+      wrong_count: wrongCount,
+      accuracy: percentage,
+      created_at: new Date().toISOString(),
+    };
+
+    saveLeaderboardEntryToSupabase(entry);
 
     // Mark specific active exam as completed and persist result
     if (activeExamId) {
@@ -210,7 +233,14 @@ export default function App() {
     }
   };
 
-  const handleOpenLeaderboard = () => {
+  const handleOpenLeaderboard = (examId?: string) => {
+    if (examId) {
+      setSelectedLeaderboardExamId(examId);
+    } else if (activeExamId) {
+      setSelectedLeaderboardExamId(activeExamId);
+    } else {
+      setSelectedLeaderboardExamId('all');
+    }
     navigateWithHistory('leaderboard');
   };
 
@@ -324,10 +354,11 @@ export default function App() {
         {currentPage === 'leaderboard' && (
           <LeaderboardPage
             onBack={handleGoBack}
-            currentUserScore={quizResult?.score || 15}
-            totalQuestions={quizResult?.totalQuestions || 15}
-            correctCount={quizResult?.correctCount || 14}
-            wrongCount={quizResult?.wrongCount || 1}
+            currentUserScore={quizResult?.score || 0}
+            totalQuestions={quizResult?.totalQuestions || 0}
+            correctCount={quizResult?.correctCount || 0}
+            wrongCount={quizResult?.wrongCount || 0}
+            initialExamId={selectedLeaderboardExamId}
           />
         )}
 

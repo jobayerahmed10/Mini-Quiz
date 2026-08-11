@@ -522,6 +522,8 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         totalQuestions={result.totalQuestions}
         correctCount={result.correctCount}
         wrongCount={result.wrongCount}
+        examId={result.selectedSubject}
+        examTitle={result.selectedSubject}
       />
 
     </div>

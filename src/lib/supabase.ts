@@ -545,6 +545,168 @@ export async function deleteQuestionFromSupabase(id: string | number): Promise<{
   }
 }
 
+export interface LeaderboardEntry {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  user_name: string;
+  user_avatar?: string;
+  score: number;
+  total_questions: number;
+  correct_count: number;
+  wrong_count: number;
+  accuracy: number;
+  created_at: string;
+}
+
+const LOCAL_LEADERBOARD_KEY = 'tamreen_leaderboard_entries';
+
+export function getLocalLeaderboardEntries(): LeaderboardEntry[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_LEADERBOARD_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {
+  try {
+    const current = getLocalLeaderboardEntries();
+    const existingIndex = current.findIndex(
+      (item) => item.id === entry.id || (item.user_name === entry.user_name && item.exam_id === entry.exam_id && item.score === entry.score)
+    );
+    if (existingIndex >= 0) {
+      current[existingIndex] = entry;
+    } else {
+      current.push(entry);
+    }
+    localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(current));
+
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('tamreen_leaderboard_channel');
+        bc.postMessage({ type: 'LEADERBOARD_UPDATED', entry });
+        bc.close();
+      } catch {}
+    }
+  } catch {}
+}
+
+export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): Promise<{ success: boolean; error?: string }> {
+  saveLocalLeaderboardEntry(entry);
+
+  if (!supabaseInstance) {
+    return { success: true };
+  }
+
+  try {
+    const record = {
+      id: entry.id,
+      exam_id: entry.exam_id,
+      exam_title: entry.exam_title,
+      user_name: entry.user_name,
+      user_avatar: entry.user_avatar || null,
+      score: entry.score,
+      total_questions: entry.total_questions,
+      correct_count: entry.correct_count,
+      wrong_count: entry.wrong_count,
+      accuracy: entry.accuracy,
+      created_at: entry.created_at || new Date().toISOString(),
+    };
+
+    const { error } = await supabaseInstance
+      .from('leaderboard_entries')
+      .insert([record]);
+
+    if (error) {
+      console.warn('Supabase leaderboard_entries insert warning:', error.message);
+      return { success: true, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: true, error: msg };
+  }
+}
+
+export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Promise<LeaderboardEntry[]> {
+  const localEntries = getLocalLeaderboardEntries();
+
+  if (!supabaseInstance) {
+    if (examId && examId !== 'all') {
+      return localEntries.filter(
+        (e) => e.exam_id === examId || e.exam_title === examId
+      );
+    }
+    return localEntries;
+  }
+
+  try {
+    let query = supabaseInstance
+      .from('leaderboard_entries')
+      .select('*')
+      .order('score', { ascending: false })
+      .order('accuracy', { ascending: false });
+
+    if (examId && examId !== 'all') {
+      query = query.or(`exam_id.eq.${examId},exam_title.eq.${examId}`);
+    }
+
+    const queryPromise = Promise.resolve(query);
+    const timeoutFallback = { data: null, error: { message: 'Timeout' } };
+    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+
+    if (error || !data) {
+      if (examId && examId !== 'all') {
+        return localEntries.filter((e) => e.exam_id === examId || e.exam_title === examId);
+      }
+      return localEntries;
+    }
+
+    const dbEntries: LeaderboardEntry[] = data.map((item: any) => ({
+      id: String(item.id || `db_${Math.random()}`),
+      exam_id: String(item.exam_id || 'general'),
+      exam_title: String(item.exam_title || 'পরীক্ষা'),
+      user_name: String(item.user_name || 'পরীক্ষার্থী'),
+      user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
+      score: Number(item.score || 0),
+      total_questions: Number(item.total_questions || 0),
+      correct_count: Number(item.correct_count || 0),
+      wrong_count: Number(item.wrong_count || 0),
+      accuracy: Number(item.accuracy || 0),
+      created_at: String(item.created_at || new Date().toISOString()),
+    }));
+
+    const mergedMap = new Map<string, LeaderboardEntry>();
+    [...dbEntries, ...localEntries].forEach((e) => {
+      const key = e.id || `${e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, e);
+      }
+    });
+
+    const mergedList = Array.from(mergedMap.values());
+
+    try {
+      localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(mergedList));
+    } catch {}
+
+    if (examId && examId !== 'all') {
+      return mergedList.filter((e) => e.exam_id === examId || e.exam_title === examId);
+    }
+
+    return mergedList;
+  } catch {
+    if (examId && examId !== 'all') {
+      return localEntries.filter((e) => e.exam_id === examId || e.exam_title === examId);
+    }
+    return localEntries;
+  }
+}
+
 
 
 
