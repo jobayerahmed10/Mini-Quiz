@@ -179,6 +179,19 @@ export interface UserProfile {
   avatar?: string;
 }
 
+export function getUserUniqueId(): string {
+  try {
+    let uId = localStorage.getItem('tamreen_user_id');
+    if (!uId) {
+      uId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      localStorage.setItem('tamreen_user_id', uId);
+    }
+    return uId;
+  } catch {
+    return `usr_temp_${Math.random().toString(36).substring(2, 9)}`;
+  }
+}
+
 export function getUserProfile(): UserProfile | null {
   try {
     const data = localStorage.getItem(PROFILE_STORAGE_KEY);
