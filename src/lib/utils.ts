@@ -237,6 +237,19 @@ export function saveUserProfile(name: string, phone: string, avatar?: string): U
     }
   } catch {}
 
+  // Update profile on shared server leaderboard as well
+  try {
+    fetch('/api/leaderboard/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        oldName: previousProfile?.name?.trim() || '',
+        newName: name.trim(),
+        newAvatar: avatar || '',
+      }),
+    }).catch(() => {});
+  } catch {}
+
   // Broadcast events for real-time UI refresh across windows/components
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tamreen_profile_updated', { detail: profile }));

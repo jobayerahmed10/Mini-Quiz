@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -10,6 +11,43 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+// Shared Server Leaderboard Persistence
+const LEADERBOARD_FILE_PATH = path.join(process.cwd(), 'leaderboard_store.json');
+
+interface ServerLeaderboardEntry {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  user_name: string;
+  user_avatar?: string;
+  score: number;
+  total_questions: number;
+  correct_count: number;
+  wrong_count: number;
+  accuracy: number;
+  created_at: string;
+}
+
+let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
+
+// Load initial data from disk if exists
+try {
+  if (fs.existsSync(LEADERBOARD_FILE_PATH)) {
+    const raw = fs.readFileSync(LEADERBOARD_FILE_PATH, 'utf-8');
+    serverLeaderboardStore = JSON.parse(raw);
+  }
+} catch (err) {
+  console.warn('Could not read leaderboard_store.json:', err);
+}
+
+function saveLeaderboardStoreToDisk() {
+  try {
+    fs.writeFileSync(LEADERBOARD_FILE_PATH, JSON.stringify(serverLeaderboardStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write leaderboard_store.json:', err);
+  }
+}
 
 // Lazy initializer for GoogleGenAI
 let genAIClient: GoogleGenAI | null = null;
@@ -53,6 +91,87 @@ app.post('/api/gemini/generate', async (req, res) => {
     return res.status(500).json({
       error: err?.message || 'Gemini API থেকে উত্তর গ্রহণে ত্রুটি হয়েছে।',
     });
+  }
+});
+
+// API endpoints for shared Leaderboard across all users and shared tests
+app.get('/api/leaderboard', (req, res) => {
+  const { examId } = req.query;
+  let results = serverLeaderboardStore;
+  if (examId && typeof examId === 'string' && examId !== 'all') {
+    results = results.filter(
+      (e) => e.exam_id === examId || e.exam_title === examId
+    );
+  }
+  return res.json({ success: true, entries: results });
+});
+
+app.post('/api/leaderboard', (req, res) => {
+  try {
+    const body = req.body;
+    const items: ServerLeaderboardEntry[] = Array.isArray(body) ? body : [body];
+
+    items.forEach((item) => {
+      if (!item || !item.id) return;
+      const existingIdx = serverLeaderboardStore.findIndex((e) => e.id === item.id);
+      if (existingIdx >= 0) {
+        serverLeaderboardStore[existingIdx] = {
+          ...serverLeaderboardStore[existingIdx],
+          ...item,
+        };
+      } else {
+        serverLeaderboardStore.push({
+          id: String(item.id),
+          exam_id: String(item.exam_id || 'general'),
+          exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_name: String(item.user_name || 'পরীক্ষার্থী'),
+          user_avatar: item.user_avatar ? String(item.user_avatar) : '',
+          score: Number(item.score || 0),
+          total_questions: Number(item.total_questions || 0),
+          correct_count: Number(item.correct_count || 0),
+          wrong_count: Number(item.wrong_count || 0),
+          accuracy: Number(item.accuracy || 0),
+          created_at: String(item.created_at || new Date().toISOString()),
+        });
+      }
+    });
+
+    saveLeaderboardStoreToDisk();
+    return res.json({ success: true, count: serverLeaderboardStore.length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error saving leaderboard entry' });
+  }
+});
+
+app.post('/api/leaderboard/update-profile', (req, res) => {
+  try {
+    const { oldName, newName, newAvatar } = req.body;
+    if (!newName) {
+      return res.status(400).json({ error: 'newName is required' });
+    }
+
+    const cleanOld = oldName ? String(oldName).trim().toLowerCase() : '';
+    const cleanNew = String(newName).trim();
+    const cleanNewLower = cleanNew.toLowerCase();
+    const cleanAvatar = newAvatar ? String(newAvatar) : '';
+
+    let updatedCount = 0;
+    serverLeaderboardStore.forEach((e) => {
+      const eNameLower = (e.user_name || '').trim().toLowerCase();
+      if ((cleanOld && eNameLower === cleanOld) || eNameLower === cleanNewLower) {
+        e.user_name = cleanNew;
+        if (cleanAvatar) e.user_avatar = cleanAvatar;
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      saveLeaderboardStoreToDisk();
+    }
+
+    return res.json({ success: true, updatedCount });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error updating profile' });
   }
 });
 

@@ -597,6 +597,18 @@ export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {
 export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): Promise<{ success: boolean; error?: string }> {
   saveLocalLeaderboardEntry(entry);
 
+  // 1. Post to Express Server API for cross-user/cross-device leaderboard sharing
+  try {
+    await fetch('/api/leaderboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+  } catch (apiErr) {
+    console.warn('Server API leaderboard post error:', apiErr);
+  }
+
+  // 2. Post to Supabase if configured
   if (!supabaseInstance) {
     return { success: true };
   }
@@ -634,77 +646,99 @@ export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): P
 
 export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Promise<LeaderboardEntry[]> {
   const localEntries = getLocalLeaderboardEntries();
+  let serverEntries: LeaderboardEntry[] = [];
 
-  if (!supabaseInstance) {
-    if (examId && examId !== 'all') {
-      return localEntries.filter(
-        (e) => e.exam_id === examId || e.exam_title === examId
-      );
+  // 1. Fetch from Express Server API (contains submissions from all users/friends)
+  try {
+    const url = examId && examId !== 'all' ? `/api/leaderboard?examId=${encodeURIComponent(examId)}` : '/api/leaderboard';
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.entries)) {
+        serverEntries = data.entries.map((item: any) => ({
+          id: String(item.id || `srv_${Math.random()}`),
+          exam_id: String(item.exam_id || 'general'),
+          exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_name: String(item.user_name || 'পরীক্ষার্থী'),
+          user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
+          score: Number(item.score || 0),
+          total_questions: Number(item.total_questions || 0),
+          correct_count: Number(item.correct_count || 0),
+          wrong_count: Number(item.wrong_count || 0),
+          accuracy: Number(item.accuracy || 0),
+          created_at: String(item.created_at || new Date().toISOString()),
+        }));
+      }
     }
-    return localEntries;
+  } catch (srvErr) {
+    console.warn('Could not fetch server leaderboard entries:', srvErr);
   }
 
-  try {
-    let query = supabaseInstance
-      .from('leaderboard_entries')
-      .select('*')
-      .order('score', { ascending: false })
-      .order('accuracy', { ascending: false });
+  let dbEntries: LeaderboardEntry[] = [];
 
-    if (examId && examId !== 'all') {
-      query = query.or(`exam_id.eq.${examId},exam_title.eq.${examId}`);
-    }
+  // 2. Fetch from Supabase if configured
+  if (supabaseInstance) {
+    try {
+      let query = supabaseInstance
+        .from('leaderboard_entries')
+        .select('*')
+        .order('score', { ascending: false })
+        .order('accuracy', { ascending: false });
 
-    const queryPromise = Promise.resolve(query);
-    const timeoutFallback = { data: null, error: { message: 'Timeout' } };
-    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
-
-    if (error || !data) {
       if (examId && examId !== 'all') {
-        return localEntries.filter((e) => e.exam_id === examId || e.exam_title === examId);
+        query = query.or(`exam_id.eq.${examId},exam_title.eq.${examId}`);
       }
-      return localEntries;
+
+      const queryPromise = Promise.resolve(query);
+      const timeoutFallback = { data: null, error: { message: 'Timeout' } };
+      const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+
+      if (data && !error) {
+        dbEntries = data.map((item: any) => ({
+          id: String(item.id || `db_${Math.random()}`),
+          exam_id: String(item.exam_id || 'general'),
+          exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_name: String(item.user_name || 'পরীক্ষার্থী'),
+          user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
+          score: Number(item.score || 0),
+          total_questions: Number(item.total_questions || 0),
+          correct_count: Number(item.correct_count || 0),
+          wrong_count: Number(item.wrong_count || 0),
+          accuracy: Number(item.accuracy || 0),
+          created_at: String(item.created_at || new Date().toISOString()),
+        }));
+      }
+    } catch (dbErr) {
+      console.warn('Supabase fetch error:', dbErr);
     }
+  }
 
-    const dbEntries: LeaderboardEntry[] = data.map((item: any) => ({
-      id: String(item.id || `db_${Math.random()}`),
-      exam_id: String(item.exam_id || 'general'),
-      exam_title: String(item.exam_title || 'পরীক্ষা'),
-      user_name: String(item.user_name || 'পরীক্ষার্থী'),
-      user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
-      score: Number(item.score || 0),
-      total_questions: Number(item.total_questions || 0),
-      correct_count: Number(item.correct_count || 0),
-      wrong_count: Number(item.wrong_count || 0),
-      accuracy: Number(item.accuracy || 0),
-      created_at: String(item.created_at || new Date().toISOString()),
-    }));
-
-    const mergedMap = new Map<string, LeaderboardEntry>();
-    [...dbEntries, ...localEntries].forEach((e) => {
-      const key = e.id || `${e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
-      if (!mergedMap.has(key)) {
+  // Combine and deduplicate across server, db, and local
+  const mergedMap = new Map<string, LeaderboardEntry>();
+  [...serverEntries, ...dbEntries, ...localEntries].forEach((e) => {
+    const key = e.id || `${e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, e);
+    } else {
+      // Prefer entry that has user_avatar if existing doesn't
+      const existing = mergedMap.get(key)!;
+      if (!existing.user_avatar && e.user_avatar) {
         mergedMap.set(key, e);
       }
-    });
-
-    const mergedList = Array.from(mergedMap.values());
-
-    try {
-      localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(mergedList));
-    } catch {}
-
-    if (examId && examId !== 'all') {
-      return mergedList.filter((e) => e.exam_id === examId || e.exam_title === examId);
     }
+  });
 
-    return mergedList;
-  } catch {
-    if (examId && examId !== 'all') {
-      return localEntries.filter((e) => e.exam_id === examId || e.exam_title === examId);
-    }
-    return localEntries;
+  const mergedList = Array.from(mergedMap.values());
+
+  try {
+    localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(mergedList));
+  } catch {}
+
+  if (examId && examId !== 'all') {
+    return mergedList.filter((e) => e.exam_id === examId || e.exam_title === examId);
   }
+
+  return mergedList;
 }
 
 

@@ -289,7 +289,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-amber-400 text-[#0B132B] flex items-center justify-center shrink-0 shadow-xs">
                   <Trophy className="w-5 h-5 fill-[#0B132B]" />
                 </div>
-                <span className="text-base font-black">জাতীয় মেধা তালিকা</span>
+                <span className="text-base font-black">লিডারবোর্ড</span>
               </div>
               <ChevronRight className="w-5 h-5 text-amber-600" />
             </button>

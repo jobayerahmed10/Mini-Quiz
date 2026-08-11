@@ -415,7 +415,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <Trophy className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="block font-black">🏆 জাতীয় মেধা তালিকা</span>
+                      <span className="block font-black">🏆 লিডারবোর্ড</span>
                       <span className="block text-[10px] font-medium opacity-60">মেধা অবস্থান ও সেরা পারফরমার</span>
                     </div>
                   </button>

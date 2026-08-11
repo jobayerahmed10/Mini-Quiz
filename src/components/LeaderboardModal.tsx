@@ -11,6 +11,7 @@ interface LeaderboardModalProps {
   wrongCount?: number;
   examId?: string;
   examTitle?: string;
+  isExamOnlyMode?: boolean;
   exams?: ExamItem[];
 }
 
@@ -18,6 +19,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   isOpen,
   onClose,
   examId = 'all',
+  isExamOnlyMode = true,
   exams,
 }) => {
   if (!isOpen) return null;
@@ -29,6 +31,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
           onClose={onClose}
           isModal={true}
           initialExamId={examId}
+          isExamOnlyMode={isExamOnlyMode}
           exams={exams}
         />
       </div>

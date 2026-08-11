@@ -529,6 +529,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         wrongCount={result.wrongCount}
         examId={result.examId || result.selectedSubject || 'all'}
         examTitle={result.selectedSubject || undefined}
+        isExamOnlyMode={true}
       />
 
     </div>

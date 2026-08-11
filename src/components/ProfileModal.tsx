@@ -307,7 +307,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <div className="w-10 h-10 rounded-2xl bg-amber-400 text-[#0B132B] flex items-center justify-center shrink-0 shadow-xs">
                     <Trophy className="w-5 h-5 fill-[#0B132B]" />
                   </div>
-                  <span className="text-sm font-black">জাতীয় মেধা তালিকা</span>
+                  <span className="text-sm font-black">লিডারবোর্ড</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-amber-600" />
               </button>

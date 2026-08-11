@@ -3,7 +3,7 @@ import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X } 
 import { toBengaliNumeral, getUserProfile } from '../lib/utils';
 import { LeaderboardEntry, fetchLeaderboardEntriesFromSupabase, fetchExamsFromSupabase, ExamItem } from '../lib/supabase';
 
-export type LeaderboardFilterType = 'this_exam' | 'this_week' | 'this_month' | 'all_time';
+export type LeaderboardFilterType = 'today' | 'this_week' | 'this_month' | 'all_time' | 'this_exam';
 
 export interface LeaderboardDisplayItem {
   id: string;
@@ -102,20 +102,33 @@ export function computeLeaderboard(
     return itemsList.map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   } else {
-    // For 'this_week', 'this_month', 'all_time':
-    const now = Date.now();
-    if (filterType === 'this_week') {
+    // For 'today', 'this_week', 'this_month', 'all_time':
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    if (filterType === 'today') {
+      filtered = filtered.filter((e) => {
+        const t = new Date(e.created_at).getTime();
+        return !isNaN(t) && t >= startOfToday;
+      });
+    } else if (filterType === 'this_week') {
       const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
       filtered = filtered.filter((e) => {
         const t = new Date(e.created_at).getTime();
-        return !isNaN(t) && (now - t <= oneWeekMs);
+        return !isNaN(t) && (now.getTime() - t <= oneWeekMs);
       });
     } else if (filterType === 'this_month') {
       const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
       filtered = filtered.filter((e) => {
         const t = new Date(e.created_at).getTime();
-        return !isNaN(t) && (now - t <= oneMonthMs);
+        return !isNaN(t) && (now.getTime() - t <= oneMonthMs);
       });
+    }
+
+    if (selectedExamId && selectedExamId !== 'all') {
+      filtered = filtered.filter(
+        (e) => e.exam_id === selectedExamId || e.exam_title === selectedExamId
+      );
     }
 
     // Group by user
@@ -198,6 +211,7 @@ interface LeaderboardViewProps {
   onClose?: () => void;
   isModal?: boolean;
   initialExamId?: string;
+  isExamOnlyMode?: boolean;
   exams?: ExamItem[];
 }
 
@@ -206,9 +220,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   onClose,
   isModal = false,
   initialExamId = 'all',
+  isExamOnlyMode = false,
   exams: propsExams,
 }) => {
-  const [filterType, setFilterType] = useState<LeaderboardFilterType>('this_exam');
+  const [filterType, setFilterType] = useState<LeaderboardFilterType>(
+    isExamOnlyMode ? 'this_exam' : 'today'
+  );
   const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -317,36 +334,21 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       </div>
 
       {/* 1. Dark Green Header Card */}
-      <div className="bg-gradient-to-b from-[#05402A] to-[#043321] text-white rounded-[32px] p-5 sm:p-7 text-center space-y-4 shadow-xl border border-emerald-900/60 relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#05402A] to-[#043321] text-white rounded-[32px] p-5 sm:p-7 text-center flex flex-col items-center justify-center space-y-4 shadow-xl border border-emerald-900/60 relative overflow-hidden mx-auto">
         
         {/* Top Badge */}
-        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-[#074D33] text-amber-300 font-extrabold text-xs shadow-xs">
+        <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-[#074D33] text-amber-300 font-extrabold text-xs shadow-xs mx-auto text-center">
           <Trophy className="w-4 h-4 text-amber-400" />
-          <span>লাইভ মেধা তালিকা</span>
+          <span>{isExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
         </div>
 
         {/* Title */}
-        <div className="space-y-1.5 max-w-xl mx-auto">
-          <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight">
-            ফ্রি পরীক্ষায় অংশগ্রহণকারীদের মেধা তালিকা
+        <div className="space-y-1.5 max-w-xl mx-auto text-center">
+          <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
+            {isExamOnlyMode
+              ? `${selectedExamTitle} - এর মেধা তালিকা`
+              : 'ফ্রি পরীক্ষায় অংশগ্রহণকারীদের লিডারবোর্ড'}
           </h1>
-
-          {/* Subject / Exam Selector */}
-          <div className="flex items-center justify-center gap-1 text-xs sm:text-sm text-emerald-200/90 font-bold">
-            <span>বিষয়:</span>
-            <select
-              value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
-              className="bg-emerald-950/80 text-amber-300 font-black text-xs sm:text-sm border border-emerald-700/60 rounded-xl px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
-            >
-              <option value="all">সকল বিষয় / পরীক্ষা (সম্মিলিত)</option>
-              {examList.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.title} ({exam.subject})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Action Buttons */}
@@ -356,67 +358,75 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               onClick={onBack}
               className="px-5 py-2.5 rounded-full border border-emerald-600/60 bg-[#074D33]/60 hover:bg-[#074D33] text-white font-extrabold text-xs sm:text-sm transition-all cursor-pointer"
             >
-              পরীক্ষায় ফিরে যান
+              ফিরে যান
             </button>
           )}
 
           <button
-            onClick={() => setFilterType('this_exam')}
+            onClick={() => {
+              if (isExamOnlyMode) {
+                setFilterType('this_exam');
+              } else {
+                setFilterType('today');
+              }
+            }}
             className="px-5 py-2.5 rounded-full bg-[#00E676] hover:bg-[#00C853] text-[#05402A] font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
           >
             <Trophy className="w-4 h-4 text-[#05402A]" />
-            <span>ফ্রি মেধা তালিকা</span>
+            <span>{isExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
           </button>
         </div>
 
-        {/* 4 Filter Tabs */}
-        <div className="pt-2">
-          <div className="bg-[#032E1E] p-1.5 rounded-full border border-emerald-900/60 flex items-center justify-between gap-1 max-w-md mx-auto">
-            <button
-              onClick={() => setFilterType('this_exam')}
-              className={`flex-1 py-2 px-2.5 rounded-full text-xs font-black transition-all cursor-pointer ${
-                filterType === 'this_exam'
-                  ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                  : 'text-emerald-100/80 hover:text-white font-extrabold'
-              }`}
-            >
-              এই পরীক্ষা
-            </button>
+        {/* 4 Filter Tabs (Only in General Leaderboard) */}
+        {!isExamOnlyMode && (
+          <div className="pt-2">
+            <div className="bg-[#032E1E] p-1.5 rounded-full border border-emerald-900/60 flex items-center justify-between gap-1 max-w-md mx-auto">
+              <button
+                onClick={() => setFilterType('today')}
+                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  filterType === 'today'
+                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                    : 'text-emerald-100/80 hover:text-white font-extrabold'
+                }`}
+              >
+                আজকে
+              </button>
 
-            <button
-              onClick={() => setFilterType('this_week')}
-              className={`flex-1 py-2 px-2.5 rounded-full text-xs font-black transition-all cursor-pointer ${
-                filterType === 'this_week'
-                  ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                  : 'text-emerald-100/80 hover:text-white font-extrabold'
-              }`}
-            >
-              এই সপ্তাহে
-            </button>
+              <button
+                onClick={() => setFilterType('this_week')}
+                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  filterType === 'this_week'
+                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                    : 'text-emerald-100/80 hover:text-white font-extrabold'
+                }`}
+              >
+                এই সপ্তাহে
+              </button>
 
-            <button
-              onClick={() => setFilterType('this_month')}
-              className={`flex-1 py-2 px-2.5 rounded-full text-xs font-black transition-all cursor-pointer ${
-                filterType === 'this_month'
-                  ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                  : 'text-emerald-100/80 hover:text-white font-extrabold'
-              }`}
-            >
-              এই মাসে
-            </button>
+              <button
+                onClick={() => setFilterType('this_month')}
+                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  filterType === 'this_month'
+                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                    : 'text-emerald-100/80 hover:text-white font-extrabold'
+                }`}
+              >
+                এই মাসে
+              </button>
 
-            <button
-              onClick={() => setFilterType('all_time')}
-              className={`flex-1 py-2 px-2.5 rounded-full text-xs font-black transition-all cursor-pointer ${
-                filterType === 'all_time'
-                  ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                  : 'text-emerald-100/80 hover:text-white font-extrabold'
-              }`}
-            >
-              সর্বকালের
-            </button>
+              <button
+                onClick={() => setFilterType('all_time')}
+                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  filterType === 'all_time'
+                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                    : 'text-emerald-100/80 hover:text-white font-extrabold'
+                }`}
+              >
+                সর্বকালে
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 
