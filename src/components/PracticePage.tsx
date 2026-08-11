@@ -111,6 +111,10 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   };
 
   const handleSelectOption = (questionId: string, optionKey: 'option_a' | 'option_b' | 'option_c' | 'option_d') => {
+    // Lock answer: if an option is already selected for this question, do not allow changing it
+    if (userSelections[questionId]) {
+      return;
+    }
     setUserSelections((prev) => ({
       ...prev,
       [questionId]: optionKey,
@@ -260,18 +264,24 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                       const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
                       const isSelected = selectedOpt === optionKey;
                       const isThisOptArabic = isFullyArabic(rawOptionText);
+                      const isQuestionAnswered = Boolean(selectedOpt);
 
                       return (
                         <button
                           key={optionKey}
                           type="button"
+                          disabled={isQuestionAnswered}
                           onClick={() => handleSelectOption(q.id, optionKey)}
                           dir={areOptionsRtl ? 'rtl' : 'ltr'}
-                          className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                          className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                            isQuestionAnswered ? 'cursor-not-allowed' : 'cursor-pointer'
+                          } ${
                             areOptionsRtl ? 'text-right' : 'text-left'
                           } ${
                             isSelected
                               ? 'bg-blue-50/80 dark:bg-slate-800/80 border-2 border-[#0B132B] text-[#0B132B] dark:text-white font-bold shadow-xs'
+                              : isQuestionAnswered
+                              ? 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800 text-slate-400 dark:text-slate-500 opacity-60'
                               : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
                           }`}
                         >

@@ -170,7 +170,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   {feedbackHeading}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-200/90 max-w-md mx-auto leading-relaxed font-semibold">
-                  তামরীন একাডেমি জাতীয় মেধা তালিকায় আপনার ফলাফল সংযুক্ত হয়েছে।
+                  তামরীন একাডেমিতে আপনার পরীক্ষার ফলাফল সফলভাবে প্রকাশিত ও সংরক্ষিত হয়েছে।
                 </p>
               </div>
 
@@ -277,26 +277,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   ০ মি. ৪ সে.
                 </span>
               </div>
-            </div>
-
-            {/* National Merit Rank Card (Matching Image 1) */}
-            <div className="bg-amber-50/80 dark:bg-amber-950/20 rounded-2xl p-4 text-center border border-amber-200/80 dark:border-amber-800/50 space-y-1 shadow-xs">
-              <span className="text-xs font-bold text-amber-800 dark:text-amber-400 block">
-                জাতীয় মেধা র‍্যাংক
-              </span>
-              <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 block tracking-tight">
-                ১৫তম
-              </span>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={onRetry}
-                className="flex-1 py-3.5 bg-[#0B132B] text-amber-400 font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-              >
-                <span>পুনরায় পরীক্ষা দিন</span>
-              </button>
             </div>
           </>
         ) : (
