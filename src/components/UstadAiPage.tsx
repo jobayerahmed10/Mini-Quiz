@@ -90,7 +90,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
     {
       id: 'welcome-1',
       sender: 'ustad',
-      text: 'আসসালামু আলাইকুম! আমি **উস্তাদ এআই** (Ustad AI) — আপনার শিক্ষক নিবন্ধন (NTRCA) ও মাদ্রাসা নিয়োগ প্রস্তুতির স্মার্ট এআই টিউটর।\n\nআল-কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি, গণিত বা যেকোনো সাধারণ জ্ঞানের প্রশ্ন আমাকে জিজ্ঞেস করতে পারেন। আমি সাথে সাথে বুঝিয়ে দেব!',
+      text: 'আসসালামু আলাইকুম! আমি **তামরীন এআই** (Tamreen AI) — আপনার শিক্ষক নিবন্ধন (NTRCA) ও মাদ্রাসা নিয়োগ প্রস্তুতির স্মার্ট এআই টিউটর।\n\nআল-কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি, গণিত বা যেকোনো সাধারণ জ্ঞানের প্রশ্ন আমাকে জিজ্ঞেস করতে পারেন। আমি সাথে সাথে বুঝিয়ে দেব!',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
   ]);
@@ -125,7 +125,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
         body: JSON.stringify({
           prompt: textToSend,
           systemInstruction:
-            'আপনি আত-তামরীন একাডেমির "উস্তাদ এআই" টিউটর। বাংলাদেশ শিক্ষক নিবন্ধন (NTRCA), প্রাথমিক বিদ্যালয় নিয়োগ ও বিসিএস পরীক্ষার জন্য শিক্ষার্থীকে উত্তর ও সঠিক তথ্য প্রদান করুন। উত্তর দেওয়ার সময় প্রয়োজনীয় ক্ষেত্রে কুরআন-হাদিস, আরবি ব্যাকরণ বা সাধারণ জ্ঞান ও শর্টকাট টেকনিক বিস্তারিত ও সুন্দর মার্কডাউন লিস্ট আকারে বুঝিয়ে বলুন।',
+            'আপনি আত-তামরীন একাডেমির "তামরীন এআই" টিউটর। বাংলাদেশ শিক্ষক নিবন্ধন (NTRCA), প্রাথমিক বিদ্যালয় নিয়োগ ও বিসিএস পরীক্ষার জন্য শিক্ষার্থীকে উত্তর ও সঠিক তথ্য প্রদান করুন। উত্তর দেওয়ার সময় প্রয়োজনীয় ক্ষেত্রে কুরআন-হাদিস, আরবি ব্যাকরণ বা সাধারণ জ্ঞান ও শর্টকাট টেকনিক বিস্তারিত ও সুন্দর মার্কডাউন লিস্ট আকারে বুঝিয়ে বলুন।',
         }),
       });
 
@@ -143,7 +143,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
     } catch (err) {
       console.error('Error fetching from Gemini API:', err);
       // Local fallback in case server or network is offline
-      let replyText = KNOWLEDGE_BASE[textToSend] || `**উস্তাদ এআই উত্তর:**\n\n"${textToSend}" প্রশ্নটির জন্য উত্তর তৈরি করা হচ্ছে। শিক্ষক নিবন্ধন পরীক্ষার জন্য এই বিষয়টি গুরুত্বপূর্ণ।`;
+      let replyText = KNOWLEDGE_BASE[textToSend] || `**তামরীন এআই উত্তর:**\n\n"${textToSend}" প্রশ্নটির জন্য উত্তর তৈরি করা হচ্ছে। শিক্ষক নিবন্ধন পরীক্ষার জন্য এই বিষয়টি গুরুত্বপূর্ণ।`;
       
       const ustadMsg: UstadAiMessage = {
         id: `ustad-${Date.now()}`,
@@ -173,7 +173,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-[#0B132B] flex items-center gap-2">
-              উস্তাদ এআই <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-[#0B132B] border border-slate-300 rounded-full">স্মার্ট টিউটর</span>
+              তামরীন এআই <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-[#0B132B] border border-slate-300 rounded-full">স্মার্ট টিউটর</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
               কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি ও গণিতের যেকোনো প্রশ্ন মুহূর্তে বুঝে নিন
@@ -264,7 +264,7 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
         {isTyping && (
           <div className="flex items-center gap-2 text-xs text-[#0B132B] p-2 font-bold">
             <Bot className="w-4 h-4 animate-spin text-amber-500" />
-            <span>উস্তাদ এআই উত্তর তৈরি করছেন...</span>
+            <span>তামরীন এআই উত্তর তৈরি করছেন...</span>
           </div>
         )}
         <div ref={chatEndRef} />

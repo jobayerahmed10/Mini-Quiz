@@ -98,7 +98,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal">
-            মাদ্রাসা (কুরআন, হাদিস, ফিকহ, আরবি), স্কুল ও কলেজের জন্য পূর্ণাঙ্গ প্রিলিমিনারি মডেল টেস্ট, ১৫টি বিষয়ভিত্তিক প্রস্তুতি, জব সার্কুলার এবং উস্তাদ এআই টিউটর।
+            মাদ্রাসা (কুরআন, হাদিস, ফিকহ, আরবি), স্কুল ও কলেজের জন্য পূর্ণাঙ্গ প্রিলিমিনারি মডেল টেস্ট, ১৫টি বিষয়ভিত্তিক প্রস্তুতি, জব সার্কুলার এবং তামরীন এআই টিউটর।
           </p>
 
           {/* 5 Quick Feature Shortcuts */}
@@ -126,7 +126,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               className="neu-btn p-3 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer hover:border-amber-400 group"
             >
               <Bot className="w-5 h-5 text-emerald-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold text-white">উস্তাদ এআই</span>
+              <span className="text-xs font-bold text-white">তামরীন এআই</span>
               <span className="text-[10px] text-emerald-300/80">স্মার্ট টিউটর</span>
             </button>
 

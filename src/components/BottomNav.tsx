@@ -33,7 +33,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'ustad_ai' as TabRoute,
-      label: 'উস্তাদ এআই',
+      label: 'তামরীন এআই',
       icon: Sparkles,
       badge: 'এআই',
     },

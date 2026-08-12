@@ -491,7 +491,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                         {aiLoadingIds.includes(answer.questionId) ? (
                           <div className="flex items-center gap-2.5 py-4 text-amber-300 text-xs font-bold">
                             <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
-                            <span>উস্তাদ এআই প্রশ্নটির নিখুঁত ব্যাখ্যা তৈরি করছেন...</span>
+                            <span>তামরীন এআই প্রশ্নটির নিখুঁত ব্যাখ্যা তৈরি করছেন...</span>
                           </div>
                         ) : (
                           <div className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal whitespace-pre-line pt-1">
