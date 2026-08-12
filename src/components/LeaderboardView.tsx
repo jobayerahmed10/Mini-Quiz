@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X } from 'lucide-react';
-import { toBengaliNumeral, getUserProfile } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, getUserUniqueId } from '../lib/utils';
 import { LeaderboardEntry, fetchLeaderboardEntriesFromSupabase, fetchExamsFromSupabase, ExamItem } from '../lib/supabase';
 
 export type LeaderboardFilterType = 'today' | 'this_week' | 'this_month' | 'all_time' | 'this_exam';
@@ -32,7 +32,8 @@ export function computeLeaderboard(
   currentUserName: string,
   currentUserAvatar?: string
 ): LeaderboardDisplayItem[] {
-  const normalizedCurrentUserName = currentUserName.toLowerCase().trim();
+  const currentUserId = getUserUniqueId();
+  const normalizedCurrentUserName = (currentUserName || '').toLowerCase().trim();
 
   let filtered = [...entries];
 
@@ -43,12 +44,18 @@ export function computeLeaderboard(
       );
     }
 
-    // Group or select best entry per user per exam
+    // Select best entry per distinct participant for this exam
     const userBestMap = new Map<string, LeaderboardEntry>();
     for (const item of filtered) {
-      const uKey = item.user_name.toLowerCase().trim();
+      // Differentiate participants by user_id or unique entry key
+      const participantKey = item.user_id
+        ? item.user_id.trim()
+        : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
+            ? item.user_name.toLowerCase().trim()
+            : item.id);
+
       const examKey = item.exam_id || item.exam_title || 'default';
-      const mapKey = selectedExamId === 'all' ? `${uKey}_${examKey}` : uKey;
+      const mapKey = selectedExamId === 'all' ? `${participantKey}_${examKey}` : participantKey;
 
       const existing = userBestMap.get(mapKey);
       if (!existing) {
@@ -67,14 +74,26 @@ export function computeLeaderboard(
     }
 
     const itemsList: LeaderboardDisplayItem[] = Array.from(userBestMap.values()).map((e) => {
-      const uKey = e.user_name.toLowerCase().trim();
-      const isCurr = Boolean(normalizedCurrentUserName && (uKey === normalizedCurrentUserName || uKey === 'আপনি (পরীক্ষার্থী)'));
+      const eUserId = (e.user_id || '').trim();
+      const uKey = (e.user_name || '').toLowerCase().trim();
+
+      const isCurr = Boolean(
+        (eUserId && currentUserId && eUserId === currentUserId) ||
+        (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && uKey === normalizedCurrentUserName) ||
+        (uKey === 'আপনি (পরীক্ষার্থী)')
+      );
+
+      let cleanName = e.user_name;
+      if (!cleanName || cleanName === 'আপনি (পরীক্ষার্থী)') {
+        cleanName = isCurr ? (currentUserName || 'পরীক্ষার্থী') : 'পরীক্ষার্থী';
+      }
+
       const totalQ = Number(e.total_questions || (e.correct_count + e.wrong_count) || 0);
 
       return {
         id: e.id,
         rank: 0,
-        userName: isCurr ? (currentUserName || e.user_name) : e.user_name,
+        userName: isCurr ? (currentUserName || cleanName) : cleanName,
         userAvatar: isCurr ? (currentUserAvatar || e.user_avatar) : e.user_avatar,
         isCurrentUser: isCurr,
         testCount: 1,
@@ -131,26 +150,44 @@ export function computeLeaderboard(
       );
     }
 
-    // Group by user
+    // Group entries by distinct participant
     const userGroupMap = new Map<string, LeaderboardEntry[]>();
     for (const item of filtered) {
-      const uKey = item.user_name.toLowerCase().trim();
-      if (!userGroupMap.has(uKey)) {
-        userGroupMap.set(uKey, []);
+      const participantKey = item.user_id
+        ? item.user_id.trim()
+        : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
+            ? item.user_name.toLowerCase().trim()
+            : item.id);
+
+      if (!userGroupMap.has(participantKey)) {
+        userGroupMap.set(participantKey, []);
       }
-      userGroupMap.get(uKey)!.push(item);
+      userGroupMap.get(participantKey)!.push(item);
     }
 
     const itemsList: LeaderboardDisplayItem[] = [];
-    for (const [uKey, userEntries] of userGroupMap.entries()) {
+    for (const [pKey, userEntries] of userGroupMap.entries()) {
       const firstEntry = userEntries[0];
       const testCount = userEntries.length;
-      const isCurr = Boolean(normalizedCurrentUserName && (uKey === normalizedCurrentUserName || uKey === 'আপনি (পরীক্ষার্থী)'));
+
+      const eUserId = (firstEntry.user_id || '').trim();
+      const uKey = (firstEntry.user_name || '').toLowerCase().trim();
+
+      const isCurr = Boolean(
+        (eUserId && currentUserId && eUserId === currentUserId) ||
+        (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && uKey === normalizedCurrentUserName) ||
+        (uKey === 'আপনি (পরীক্ষার্থী)')
+      );
+
+      let cleanName = firstEntry.user_name;
+      if (!cleanName || cleanName === 'আপনি (পরীক্ষার্থী)') {
+        cleanName = isCurr ? (currentUserName || 'পরীক্ষার্থী') : 'পরীক্ষার্থী';
+      }
 
       let totalCorrect = 0;
       let totalQuestions = 0;
       let totalScore = 0;
-      let earliestCreatedAt = userEntries[0].created_at;
+      let earliestCreatedAt = firstEntry.created_at;
       let latestAvatar = firstEntry.user_avatar;
 
       for (const e of userEntries) {
@@ -174,15 +211,15 @@ export function computeLeaderboard(
       }
 
       itemsList.push({
-        id: `user_agg_${uKey}`,
+        id: `user_agg_${pKey}`,
         rank: 0,
-        userName: isCurr ? (currentUserName || firstEntry.user_name) : firstEntry.user_name,
+        userName: isCurr ? (currentUserName || cleanName) : cleanName,
         userAvatar: isCurr ? (currentUserAvatar || latestAvatar) : latestAvatar,
         isCurrentUser: isCurr,
         testCount,
         avgAccuracy,
         points,
-        totalQuestions: totalQuestions,
+        totalQuestions,
         correctCount: totalCorrect,
         wrongCount: Math.max(0, totalQuestions - totalCorrect),
         score: totalScore,
@@ -246,7 +283,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const [examList, setExamList] = useState<ExamItem[]>(propsExams || []);
 
   const userProfile = getUserProfile();
-  const userName = userProfile?.name?.trim() || 'আপনি (পরীক্ষার্থী)';
+  const userName = userProfile?.name?.trim() || 'পরীক্ষার্থী';
   const userAvatar = userProfile?.avatar || '';
 
   // Load Exam List

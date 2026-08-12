@@ -19,6 +19,7 @@ interface ServerLeaderboardEntry {
   id: string;
   exam_id: string;
   exam_title: string;
+  user_id?: string;
   user_name: string;
   user_avatar?: string;
   score: number;
@@ -124,6 +125,7 @@ app.post('/api/leaderboard', (req, res) => {
           id: String(item.id),
           exam_id: String(item.exam_id || 'general'),
           exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_id: item.user_id ? String(item.user_id) : undefined,
           user_name: String(item.user_name || 'পরীক্ষার্থী'),
           user_avatar: item.user_avatar ? String(item.user_avatar) : '',
           score: Number(item.score || 0),

@@ -549,6 +549,7 @@ export interface LeaderboardEntry {
   id: string;
   exam_id: string;
   exam_title: string;
+  user_id?: string;
   user_name: string;
   user_avatar?: string;
   score: number;
@@ -574,9 +575,8 @@ export function getLocalLeaderboardEntries(): LeaderboardEntry[] {
 export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {
   try {
     const current = getLocalLeaderboardEntries();
-    const existingIndex = current.findIndex(
-      (item) => item.id === entry.id || (item.user_name === entry.user_name && item.exam_id === entry.exam_id && item.score === entry.score)
-    );
+    // Match strictly by exact entry ID so distinct users are never merged or overwritten
+    const existingIndex = current.findIndex((item) => item.id === entry.id);
     if (existingIndex >= 0) {
       current[existingIndex] = entry;
     } else {
@@ -618,6 +618,7 @@ export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): P
       id: entry.id,
       exam_id: entry.exam_id,
       exam_title: entry.exam_title,
+      user_id: entry.user_id || null,
       user_name: entry.user_name,
       user_avatar: entry.user_avatar || null,
       score: entry.score,
@@ -648,10 +649,9 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
   const localEntries = getLocalLeaderboardEntries();
   let serverEntries: LeaderboardEntry[] = [];
 
-  // 1. Fetch from Express Server API (contains submissions from all users/friends)
+  // 1. Fetch from Express Server API (contains submissions from all users)
   try {
-    const url = examId && examId !== 'all' ? `/api/leaderboard?examId=${encodeURIComponent(examId)}` : '/api/leaderboard';
-    const res = await fetch(url);
+    const res = await fetch('/api/leaderboard');
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.entries)) {
@@ -659,6 +659,7 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
           id: String(item.id || `srv_${Math.random()}`),
           exam_id: String(item.exam_id || 'general'),
           exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_id: item.user_id ? String(item.user_id) : undefined,
           user_name: String(item.user_name || 'পরীক্ষার্থী'),
           user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
           score: Number(item.score || 0),
@@ -681,23 +682,21 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
     try {
       let query = supabaseInstance
         .from('leaderboard_entries')
-        .select('*')
+        .select('id, exam_id, exam_title, user_id, user_name, user_avatar, score, total_questions, correct_count, wrong_count, accuracy, created_at')
         .order('score', { ascending: false })
-        .order('accuracy', { ascending: false });
-
-      if (examId && examId !== 'all') {
-        query = query.or(`exam_id.eq.${examId},exam_title.eq.${examId}`);
-      }
+        .order('created_at', { ascending: false })
+        .limit(1000);
 
       const queryPromise = Promise.resolve(query);
       const timeoutFallback = { data: null, error: { message: 'Timeout' } };
       const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
 
-      if (data && !error) {
+      if (data && !error && Array.isArray(data)) {
         dbEntries = data.map((item: any) => ({
           id: String(item.id || `db_${Math.random()}`),
           exam_id: String(item.exam_id || 'general'),
           exam_title: String(item.exam_title || 'পরীক্ষা'),
+          user_id: item.user_id ? String(item.user_id) : undefined,
           user_name: String(item.user_name || 'পরীক্ষার্থী'),
           user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
           score: Number(item.score || 0),
@@ -716,15 +715,16 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
   // Combine and deduplicate across server, db, and local
   const mergedMap = new Map<string, LeaderboardEntry>();
   [...serverEntries, ...dbEntries, ...localEntries].forEach((e) => {
-    const key = e.id || `${e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
+    const key = e.id || `${e.user_id || e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
     if (!mergedMap.has(key)) {
       mergedMap.set(key, e);
     } else {
-      // Prefer entry that has user_avatar if existing doesn't
       const existing = mergedMap.get(key)!;
-      if (!existing.user_avatar && e.user_avatar) {
-        mergedMap.set(key, e);
-      }
+      mergedMap.set(key, {
+        ...existing,
+        user_id: existing.user_id || e.user_id,
+        user_avatar: existing.user_avatar || e.user_avatar,
+      });
     }
   });
 

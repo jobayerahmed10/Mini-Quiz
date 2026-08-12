@@ -14,7 +14,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, LeaderboardEntry } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile } from './lib/utils';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('exam');
@@ -180,6 +180,7 @@ export default function App() {
       id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       exam_id: examId,
       exam_title: selectedSubject || 'মডেল টেস্ট',
+      user_id: getUserUniqueId(),
       user_name: userName,
       user_avatar: userAvatar,
       score: correctCount,
