@@ -40,6 +40,7 @@ export default function App() {
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [activeExamId, setActiveExamId] = useState<string | undefined>(undefined);
+  const [activeExamTitle, setActiveExamTitle] = useState<string | undefined>(undefined);
   const [selectedLeaderboardExamId, setSelectedLeaderboardExamId] = useState<string>('all');
   const [quizResult, setQuizResult] = useState<QuizResult | null>(() => {
     return getExamResult('latest_exam_result');
@@ -176,10 +177,12 @@ export default function App() {
     const userAvatar = userProfile?.avatar;
 
     const examId = activeExamId || selectedSubject || 'general';
+    const examTitle = activeExamTitle || (typeof activeExamId === 'string' && activeExamId !== selectedSubject ? activeExamId : selectedSubject) || 'মডেল টেস্ট';
+
     const entry: LeaderboardEntry = {
       id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       exam_id: examId,
-      exam_title: selectedSubject || 'মডেল টেস্ট',
+      exam_title: examTitle,
       user_id: getUserUniqueId(),
       user_name: userName,
       user_avatar: userAvatar,
@@ -252,11 +255,13 @@ export default function App() {
       setExamQuestionCount(undefined);
       setExamTimeMinutes(30);
       setActiveExamId(undefined);
+      setActiveExamTitle(subjectOrOpts);
     } else {
       setSelectedSubject(subjectOrOpts.subject);
       setExamQuestionCount(subjectOrOpts.questionCount);
       setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
       setActiveExamId(subjectOrOpts.examId || subjectOrOpts.examType);
+      setActiveExamTitle(subjectOrOpts.examType || subjectOrOpts.subject);
     }
     navigateWithHistory('practice');
   };

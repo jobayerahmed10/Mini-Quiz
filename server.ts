@@ -32,106 +32,18 @@ interface ServerLeaderboardEntry {
 
 let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 
-// Load initial data from disk if exists, or seed initial demo entries for active competition
-const INITIAL_SEED_LEADERBOARD: ServerLeaderboardEntry[] = [
-  {
-    id: 'seed_lb_1',
-    exam_id: 'free-ntrca-1',
-    exam_title: '১৮তম শিক্ষক নিবন্ধন (NTRCA) মডেল টেস্ট - ০১',
-    user_id: 'usr_seed_1',
-    user_name: 'তানভীর আহমেদ',
-    user_avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-    score: 48,
-    total_questions: 50,
-    correct_count: 48,
-    wrong_count: 2,
-    accuracy: 96,
-    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-  {
-    id: 'seed_lb_2',
-    exam_id: 'free-ntrca-1',
-    exam_title: '১৮তম শিক্ষক নিবন্ধন (NTRCA) মডেল টেস্ট - ০১',
-    user_id: 'usr_seed_2',
-    user_name: 'নুসরাত জাহান',
-    user_avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-    score: 46,
-    total_questions: 50,
-    correct_count: 46,
-    wrong_count: 4,
-    accuracy: 92,
-    created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
-  },
-  {
-    id: 'seed_lb_3',
-    exam_id: 'free-topic-1',
-    exam_title: 'সহকারী মৌলভী বিষয়ভিত্তিক ফ্রি প্র্যাকটিস টেস্ট',
-    user_id: 'usr_seed_3',
-    user_name: 'মেহেদী হাসান',
-    user_avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
-    score: 28,
-    total_questions: 30,
-    correct_count: 28,
-    wrong_count: 2,
-    accuracy: 93.33,
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-  {
-    id: 'seed_lb_4',
-    exam_id: 'vip-mega-1',
-    exam_title: 'ভিআইপি প্রভাষক (আরবি ক্যাডার) প্রিমিয়াম মেগা মডেল টেস্ট',
-    user_id: 'usr_seed_4',
-    user_name: 'ফাতেমা খাতুন',
-    user_avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-    score: 92,
-    total_questions: 100,
-    correct_count: 92,
-    wrong_count: 8,
-    accuracy: 92,
-    created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-  },
-  {
-    id: 'seed_lb_5',
-    exam_id: 'free-live-1',
-    exam_title: 'আগামীকালের লাইভ সাবজেক্ট উইকলি ব্যাটল',
-    user_id: 'usr_seed_5',
-    user_name: 'রাকিবুল ইসলাম',
-    user_avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    score: 38,
-    total_questions: 40,
-    correct_count: 38,
-    wrong_count: 2,
-    accuracy: 95,
-    created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
-  },
-  {
-    id: 'seed_lb_6',
-    exam_id: 'free-ntrca-1',
-    exam_title: '১৮তম শিক্ষক নিবন্ধন (NTRCA) মডেল টেস্ট - ০১',
-    user_id: 'usr_seed_6',
-    user_name: 'শামীমা সুলতানা',
-    user_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    score: 44,
-    total_questions: 50,
-    correct_count: 44,
-    wrong_count: 6,
-    accuracy: 88,
-    created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-  }
-];
-
 try {
   if (fs.existsSync(LEADERBOARD_FILE_PATH)) {
     const raw = fs.readFileSync(LEADERBOARD_FILE_PATH, 'utf-8');
-    serverLeaderboardStore = JSON.parse(raw);
-  }
-  if (!serverLeaderboardStore || serverLeaderboardStore.length === 0) {
-    serverLeaderboardStore = [...INITIAL_SEED_LEADERBOARD];
-    saveLeaderboardStoreToDisk();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      // Remove any legacy seed / dummy entries if present
+      serverLeaderboardStore = parsed.filter((e) => e && e.id && !String(e.id).startsWith('seed_lb_'));
+    }
   }
 } catch (err) {
   console.warn('Could not read leaderboard_store.json:', err);
-  serverLeaderboardStore = [...INITIAL_SEED_LEADERBOARD];
+  serverLeaderboardStore = [];
 }
 
 function saveLeaderboardStoreToDisk() {

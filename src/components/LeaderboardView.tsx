@@ -30,44 +30,63 @@ export function computeLeaderboard(
   filterType: LeaderboardFilterType,
   selectedExamId: string,
   currentUserName: string,
-  currentUserAvatar?: string
+  currentUserAvatar?: string,
+  examList?: ExamItem[]
 ): LeaderboardDisplayItem[] {
   const currentUserId = getUserUniqueId();
   const normalizedCurrentUserName = (currentUserName || '').toLowerCase().trim();
 
   let filtered = [...entries];
 
+  // Helper set of candidate exam identifiers for flexible matching
+  const currentExamObj = examList?.find(
+    (e) => e.id === selectedExamId || e.title === selectedExamId || e.subject === selectedExamId
+  );
+
+  const candidateIds = new Set<string>();
+  if (selectedExamId && selectedExamId !== 'all') {
+    candidateIds.add(selectedExamId.toLowerCase().trim());
+  }
+  if (currentExamObj) {
+    if (currentExamObj.id) candidateIds.add(currentExamObj.id.toLowerCase().trim());
+    if (currentExamObj.title) candidateIds.add(currentExamObj.title.toLowerCase().trim());
+    if (currentExamObj.subject) candidateIds.add(currentExamObj.subject.toLowerCase().trim());
+  }
+
+  const isExamMatch = (e: LeaderboardEntry) => {
+    if (!selectedExamId || selectedExamId === 'all') return true;
+    const eId = (e.exam_id || '').toLowerCase().trim();
+    const eTitle = (e.exam_title || '').toLowerCase().trim();
+    if (candidateIds.size === 0) return true;
+    return candidateIds.has(eId) || candidateIds.has(eTitle);
+  };
+
   if (filterType === 'this_exam') {
     if (selectedExamId && selectedExamId !== 'all') {
-      filtered = filtered.filter(
-        (e) => e.exam_id === selectedExamId || e.exam_title === selectedExamId
-      );
+      filtered = filtered.filter(isExamMatch);
     }
 
     // Select best entry per distinct participant for this exam
     const userBestMap = new Map<string, LeaderboardEntry>();
     for (const item of filtered) {
-      // Differentiate participants by user_id or unique entry key
-      const participantKey = item.user_id
+      // Differentiate participants by user_id or unique name key
+      const participantKey = item.user_id && item.user_id.trim()
         ? item.user_id.trim()
         : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
             ? item.user_name.toLowerCase().trim()
             : item.id);
 
-      const examKey = item.exam_id || item.exam_title || 'default';
-      const mapKey = selectedExamId === 'all' ? `${participantKey}_${examKey}` : participantKey;
-
-      const existing = userBestMap.get(mapKey);
+      const existing = userBestMap.get(participantKey);
       if (!existing) {
-        userBestMap.set(mapKey, item);
+        userBestMap.set(participantKey, item);
       } else {
         if (item.score > existing.score) {
-          userBestMap.set(mapKey, item);
+          userBestMap.set(participantKey, item);
         } else if (item.score === existing.score) {
           if (item.accuracy > existing.accuracy) {
-            userBestMap.set(mapKey, item);
+            userBestMap.set(participantKey, item);
           } else if (new Date(item.created_at).getTime() < new Date(existing.created_at).getTime()) {
-            userBestMap.set(mapKey, item);
+            userBestMap.set(participantKey, item);
           }
         }
       }
@@ -145,15 +164,13 @@ export function computeLeaderboard(
     }
 
     if (selectedExamId && selectedExamId !== 'all') {
-      filtered = filtered.filter(
-        (e) => e.exam_id === selectedExamId || e.exam_title === selectedExamId
-      );
+      filtered = filtered.filter(isExamMatch);
     }
 
     // Group entries by distinct participant
     const userGroupMap = new Map<string, LeaderboardEntry[]>();
     for (const item of filtered) {
-      const participantKey = item.user_id
+      const participantKey = item.user_id && item.user_id.trim()
         ? item.user_id.trim()
         : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
             ? item.user_name.toLowerCase().trim()
@@ -343,7 +360,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const currentFilter = effectiveExamOnlyMode ? 'this_exam' : filterType;
 
   // Compute ranked list based on current filter & selected exam
-  const rankedList = computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar);
+  const rankedList = computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar, examList);
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
 
