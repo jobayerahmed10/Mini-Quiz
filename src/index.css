@@ -3,14 +3,14 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-bengali: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
+  --font-bengali: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, sans-serif;
   --color-navy-dark: #0B132B;
   --color-navy-card: #121E36;
   --color-navy-border: #233558;
 }
 
 body {
-  font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: #F1F5F9;
   color: #0F172A;
   -webkit-tap-highlight-color: transparent;
@@ -80,7 +80,7 @@ body.dark input, body.dark select, body.dark textarea {
   font-family: 'Hind Siliguri', sans-serif !important;
 }
 .font-noto {
-  font-family: 'Noto Sans Bengali', sans-serif !important;
+  font-family: 'Noto Serif Bengali', serif !important;
 }
 .font-tiro {
   font-family: 'Tiro Bangla', serif !important;

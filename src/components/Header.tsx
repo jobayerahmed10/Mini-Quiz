@@ -48,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const bengaliFonts: { id: FontFamilyType; name: string; sample: string }[] = [
     { id: 'hind', name: 'হিন্দ শিলিগুড়ি', sample: 'Bengali Standard' },
-    { id: 'noto', name: 'নোটো সান্স', sample: 'Noto Sans Bengali' },
+    { id: 'noto', name: 'নোটো সেরিফ', sample: 'Noto Serif Bengali' },
     { id: 'tiro', name: 'তিরো বাংলা', sample: 'Tiro Serif Bangla' },
     { id: 'anek', name: 'অনেক বাংলা', sample: 'Anek Modern' },
   ];
@@ -136,145 +136,152 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Font Options Popover Dropdown */}
             {showFontMenu && (
-              <div className={`absolute right-0 mt-3 w-80 max-h-[85vh] overflow-y-auto rounded-3xl p-4 shadow-2xl z-50 border transition-all ${
-                isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-              }`}>
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-1.5 text-xs font-black">
-                    <Type className="w-4 h-4 text-amber-500" />
-                    <span>ফন্ট ও আরবি সেটিং</span>
-                  </div>
-                  <button
-                    onClick={() => setShowFontMenu(false)}
-                    className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+              <>
+                {/* Backdrop for mobile to tap outside */}
+                <div
+                  className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 sm:hidden"
+                  onClick={() => setShowFontMenu(false)}
+                />
 
-                {/* 1. Font Size Chooser */}
-                <div className="mb-4 space-y-1.5">
-                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    ফন্ট সাইজ (Font Size):
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {fontSizeOptions.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => onChangeFontSize(opt.id)}
-                        className={`py-2 px-1 rounded-xl text-xs font-black cursor-pointer transition-all border ${
-                          fontSize === opt.id
-                            ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
-                            : 'neu-btn text-slate-700 dark:text-slate-200'
-                        }`}
-                      >
-                        <div>{opt.label}</div>
-                        <div className="text-[9px] font-normal opacity-70">{opt.desc}</div>
-                      </button>
-                    ))}
+                <div
+                  className={`fixed sm:absolute top-16 right-3 left-3 sm:left-auto sm:right-0 sm:top-full mt-0 sm:mt-2.5 w-auto sm:w-80 max-w-[340px] mx-auto sm:mx-0 max-h-[78vh] sm:max-h-[82vh] overflow-y-auto rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xl z-50 border transition-all ${
+                    isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5 text-xs font-black">
+                      <Type className="w-4 h-4 text-amber-500" />
+                      <span>ফন্ট ও আরবি সেটিং</span>
+                    </div>
+                    <button
+                      onClick={() => setShowFontMenu(false)}
+                      className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
 
-                {/* 2. Arabic Harakat Option (হরকত সহ / ছাড়া) */}
-                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>আরবি হরকত (Tashkeel) সেটিং:</span>
+                  {/* 1. Font Size Chooser */}
+                  <div className="mb-3 space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      ফন্ট সাইজ (Font Size):
                     </label>
+                    <div className="grid grid-cols-3 gap-1">
+                      {fontSizeOptions.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => onChangeFontSize(opt.id)}
+                          className={`py-1.5 px-1 rounded-lg text-xs font-black cursor-pointer transition-all border ${
+                            fontSize === opt.id
+                              ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                              : 'neu-btn text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <div>{opt.label}</div>
+                          <div className="text-[9px] font-normal opacity-70">{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                    আরবি প্রশ্নে হরকত/জের-জবর যুক্ত বা মুক্ত রাখুন:
-                  </p>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      onClick={() => onChangeShowHarakat(true)}
-                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                        showHarakat
-                          ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                      }`}
-                    >
-                      <span>হরকত সহ</span>
-                      <span className="text-[10px] font-amiri opacity-90">﴿قُلْ هُوَ اللَّهُ﴾</span>
-                    </button>
+                  {/* 2. Arabic Harakat Option (হরকত সহ / ছাড়া) */}
+                  <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>আরবি হরকত (Tashkeel) সেটিং:</span>
+                      </label>
+                    </div>
 
-                    <button
-                      onClick={() => onChangeShowHarakat(false)}
-                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                        !showHarakat
-                          ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                      }`}
-                    >
-                      <span>হরকত ছাড়া</span>
-                      <span className="text-[10px] font-amiri opacity-90">﴿قل هو الله﴾</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Bengali Fonts */}
-                <div className="mb-4 space-y-1.5">
-                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                    <span>বাংলা ফন্ট (Bangla Fonts):</span>
-                  </label>
-                  <div className="space-y-1">
-                    {bengaliFonts.map((f) => (
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                       <button
-                        key={f.id}
-                        onClick={() => onChangeFontFamily(f.id)}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
-                          fontFamily === f.id
-                            ? 'bg-[#0B132B] text-white font-bold shadow-xs'
-                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                        onClick={() => onChangeShowHarakat(true)}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                          showHarakat
+                            ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                         }`}
                       >
-                        <div>
-                          <span className="block font-bold">{f.name}</span>
-                          <span className="text-[10px] opacity-60">{f.sample}</span>
-                        </div>
-                        {fontFamily === f.id && (
-                          <Check className="w-4 h-4 text-amber-400" />
-                        )}
+                        <span>হরকত সহ</span>
+                        <span className="text-[10px] font-amiri opacity-90">﴿قُلْ هُوَ اللَّهُ﴾</span>
                       </button>
-                    ))}
-                  </div>
-                </div>
 
-                {/* 4. Arabic Fonts */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <label className="block text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <Languages className="w-3.5 h-3.5" />
-                    <span>আরবি ফন্ট (Arabic Calligraphy Fonts):</span>
-                  </label>
-                  <div className="space-y-1">
-                    {arabicFonts.map((f) => (
                       <button
-                        key={f.id}
-                        onClick={() => onChangeFontFamily(f.id)}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
-                          fontFamily === f.id
-                            ? 'bg-[#0B132B] text-white font-bold shadow-xs'
-                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                        onClick={() => onChangeShowHarakat(false)}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                          !showHarakat
+                            ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                         }`}
                       >
-                        <div>
-                          <span className="block font-bold flex items-center gap-1.5">
-                            {f.name}
-                            <span className="text-[10px] text-amber-400 font-normal">({f.arName})</span>
-                          </span>
-                          <span className="text-[11px] text-amber-500/90 font-amiri block mt-0.5" dir="rtl">{f.sample}</span>
-                        </div>
-                        {fontFamily === f.id && (
-                          <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                        )}
+                        <span>হরকত ছাড়া</span>
+                        <span className="text-[10px] font-amiri opacity-90">﴿قل هو الله﴾</span>
                       </button>
-                    ))}
+                    </div>
                   </div>
-                </div>
 
-              </div>
+                  {/* 3. Bengali Fonts */}
+                  <div className="mb-3 space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      <span>বাংলা ফন্ট (Bangla Fonts):</span>
+                    </label>
+                    <div className="space-y-1">
+                      {bengaliFonts.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => onChangeFontFamily(f.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                            fontFamily === f.id
+                              ? 'bg-[#0B132B] text-white font-bold shadow-xs'
+                              : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <span className="block font-bold text-[11px]">{f.name}</span>
+                            <span className="text-[9px] opacity-60">{f.sample}</span>
+                          </div>
+                          {fontFamily === f.id && (
+                            <Check className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Arabic Fonts */}
+                  <div className="space-y-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <label className="block text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Languages className="w-3.5 h-3.5" />
+                      <span>আরবি ফন্ট (Arabic Fonts):</span>
+                    </label>
+                    <div className="space-y-1">
+                      {arabicFonts.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => onChangeFontFamily(f.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                            fontFamily === f.id
+                              ? 'bg-[#0B132B] text-white font-bold shadow-xs'
+                              : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <span className="block font-bold text-[11px] flex items-center gap-1">
+                              {f.name}
+                              <span className="text-[9px] text-amber-400 font-normal">({f.arName})</span>
+                            </span>
+                            <span className="text-[10px] text-amber-500/90 font-amiri block mt-0.5" dir="rtl">{f.sample}</span>
+                          </div>
+                          {fontFamily === f.id && (
+                            <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </>
             )}
           </div>
 
