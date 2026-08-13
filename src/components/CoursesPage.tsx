@@ -19,9 +19,13 @@ import {
   CreditCard
 } from 'lucide-react';
 import { CourseModule } from '../types';
+import { CourseDetailView } from './CourseDetailView';
 
 interface CoursesPageProps {
   onSelectCourse?: (courseId: string) => void;
+  onStartExam?: (opts: { subject: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string }) => void;
+  onReviewAnswers?: (opts: { examId?: string; subject?: string; examType?: string }) => void;
+  onOpenLeaderboard?: (examId?: string) => void;
 }
 
 const INITIAL_COURSES: CourseModule[] = [
@@ -164,10 +168,16 @@ const INITIAL_COURSES: CourseModule[] = [
   }
 ];
 
-export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse }) => {
+export const CoursesPage: React.FC<CoursesPageProps> = ({
+  onSelectCourse,
+  onStartExam,
+  onReviewAnswers,
+  onOpenLeaderboard
+}) => {
   const [courses, setCourses] = useState<CourseModule[]>(INITIAL_COURSES);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeCourseModal, setActiveCourseModal] = useState<CourseModule | null>(null);
+  const [selectedCourseForDetail, setSelectedCourseForDetail] = useState<CourseModule | null>(null);
 
   const subjects = [
     {
@@ -213,7 +223,30 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse }) => {
     if (activeCourseModal && activeCourseModal.id === courseId) {
       setActiveCourseModal({ ...activeCourseModal, isEnrolled: true, accentColor: 'emerald' });
     }
+    if (selectedCourseForDetail && selectedCourseForDetail.id === courseId) {
+      setSelectedCourseForDetail({ ...selectedCourseForDetail, isEnrolled: true, accentColor: 'emerald' });
+    }
   };
+
+  // If a course detail view is active, render CourseDetailView directly!
+  if (selectedCourseForDetail) {
+    return (
+      <CourseDetailView
+        course={selectedCourseForDetail}
+        onBack={() => setSelectedCourseForDetail(null)}
+        onStartExam={(opts) => {
+          if (onStartExam) onStartExam(opts);
+        }}
+        onReviewAnswers={(opts) => {
+          if (onReviewAnswers) onReviewAnswers(opts);
+        }}
+        onOpenLeaderboard={(examId) => {
+          if (onOpenLeaderboard) onOpenLeaderboard(examId);
+        }}
+        onEnroll={(courseId) => handleEnrollCourse(courseId)}
+      />
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 mb-28 space-y-5">
@@ -371,13 +404,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse }) => {
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (onSelectCourse) {
-                            onSelectCourse(course.id);
-                          } else {
-                            setActiveCourseModal(course);
-                          }
-                        }}
+                        onClick={() => setSelectedCourseForDetail(course)}
                         className="px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl bg-[#046A38] hover:bg-[#03522b] text-white text-[10px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                       >
                         <Play className="w-2.5 h-2.5 fill-current" />
@@ -392,7 +419,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse }) => {
                       </div>
 
                       <button
-                        onClick={() => setActiveCourseModal(course)}
+                        onClick={() => setSelectedCourseForDetail(course)}
                         className="px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-xl bg-[#0D1930] hover:bg-[#16274a] text-white text-[10px] sm:text-xs font-bold cursor-pointer shadow-xs active:scale-95 transition-all"
                       >
                         বিস্তারিত

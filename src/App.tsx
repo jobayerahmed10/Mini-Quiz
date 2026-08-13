@@ -381,7 +381,11 @@ export default function App() {
             )}
 
             {activeTab === 'courses' && (
-              <CoursesPage />
+              <CoursesPage
+                onStartExam={(opts) => handleStartPractice(opts)}
+                onReviewAnswers={(opts) => handleReviewAnswers(opts)}
+                onOpenLeaderboard={handleOpenLeaderboard}
+              />
             )}
 
             {activeTab === 'ustad_ai' && (
