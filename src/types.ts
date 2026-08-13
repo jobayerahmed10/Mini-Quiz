@@ -63,15 +63,22 @@ export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard' | 'profil
 export interface CourseModule {
   id: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   category: string;
-  duration: string;
-  lessonsCount: number;
-  enrolledCount: string;
-  rating: number;
-  iconName: string;
+  duration?: string;
+  lessonsCount?: number;
+  enrolledCount?: string;
+  rating?: number;
+  iconName?: string;
   badge?: string;
-  topics: string[];
+  badgeSub?: string;
+  classesCount?: number;
+  sheetsCount?: number;
+  examsCount?: number;
+  isEnrolled?: boolean;
+  price?: string;
+  accentColor?: 'emerald' | 'purple' | 'amber';
+  topics?: string[];
   pdfAvailable?: boolean;
 }
 
