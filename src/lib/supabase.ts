@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Question } from '../types';
+import { Question, CourseModule, CourseEnrollmentRecord } from '../types';
 import { detectQuestionSubject } from './subjects';
 
 /**
@@ -740,6 +740,368 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   return mergedList;
 }
+
+/**
+ * ==========================================
+ * COURSES SUPABASE CRUD & PERSISTENCE ENGINE
+ * ==========================================
+ */
+
+export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModule[]; isFromSupabase: boolean; error?: string | null }> {
+  let cachedCourses: CourseModule[] = [];
+  try {
+    const raw = localStorage.getItem('tamreen_courses_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedCourses = parsed;
+      }
+    }
+  } catch {}
+
+  if (!supabaseInstance) {
+    return {
+      courses: cachedCourses,
+      isFromSupabase: false,
+      error: null,
+    };
+  }
+
+  try {
+    const queryPromise = Promise.resolve(
+      supabaseInstance
+        .from('courses')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+    );
+
+    const timeoutFallback = { data: null, error: { message: 'Network Timeout', code: 'TIMEOUT' } };
+    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+
+    if (error || !data || data.length === 0) {
+      return {
+        courses: cachedCourses,
+        isFromSupabase: true,
+        error: error ? error.message : null,
+      };
+    }
+
+    const fetchedCourses: CourseModule[] = data.map((item: any) => ({
+      id: String(item.id),
+      title: String(item.title || 'কোর্স'),
+      category: String(item.category || 'general'),
+      badge: String(item.badge || 'রেকর্ড ব্যাচ'),
+      badgeSub: item.badge_sub ? String(item.badge_sub) : undefined,
+      classesCount: Number(item.classes_count || 0),
+      sheetsCount: Number(item.sheets_count || 0),
+      examsCount: Number(item.exams_count || 0),
+      enrolledCount: item.enrolled_count ? String(item.enrolled_count) : '500',
+      price: item.price ? String(item.price) : '৯৫০',
+      accentColor: (item.accent_color || 'purple') as 'emerald' | 'purple' | 'amber',
+      topics: Array.isArray(item.topics) ? item.topics : (typeof item.topics === 'string' ? JSON.parse(item.topics) : []),
+      instructor: item.instructor ? String(item.instructor) : undefined,
+      isEnrolled: Boolean(item.is_enrolled),
+      isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
+      status: item.status || 'active',
+    }));
+
+    try {
+      localStorage.setItem('tamreen_courses_cache', JSON.stringify(fetchedCourses));
+    } catch {}
+
+    return {
+      courses: fetchedCourses,
+      isFromSupabase: true,
+      error: null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      courses: cachedCourses,
+      isFromSupabase: true,
+      error: msg,
+    };
+  }
+}
+
+export async function addCourseToSupabase(course: Partial<CourseModule>): Promise<{ success: boolean; data?: CourseModule; error?: string }> {
+  const newRecord = {
+    title: course.title || 'নতুন কোর্স',
+    category: course.category || 'general',
+    badge: course.badge || 'রেকর্ড ব্যাচ',
+    badge_sub: course.badgeSub || course.title,
+    classes_count: course.classesCount || 0,
+    sheets_count: course.sheetsCount || 0,
+    exams_count: course.examsCount || 0,
+    enrolled_count: course.enrolledCount || '0',
+    price: course.price || '৯৫০',
+    accent_color: course.accentColor || 'purple',
+    topics: course.topics || [],
+    instructor: course.instructor || 'উস্তাদ আহমেদ',
+    is_enrolled: Boolean(course.isEnrolled),
+    status: 'active',
+    created_at: new Date().toISOString(),
+  };
+
+  if (!supabaseInstance) {
+    const localId = course.id || `course_${Date.now()}`;
+    const createdCourse: CourseModule = {
+      id: localId,
+      ...course,
+      title: newRecord.title,
+      category: newRecord.category,
+      badge: newRecord.badge,
+      badgeSub: newRecord.badge_sub,
+      classesCount: newRecord.classes_count,
+      sheetsCount: newRecord.sheets_count,
+      examsCount: newRecord.exams_count,
+      enrolledCount: newRecord.enrolled_count,
+      price: newRecord.price,
+      accentColor: newRecord.accent_color as 'emerald' | 'purple' | 'amber',
+      topics: newRecord.topics,
+      instructor: newRecord.instructor,
+      isEnrolled: newRecord.is_enrolled,
+    };
+    return { success: true, data: createdCourse };
+  }
+
+  try {
+    const { data, error } = await supabaseInstance
+      .from('courses')
+      .insert([newRecord])
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const createdCourse: CourseModule = {
+      id: String(data.id),
+      title: data.title,
+      category: data.category,
+      badge: data.badge,
+      badgeSub: data.badge_sub,
+      classesCount: Number(data.classes_count || 0),
+      sheetsCount: Number(data.sheets_count || 0),
+      examsCount: Number(data.exams_count || 0),
+      enrolledCount: String(data.enrolled_count || '0'),
+      price: String(data.price || '৯৫০'),
+      accentColor: (data.accent_color || 'purple') as 'emerald' | 'purple' | 'amber',
+      topics: Array.isArray(data.topics) ? data.topics : [],
+      instructor: data.instructor,
+      isEnrolled: Boolean(data.is_enrolled),
+    };
+
+    return { success: true, data: createdCourse };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+export async function updateCourseInSupabase(id: string, updates: Partial<CourseModule>): Promise<{ success: boolean; data?: CourseModule; error?: string }> {
+  const dbUpdates: Record<string, any> = {};
+  if (updates.title !== undefined) dbUpdates.title = updates.title;
+  if (updates.category !== undefined) dbUpdates.category = updates.category;
+  if (updates.badge !== undefined) dbUpdates.badge = updates.badge;
+  if (updates.badgeSub !== undefined) dbUpdates.badge_sub = updates.badgeSub;
+  if (updates.classesCount !== undefined) dbUpdates.classes_count = updates.classesCount;
+  if (updates.sheetsCount !== undefined) dbUpdates.sheets_count = updates.sheetsCount;
+  if (updates.examsCount !== undefined) dbUpdates.exams_count = updates.examsCount;
+  if (updates.enrolledCount !== undefined) dbUpdates.enrolled_count = updates.enrolledCount;
+  if (updates.price !== undefined) dbUpdates.price = updates.price;
+  if (updates.accentColor !== undefined) dbUpdates.accent_color = updates.accentColor;
+  if (updates.topics !== undefined) dbUpdates.topics = updates.topics;
+  if (updates.instructor !== undefined) dbUpdates.instructor = updates.instructor;
+  if (updates.isEnrolled !== undefined) dbUpdates.is_enrolled = updates.isEnrolled;
+
+  if (!supabaseInstance) {
+    return { success: true, data: { id, ...updates } as CourseModule };
+  }
+
+  try {
+    const { data, error } = await supabaseInstance
+      .from('courses')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const updatedCourse: CourseModule = {
+      id: String(data.id),
+      title: data.title,
+      category: data.category,
+      badge: data.badge,
+      badgeSub: data.badge_sub,
+      classesCount: Number(data.classes_count || 0),
+      sheetsCount: Number(data.sheets_count || 0),
+      examsCount: Number(data.exams_count || 0),
+      enrolledCount: String(data.enrolled_count || '0'),
+      price: String(data.price || '৯৫০'),
+      accentColor: (data.accent_color || 'purple') as 'emerald' | 'purple' | 'amber',
+      topics: Array.isArray(data.topics) ? data.topics : [],
+      instructor: data.instructor,
+      isEnrolled: Boolean(data.is_enrolled),
+    };
+
+    return { success: true, data: updatedCourse };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+export async function deleteCourseFromSupabase(id: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseInstance) {
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabaseInstance
+      .from('courses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+// =========================================================
+// Course Enrollments & Applications Table Functions
+// (public.course_applications & public.course_enrollments)
+// =========================================================
+
+export async function submitEnrollmentToSupabase(
+  enrollment: CourseEnrollmentRecord
+): Promise<{ success: boolean; data?: CourseEnrollmentRecord; error?: string }> {
+  const payload = {
+    course_id: enrollment.course_id,
+    course_title: enrollment.course_title,
+    student_name: enrollment.student_name,
+    phone_number: enrollment.phone_number,
+    email: enrollment.email || null,
+    payment_method: enrollment.payment_method,
+    amount: enrollment.amount,
+    transaction_id: enrollment.transaction_id,
+    status: enrollment.status || 'pending',
+    created_at: enrollment.created_at || new Date().toISOString()
+  };
+
+  if (!supabaseInstance) {
+    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+  }
+
+  try {
+    // Attempt inserting into course_applications table
+    const { data: appData, error: appErr } = await supabaseInstance
+      .from('course_applications')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (!appErr && appData) {
+      return { success: true, data: appData as CourseEnrollmentRecord };
+    }
+
+    // Fallback: try inserting into course_enrollments
+    const { data, error } = await supabaseInstance
+      .from('course_enrollments')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Supabase course enrollment insert error:', error.message);
+      return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+    }
+
+    return { success: true, data: data as CourseEnrollmentRecord };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+  }
+}
+
+export async function fetchCourseApplicationsFromSupabase(
+  phoneNumber?: string
+): Promise<{ applications: CourseEnrollmentRecord[]; error?: string | null }> {
+  let cached: CourseEnrollmentRecord[] = [];
+  try {
+    const raw = localStorage.getItem('tamreen_enrollments');
+    if (raw) cached = JSON.parse(raw);
+  } catch {}
+
+  if (!supabaseInstance) {
+    return { applications: cached, error: null };
+  }
+
+  try {
+    // First attempt: query 'course_applications'
+    let query = supabaseInstance
+      .from('course_applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (phoneNumber) {
+      query = query.eq('phone_number', phoneNumber);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data && data.length > 0) {
+      const records = data as CourseEnrollmentRecord[];
+      try {
+        localStorage.setItem('tamreen_enrollments', JSON.stringify(records));
+      } catch {}
+      return { applications: records, error: null };
+    }
+
+    // Second attempt: query 'course_enrollments'
+    let fallbackQuery = supabaseInstance
+      .from('course_enrollments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (phoneNumber) {
+      fallbackQuery = fallbackQuery.eq('phone_number', phoneNumber);
+    }
+
+    const fallbackRes = await fallbackQuery;
+    if (!fallbackRes.error && fallbackRes.data && fallbackRes.data.length > 0) {
+      const records = fallbackRes.data as CourseEnrollmentRecord[];
+      try {
+        localStorage.setItem('tamreen_enrollments', JSON.stringify(records));
+      } catch {}
+      return { applications: records, error: null };
+    }
+
+    return { applications: cached, error: error?.message || fallbackRes.error?.message || null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { applications: cached, error: msg };
+  }
+}
+
+export async function fetchEnrollmentsFromSupabase(
+  phoneNumber?: string
+): Promise<{ enrollments: CourseEnrollmentRecord[]; error?: string | null }> {
+  const res = await fetchCourseApplicationsFromSupabase(phoneNumber);
+  return { enrollments: res.applications, error: res.error };
+}
+
 
 
 

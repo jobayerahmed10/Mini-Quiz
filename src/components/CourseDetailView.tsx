@@ -21,7 +21,8 @@ import {
   Award,
   Lock
 } from 'lucide-react';
-import { CourseModule } from '../types';
+import { CourseModule, CourseEnrollmentRecord } from '../types';
+import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 
 interface CourseDetailViewProps {
   course: CourseModule;
@@ -42,6 +43,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'routine' | 'syllabus' | 'sheets' | 'exams' | 'leaderboard'>('details');
   const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
+  const [showEnrollModal, setShowEnrollModal] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -55,8 +57,25 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
     showToast(`${fileName} ডাউনলোড সম্পন্ন হয়েছে!`);
   };
 
+  const handleTriggerEnroll = () => {
+    setShowEnrollModal(true);
+  };
+
+  const handleEnrollSuccess = (enrollment: CourseEnrollmentRecord) => {
+    showToast('ভর্তি আবেদন জমা সফল—পেমেন্ট যাচাই করা হচ্ছে!');
+    onEnroll(course.id);
+  };
+
   return (
     <div className={`max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 animate-fade-in ${!course.isEnrolled ? 'pb-24' : ''}`}>
+      {/* Course Enrollment 5-Step Modal */}
+      {showEnrollModal && (
+        <CourseEnrollmentModal
+          course={course}
+          onClose={() => setShowEnrollModal(false)}
+          onSuccess={handleEnrollSuccess}
+        />
+      )}
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#046A38] text-white px-4 py-2 rounded-2xl shadow-xl text-xs sm:text-sm font-bold flex items-center gap-2 animate-bounce">
@@ -82,7 +101,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
           </div>
         ) : (
           <button
-            onClick={() => onEnroll(course.id)}
+            onClick={handleTriggerEnroll}
             className="px-4 py-2 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
           >
             <CreditCard className="w-4 h-4 text-amber-300" />
@@ -679,7 +698,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
             </div>
 
             <button
-              onClick={() => onEnroll(course.id)}
+              onClick={handleTriggerEnroll}
               className="px-5 py-2.5 rounded-xl bg-[#0D1930] hover:bg-[#16274a] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
             >
               <span>ভর্তি হন</span>

@@ -1,15 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   User, Phone, Camera, Check, X, Sparkles, Trophy, Crown, Flame, 
   ChevronRight, BookOpen, Bookmark, AlertTriangle, RotateCcw, 
   LayoutGrid, Settings, Upload, ArrowLeft, BarChart3, HelpCircle, 
-  CheckCircle2, Clock
+  CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck
 } from 'lucide-react';
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
   getBookmarkedIds 
 } from '../lib/utils';
+import { fetchCourseApplicationsFromSupabase } from '../lib/supabase';
+import { CourseEnrollmentRecord } from '../types';
 
 interface ProfilePageProps {
   onNavigateHome: () => void;
@@ -33,7 +35,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onOpenFontSettings,
 }) => {
   const currentProfile = getUserProfile();
-  const [activeTab, setActiveTab] = useState<'menu' | 'edit_profile' | 'dashboard' | 'bookmarks' | 'wrong_bank' | 'archive' | 'vip_membership'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'edit_profile' | 'dashboard' | 'bookmarks' | 'wrong_bank' | 'archive' | 'vip_membership' | 'applications'>('menu');
   
   const [name, setName] = useState(currentProfile?.name || 'জোবায়ের আহমদ');
   const [phone, setPhone] = useState(currentProfile?.phone || '01700000000');
@@ -43,10 +45,45 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Course Applications State from Supabase
+  const [applications, setApplications] = useState<CourseEnrollmentRecord[]>([]);
+  const [loadingApps, setLoadingApps] = useState<boolean>(false);
+  const [appFetchError, setAppFetchError] = useState<string | null>(null);
+  const [copiedTrxId, setCopiedTrxId] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentStats = getStudentStats();
   const streakDays = getUserStreakDays();
   const bookmarkedCount = getBookmarkedIds().length;
+
+  const loadApplications = async () => {
+    setLoadingApps(true);
+    setAppFetchError(null);
+    const res = await fetchCourseApplicationsFromSupabase(phone);
+    setLoadingApps(false);
+    if (res.applications) {
+      setApplications(res.applications);
+    }
+    if (res.error) {
+      setAppFetchError(res.error);
+    }
+  };
+
+  useEffect(() => {
+    loadApplications();
+  }, [phone]);
+
+  useEffect(() => {
+    if (activeTab === 'applications') {
+      loadApplications();
+    }
+  }, [activeTab]);
+
+  const handleCopyTrx = (trx: string) => {
+    navigator.clipboard.writeText(trx);
+    setCopiedTrxId(trx);
+    setTimeout(() => setCopiedTrxId(null), 2000);
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -229,6 +266,34 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <span className="text-base font-black">আমার কোর্সসমূহ</span>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-400" />
+            </button>
+
+            {/* 3.5 My Applications (আমার ভর্তি আবেদনসমূহ) */}
+            <button
+              onClick={() => setActiveTab('applications')}
+              className="w-full p-4 rounded-2xl bg-white dark:bg-[#0D172A] hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
+                  <FileCheck2 className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <span className="text-base font-black block">আমার ভর্তি আবেদনসমূহ</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {applications.length > 0 
+                      ? `${toBengaliNumeral(applications.length)}টি আবেদন জমা আছে` 
+                      : 'আবেদন স্ট্যাটাস ও ট্রানজেকশন ট্র্যাকিং'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {applications.some(a => a.status === 'pending') && (
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse">
+                    যাচাইাধীন
+                  </span>
+                )}
+                <ChevronRight className="w-5 h-5 text-slate-400" />
+              </div>
             </button>
 
             {/* 4. Bookmarked Questions */}
@@ -495,6 +560,229 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 text-center leading-relaxed">
               🌟 মাশাআল্লাহ্‌! আপনার ১৮তম শিক্ষক নিবন্ধন পরীক্ষার প্রস্তুতি অনেক এগিয়ে রয়েছে।
             </div>
+          </div>
+        )}
+
+        {/* MY APPLICATIONS TAB */}
+        {activeTab === 'applications' && (
+          <div className="space-y-4">
+            
+            {/* Header Box */}
+            <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
+                  <FileCheck2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#0B132B] dark:text-white leading-tight">
+                    আমার ভর্তি আবেদনসমূহ
+                  </h3>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Supabase 'course_applications' ডাটাবেস থেকে রিয়েল-টাইম স্ট্যাটাস
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={loadApplications}
+                disabled={loadingApps}
+                className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                title="রিফ্রেশ করুন"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingApps ? 'animate-spin text-[#0b705c]' : ''}`} />
+                <span className="hidden sm:inline">রিফ্রেশ</span>
+              </button>
+            </div>
+
+            {/* Status Summary Cards */}
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 p-3 rounded-2xl text-center">
+                <span className="text-[10px] font-black text-amber-700 dark:text-amber-400 block uppercase tracking-wider">যাচাইাধীন</span>
+                <span className="text-lg font-black text-amber-800 dark:text-amber-300 mt-0.5 block">
+                  {toBengaliNumeral(applications.filter(a => a.status === 'pending').length)}টি
+                </span>
+              </div>
+
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 p-3 rounded-2xl text-center">
+                <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 block uppercase tracking-wider">অনুমোদিত</span>
+                <span className="text-lg font-black text-emerald-800 dark:text-emerald-300 mt-0.5 block">
+                  {toBengaliNumeral(applications.filter(a => a.status === 'approved').length)}টি
+                </span>
+              </div>
+
+              <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 p-3 rounded-2xl text-center">
+                <span className="text-[10px] font-black text-rose-700 dark:text-rose-400 block uppercase tracking-wider">বাতিলকৃত</span>
+                <span className="text-lg font-black text-rose-800 dark:text-rose-300 mt-0.5 block">
+                  {toBengaliNumeral(applications.filter(a => a.status === 'rejected').length)}টি
+                </span>
+              </div>
+            </div>
+
+            {/* Loading Indicator */}
+            {loadingApps && (
+              <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-8 border border-slate-200 dark:border-slate-800 text-center space-y-3">
+                <div className="w-8 h-8 border-3 border-[#0b705c] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Supabase থেকে আবেদনের তথ্য লোড করা হচ্ছে...
+                </p>
+              </div>
+            )}
+
+            {/* Fetch Error */}
+            {!loadingApps && appFetchError && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                <span>{appFetchError}</span>
+                <button
+                  onClick={loadApplications}
+                  className="px-3 py-1 bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-xl text-xs font-black cursor-pointer"
+                >
+                  পুনরায় চেষ্টা করুন
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!loadingApps && applications.length === 0 && (
+              <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-8 border border-slate-200 dark:border-slate-800 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                  <FileCheck2 className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-black text-slate-800 dark:text-slate-200">
+                    কোনো আবেদন জমা দেওয়া হয়নি
+                  </h4>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    আপনার ফোন নম্বর ({phone}) দিয়ে এখনও কোনো কোর্সে ভর্তি আবেদন পাওয়া যায়নি।
+                  </p>
+                </div>
+                <button
+                  onClick={onOpenCourses}
+                  className="px-5 py-2.5 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white text-xs font-black shadow-md transition-all active:scale-95 inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>কোর্সসমূহ এক্সপ্লোর করুন</span>
+                </button>
+              </div>
+            )}
+
+            {/* Applications List */}
+            {!loadingApps && applications.length > 0 && (
+              <div className="space-y-3.5">
+                {applications.map((app, index) => {
+                  const isApproved = app.status === 'approved';
+                  const isPending = app.status === 'pending';
+                  const isRejected = app.status === 'rejected';
+
+                  return (
+                    <div
+                      key={app.id || index}
+                      className="bg-white dark:bg-[#0D172A] rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                    >
+                      {/* Card Top Row: Title & Badge */}
+                      <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                        <div>
+                          <span className="text-[10px] font-black text-[#0b705c] dark:text-emerald-400 tracking-wider uppercase block">
+                            ভর্তি আবেদন #{toBengaliNumeral(index + 1)}
+                          </span>
+                          <h4 className="text-base font-black text-slate-900 dark:text-white mt-0.5 leading-snug">
+                            {app.course_title}
+                          </h4>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div>
+                          {isApproved && (
+                            <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shrink-0 shadow-xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span>অনুমোদিত</span>
+                            </span>
+                          )}
+                          {isPending && (
+                            <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 shrink-0 shadow-xs animate-pulse">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                              <span>যাচাইাধীন</span>
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 flex items-center gap-1.5 shrink-0 shadow-xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                              <span>বাতিলকৃত</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Detail Fields */}
+                      <div className="grid grid-cols-2 gap-2.5 text-xs">
+                        <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-2xl">
+                          <span className="text-slate-400 font-semibold block text-[10px]">শিক্ষার্থীর নাম</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">{app.student_name}</span>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-2xl">
+                          <span className="text-slate-400 font-semibold block text-[10px]">পেমেন্ট মেথড</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block capitalize">
+                            {app.payment_method} ({app.amount})
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-2xl col-span-2 flex items-center justify-between">
+                          <div>
+                            <span className="text-slate-400 font-semibold block text-[10px]">ট্রানজেকশন আইডি (TrxID)</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-amber-300 text-xs sm:text-sm mt-0.5 block tracking-wide">
+                              {app.transaction_id}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleCopyTrx(app.transaction_id)}
+                            className="px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            {copiedTrxId === app.transaction_id ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            <span>{copiedTrxId === app.transaction_id ? 'কপি হয়েছে' : 'কপি'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Contextual Status Banner */}
+                      {isApproved && (
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl flex items-center justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>আবেদন অনুমোদিত! কোর্সটি সম্পূর্ণ সক্রিয়।</span>
+                          </div>
+                          <button
+                            onClick={onOpenCourses}
+                            className="px-3 py-1.5 bg-[#0b705c] hover:bg-[#085a4a] text-white rounded-xl text-[11px] font-black transition-colors cursor-pointer shrink-0 ml-2 shadow-xs"
+                          >
+                            কোর্সে যান
+                          </button>
+                        </div>
+                      )}
+
+                      {isPending && (
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>আপনার ট্রানজেকশন তথ্য এডমিন প্যানেলে যাচাই করা হচ্ছে। শীঘ্রই আপডেট জানানো হবে।</span>
+                        </div>
+                      )}
+
+                      {isRejected && (
+                        <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 rounded-2xl text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>ট্রানজেকশন আইডিতে অসঙ্গতি থাকায় আবেদনটি বাতিল হয়েছে। তথ্যাদি যাচাই করে পুনরায় আবেদন করুন।</span>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
           </div>
         )}
 

@@ -76,9 +76,11 @@ export interface CourseModule {
   sheetsCount?: number;
   examsCount?: number;
   isEnrolled?: boolean;
+  isLocked?: boolean;
   price?: string;
   accentColor?: 'emerald' | 'purple' | 'amber';
   topics?: string[];
+  instructor?: string;
   pdfAvailable?: boolean;
 }
 
@@ -118,6 +120,20 @@ export interface PastPaper {
   timeMinutes: number;
   difficulty: 'সহজ' | 'মাঝারি' | 'কঠিন';
   passingMarks: number;
+}
+
+export interface CourseEnrollmentRecord {
+  id?: string;
+  course_id: string;
+  course_title: string;
+  student_name: string;
+  phone_number: string;
+  email?: string;
+  payment_method: 'bkash' | 'nagad' | 'rocket' | string;
+  amount: string;
+  transaction_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at?: string;
 }
 
 

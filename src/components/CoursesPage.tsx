@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   GraduationCap,
@@ -16,10 +16,17 @@ import {
   Download,
   Users,
   Award,
-  CreditCard
+  CreditCard,
+  FileCheck2,
+  Hourglass
 } from 'lucide-react';
-import { CourseModule } from '../types';
+import { CourseModule, CourseEnrollmentRecord } from '../types';
 import { CourseDetailView } from './CourseDetailView';
+import { CourseEnrollmentModal } from './CourseEnrollmentModal';
+import {
+  fetchCoursesFromSupabase,
+  fetchEnrollmentsFromSupabase
+} from '../lib/supabase';
 
 interface CoursesPageProps {
   onSelectCourse?: (courseId: string) => void;
@@ -42,6 +49,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'emerald',
     enrolledCount: '1280',
     price: '৮৫০',
+    instructor: 'মাওলানা ড. আহমেদ হাসান',
     topics: [
       'আল কুরআন, তাফসির ও সিহাহ সিত্তা',
       'ফিকহ ও উসুলুল ফিকহ স্পেশাল নোট',
@@ -62,6 +70,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'purple',
     enrolledCount: '722',
     price: '৯৫০',
+    instructor: 'মাওলানা ড. আহমেদ হাসান',
     topics: [
       '৪২টি হাই-ডেফিনিশন সাবজেক্টিভ ক্লাস',
       'আরবি সাহিত্য, বালাগাত ও মানতিক',
@@ -82,6 +91,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'amber',
     enrolledCount: '1850',
     price: '৫০০',
+    instructor: 'মাওলানা হাফেজ কারী আব্দুল্লাহ',
     topics: [
       'তাজবিদ ও কেরাত বিশেষ প্রশ্নব্যাংক',
       'উসুলুত তাফসির ও আরবি ব্যাকরণ',
@@ -102,6 +112,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'purple',
     enrolledCount: '3400',
     price: '৬৫০',
+    instructor: 'প্রফেসর ড. রফিকুল ইসলাম',
     topics: [
       'বাংলা ব্যাকরণ ও সাহিত্য মাস্টার ক্লাস',
       'English Grammar & Vocabulary Shortcut',
@@ -122,6 +133,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'emerald',
     enrolledCount: '920',
     price: '৪৫০',
+    instructor: 'মাওলানা হাফেজ কারী আব্দুল্লাহ',
     topics: [
       '৩০টি স্পেশাল লেকচার শিট',
       '৩০টি বিষয়ভিত্তিক ও পূর্ণাঙ্গ মডেল টেস্ট',
@@ -141,6 +153,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'amber',
     enrolledCount: '1450',
     price: '৫৫০',
+    instructor: 'মাওলানা ড. আহমেদ হাসান',
     topics: [
       '১৫টি স্পেশাল গাইডেন্স ও সলভ ক্লাস',
       '৩৬টি পিডিএফ হ্যান্ডনোট শিট',
@@ -160,6 +173,7 @@ const INITIAL_COURSES: CourseModule[] = [
     accentColor: 'purple',
     enrolledCount: '2150',
     price: '৬৫০',
+    instructor: 'মাওলানা ড. আহমেদ হাসান',
     topics: [
       '২০টি সলভ ও প্রাকটিস ক্লাস',
       '২৫টি বিশেষ হ্যান্ডনোট শিট',
@@ -174,10 +188,81 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   onReviewAnswers,
   onOpenLeaderboard
 }) => {
-  const [courses, setCourses] = useState<CourseModule[]>(INITIAL_COURSES);
+  const [courses, setCourses] = useState<CourseModule[]>(() => {
+    try {
+      const raw = localStorage.getItem('tamreen_courses_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_COURSES;
+  });
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeCourseModal, setActiveCourseModal] = useState<CourseModule | null>(null);
   const [selectedCourseForDetail, setSelectedCourseForDetail] = useState<CourseModule | null>(null);
+  const [enrollmentModalCourse, setEnrollmentModalCourse] = useState<CourseModule | null>(null);
+  const [pendingCourseIds, setPendingCourseIds] = useState<Set<string>>(new Set());
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Load courses dynamically from Supabase & Sync Approved/Pending Enrollments
+  useEffect(() => {
+    let isMounted = true;
+    async function loadRemoteCoursesAndEnrollments() {
+      const result = await fetchCoursesFromSupabase();
+      const enrollResult = await fetchEnrollmentsFromSupabase();
+
+      const approvedIds = new Set<string>();
+      const pendingIds = new Set<string>();
+
+      (enrollResult.enrollments || []).forEach((e) => {
+        if (e.status === 'approved') {
+          approvedIds.add(e.course_id);
+        } else if (e.status === 'pending') {
+          pendingIds.add(e.course_id);
+        }
+      });
+
+      if (isMounted) {
+        setPendingCourseIds(pendingIds);
+        setCourses((prev) => {
+          const map = new Map<string, CourseModule>();
+          prev.forEach((c) => {
+            const isApproved = approvedIds.has(c.id) || c.isEnrolled;
+            map.set(c.id, {
+              ...c,
+              isEnrolled: isApproved,
+              accentColor: isApproved ? 'emerald' : c.accentColor
+            });
+          });
+
+          if (result.courses && result.courses.length > 0) {
+            result.courses.forEach((c) => {
+              const isApproved = approvedIds.has(c.id) || c.isEnrolled;
+              map.set(c.id, {
+                ...c,
+                isEnrolled: isApproved,
+                accentColor: isApproved ? 'emerald' : c.accentColor
+              });
+            });
+          }
+
+          return Array.from(map.values());
+        });
+      }
+    }
+    loadRemoteCoursesAndEnrollments();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const subjects = [
     {
@@ -216,15 +301,20 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
     ? courses
     : courses.filter((c) => c.category === selectedCategory);
 
+  const handleOpenEnrollment = (course: CourseModule) => {
+    setEnrollmentModalCourse(course);
+    if (activeCourseModal) setActiveCourseModal(null);
+  };
+
+  const handleEnrollmentSuccess = (enrollment: CourseEnrollmentRecord) => {
+    setPendingCourseIds((prev) => new Set([...Array.from(prev), enrollment.course_id]));
+    showToast('ভর্তি আবেদন জমা সফল—পেমেন্ট যাচাই করা হচ্ছে!');
+  };
+
   const handleEnrollCourse = (courseId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => (c.id === courseId ? { ...c, isEnrolled: true, accentColor: 'emerald' } : c))
-    );
-    if (activeCourseModal && activeCourseModal.id === courseId) {
-      setActiveCourseModal({ ...activeCourseModal, isEnrolled: true, accentColor: 'emerald' });
-    }
-    if (selectedCourseForDetail && selectedCourseForDetail.id === courseId) {
-      setSelectedCourseForDetail({ ...selectedCourseForDetail, isEnrolled: true, accentColor: 'emerald' });
+    const target = courses.find((c) => c.id === courseId);
+    if (target) {
+      handleOpenEnrollment(target);
     }
   };
 
@@ -249,7 +339,15 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 mb-28 space-y-5">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 mb-28 space-y-5 animate-fade-in">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#046A38] text-white px-4 py-2 rounded-2xl shadow-xl text-xs sm:text-sm font-bold flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Banner Card */}
       <div className="bg-[#046A38] rounded-2xl sm:rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden flex items-center justify-between">
         <div>
@@ -261,6 +359,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
             আমাদের কোর্স সমূহ
           </h1>
         </div>
+
         <div className="w-11 h-11 sm:w-12 sm:h-12 bg-white/10 backdrop-blur-xs text-white rounded-2xl flex items-center justify-center border border-white/20 shrink-0 shadow-inner">
           <GraduationCap className="w-6 h-6 text-emerald-100" />
         </div>
@@ -304,12 +403,11 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
         </div>
       </div>
 
-      {/* Course Cards List (Neumorphic Style matching Screenshot) */}
+      {/* Course Cards List */}
       <div className="space-y-3">
         {filteredCourses.map((course) => {
           const isEnrolled = course.isEnrolled;
 
-          // Determine border accent line based on status / accent color
           const borderAccentClass = isEnrolled
             ? 'border-l-[5px] border-l-[#046A38]'
             : course.accentColor === 'amber'
@@ -355,7 +453,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                     {course.title}
                   </h3>
 
-                  {/* Enrolled Students Pill (Only for Unenrolled Courses) */}
+                  {/* Enrolled Students Pill */}
                   {!isEnrolled && course.enrolledCount && (
                     <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/70">
                       <Users className="w-3 h-3 text-purple-600 dark:text-purple-400" />
@@ -397,7 +495,6 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                 <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
                   {isEnrolled ? (
                     <>
-                      {/* Enrolled View Buttons */}
                       <div className="px-2.5 py-0.5 rounded-lg bg-[#E8F8F5] dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] sm:text-xs font-bold flex items-center gap-1">
                         <Check className="w-3 h-3 text-emerald-600" />
                         <span>ভর্তি সম্পন্ন</span>
@@ -413,7 +510,6 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                     </>
                   ) : (
                     <>
-                      {/* Unenrolled View Price & Details Button */}
                       <div className="text-xs sm:text-base font-black text-[#0B132B] dark:text-white">
                         ৳{course.price || '৯৫০'}
                       </div>

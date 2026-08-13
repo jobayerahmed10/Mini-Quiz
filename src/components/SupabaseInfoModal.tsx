@@ -70,6 +70,76 @@ VALUES
 ('দৈনিক ফ্রি ১০০ মার্কস প্রিলিমিনারি প্রাকটিস মডেল টেস্ট', 'দৈনিক মডেল টেস্ট', 'daily', 'সকল বিষয়', 100, 60, 0.50, 100, '১০০ নম্বরের ১ ঘণ্টার পূর্ণাঙ্গ প্রিলিমিনারি মডেল টেস্ট।'),
 ('সাপ্তাহিক স্পেশাল মেগা প্রিলিমিনারি মডেল টেস্ট', 'সাপ্তাহিক মডেল টেস্ট', 'weekly', 'সকল বিষয়', 50, 35, 0.50, 50, 'সপ্তাহের সেরা বাছাইকৃত ৫০টি প্রশ্ন।'),
 ('ফ্রি সাধারণ জ্ঞান কুইক টেস্ট', 'ফ্রি পরীক্ষা', 'free', 'বাংলাদেশ বিষয়াবলী', 25, 15, 0.50, 25, 'সাম্প্রতিক ও ইতিহাস ভিত্তিক ফ্রি কুইক টেস্ট।');
+-- ==========================================
+-- ৩. কোর্স ব্যবস্থাপনা টেবিল (public.courses)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.courses (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'general',
+  badge TEXT DEFAULT 'রেকর্ড ব্যাচ',
+  badge_sub TEXT,
+  classes_count INT DEFAULT 0,
+  sheets_count INT DEFAULT 0,
+  exams_count INT DEFAULT 0,
+  enrolled_count TEXT DEFAULT '0',
+  price TEXT DEFAULT '৯৫০',
+  accent_color TEXT DEFAULT 'purple',
+  topics JSONB DEFAULT '[]'::jsonb,
+  instructor TEXT,
+  is_enrolled BOOLEAN DEFAULT false,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access for active courses" 
+ON public.courses FOR SELECT USING (status = 'active');
+
+CREATE POLICY "Allow public all access for courses" 
+ON public.courses FOR ALL USING (true);
+
+-- ==========================================
+-- ৪. ভর্তি আবেদন টেবিল (public.course_applications & public.course_enrollments)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.course_applications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  course_id TEXT NOT NULL,
+  course_title TEXT NOT NULL,
+  student_name TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  email TEXT,
+  payment_method TEXT NOT NULL, -- bkash, nagad, rocket
+  amount TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, approved, rejected
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.course_applications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public all access for course_applications" 
+ON public.course_applications FOR ALL USING (true);
+
+CREATE TABLE IF NOT EXISTS public.course_enrollments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  course_id TEXT NOT NULL,
+  course_title TEXT NOT NULL,
+  student_name TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  email TEXT,
+  payment_method TEXT NOT NULL, -- bkash, nagad, rocket
+  amount TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, approved, rejected
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.course_enrollments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public all access for course_enrollments" 
+ON public.course_enrollments FOR ALL USING (true);
 `;
 
   const copyToClipboard = () => {
