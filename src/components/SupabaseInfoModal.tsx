@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Database, ExternalLink, Sparkles } from 'lucide-react';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { X, Copy, Check, Database, ExternalLink, Sparkles, Key, Save, RefreshCw } from 'lucide-react';
+import { isSupabaseConfigured, getSavedSupabaseConfig, saveCustomSupabaseConfig, resetCustomSupabaseConfig } from '../lib/supabase';
 
 interface SupabaseInfoModalProps {
   isOpen: boolean;
@@ -9,8 +9,28 @@ interface SupabaseInfoModalProps {
 
 export const SupabaseInfoModal: React.FC<SupabaseInfoModalProps> = ({ isOpen, onClose }) => {
   const [copiedSql, setCopiedSql] = useState(false);
+  const savedConfig = getSavedSupabaseConfig();
+  const [inputUrl, setInputUrl] = useState(savedConfig.url || '');
+  const [inputKey, setInputKey] = useState(savedConfig.key || '');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleSaveConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputUrl.trim() || !inputKey.trim()) {
+      alert('অনুগ্রহ করে Supabase URL এবং Anon Key উভয় ফিল্ডই পূরণ করুন।');
+      return;
+    }
+    saveCustomSupabaseConfig(inputUrl, inputKey);
+    setSaveSuccess(true);
+  };
+
+  const handleResetConfig = () => {
+    if (confirm('আপনি কি সত্যিই ব্রাউজারে সেভ করা Supabase Key মুছে ফেলতে চান?')) {
+      resetCustomSupabaseConfig();
+    }
+  };
 
   const sqlSchema = `-- ==========================================
 -- ১. প্রশ্ন ব্যাংক টেবিল (public.questions)
@@ -177,14 +197,73 @@ ON public.course_enrollments FOR ALL USING (true);
             <Sparkles className={`w-5 h-5 shrink-0 mt-0.5 ${isSupabaseConfigured ? 'text-[#8AA682]' : 'text-amber-600'}`} />
             <div>
               <p className="font-bold text-base mb-0.5">
-                {isSupabaseConfigured ? 'Supabase এর সাথে সংযুক্ত' : 'Supabase কী সংযুক্ত নেই (ডেমো মোড সক্রিয়)'}
+                {isSupabaseConfigured ? 'Supabase এর সাথে সঠিকভাবে সংযুক্ত' : 'Supabase যুক্ত করা নেই (ডেমো মোড)'}
               </p>
               <p className="text-xs opacity-90">
                 {isSupabaseConfigured 
-                  ? 'আপনার অ্যাপ এখন Supabase ডাটাবেসের questions টেবিল থেকে সরাসরি প্রশ্ন লোড করছে।'
-                  : 'আপনি এখন ডেমো প্রশ্ন দিয়ে অ্যাপের ট্রায়াল দেখতে পাচ্ছেন। সরাসরি Supabase সংযুক্ত করতে নিচের নির্দেশাবলী অনুসরণ করুন।'}
+                  ? 'আপনার অ্যাপ এখন সুপাবেজ ডাটাবেসের সাথে যুক্ত। আপনার ভর্তি আবেদন ও অন্যান্য তথ্য সরাসরি ক্লাউড ডাটাবেসে সেভ হচ্ছে।'
+                  : 'আপনি এখন ডেমো মোডে আছেন। সরাসরি অ্যাপেই আপনার Supabase URL ও Anon Key ইনপুট দিয়ে সেভ করতে পারেন।'}
               </p>
             </div>
+          </div>
+
+          {/* Direct Input Form for Supabase Credentials */}
+          <div className="bg-[#2D4B3E]/5 p-4 rounded-2xl border border-[#2D4B3E]/20 space-y-3">
+            <div className="flex items-center gap-2 text-[#2D4B3E] font-bold text-sm">
+              <Key className="w-4 h-4 text-[#8AA682]" />
+              <span>অ্যাপ থেকে সরাসরি Supabase URL & Key সেভ করুন:</span>
+            </div>
+
+            <form onSubmit={handleSaveConfig} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[#2D4B3E]">
+                  Supabase Project URL:
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://your-project.supabase.co"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-slate-300 text-xs text-[#2D4B3E] focus:outline-none focus:ring-2 focus:ring-[#8AA682]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[#2D4B3E]">
+                  Supabase Anon / Public Key:
+                </label>
+                <input
+                  type="text"
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                  value={inputKey}
+                  onChange={(e) => setInputKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-slate-300 text-xs text-[#2D4B3E] font-mono focus:outline-none focus:ring-2 focus:ring-[#8AA682]"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#046A38] text-white hover:bg-[#03522b] rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>কানেক্ট ও সেভ করুন</span>
+                </button>
+
+                {savedConfig.isCustom && (
+                  <button
+                    type="button"
+                    onClick={handleResetConfig}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg font-medium transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>রিসেট করুন</span>
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
 
           <div>

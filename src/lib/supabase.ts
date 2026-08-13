@@ -5,10 +5,18 @@ import { detectQuestionSubject } from './subjects';
 /**
  * Safely retrieve Supabase configuration.
  * For this Vite project:
- * Primary: import.meta.env.VITE_SUPABASE_URL & import.meta.env.VITE_SUPABASE_ANON_KEY
+ * Primary: localStorage custom credentials if set by user
+ * Secondary: import.meta.env.VITE_SUPABASE_URL & import.meta.env.VITE_SUPABASE_ANON_KEY
  * Fallbacks: process.env or NEXT_PUBLIC_* variables
  */
+const DEFAULT_SUPABASE_URL = 'https://yedhwzcbpkrqixvpkgoc.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllZGh3emNicGtycWl4dnBrZ29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNjA1OTIsImV4cCI6MjEwMTczNjU5Mn0.-oOgefi5RERPb3gbTC8rTYIVf6if6JWGIrz45rhZsVE';
+
 const getSupabaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('custom_supabase_url');
+    if (customUrl && customUrl.trim()) return customUrl.trim();
+  }
   const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env;
   if (metaEnv) {
     if (metaEnv.VITE_SUPABASE_URL) return metaEnv.VITE_SUPABASE_URL;
@@ -18,10 +26,14 @@ const getSupabaseUrl = (): string => {
     if (process.env.VITE_SUPABASE_URL) return process.env.VITE_SUPABASE_URL;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL) return process.env.NEXT_PUBLIC_SUPABASE_URL;
   }
-  return '';
+  return DEFAULT_SUPABASE_URL;
 };
 
 const getSupabaseAnonKey = (): string => {
+  if (typeof window !== 'undefined') {
+    const customKey = localStorage.getItem('custom_supabase_anon_key');
+    if (customKey && customKey.trim()) return customKey.trim();
+  }
   const metaEnv = (import.meta as unknown as { env?: Record<string, string> })?.env;
   if (metaEnv) {
     if (metaEnv.VITE_SUPABASE_ANON_KEY) return metaEnv.VITE_SUPABASE_ANON_KEY;
@@ -31,7 +43,30 @@ const getSupabaseAnonKey = (): string => {
     if (process.env.VITE_SUPABASE_ANON_KEY) return process.env.VITE_SUPABASE_ANON_KEY;
     if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   }
-  return '';
+  return DEFAULT_SUPABASE_ANON_KEY;
+};
+
+export const getSavedSupabaseConfig = () => {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+  const isCustom = typeof window !== 'undefined' && Boolean(localStorage.getItem('custom_supabase_url'));
+  return { url, key, isCustom };
+};
+
+export const saveCustomSupabaseConfig = (url: string, key: string) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('custom_supabase_url', url.trim());
+    localStorage.setItem('custom_supabase_anon_key', key.trim());
+    window.location.reload();
+  }
+};
+
+export const resetCustomSupabaseConfig = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('custom_supabase_url');
+    localStorage.removeItem('custom_supabase_anon_key');
+    window.location.reload();
+  }
 };
 
 const supabaseUrl = getSupabaseUrl();
