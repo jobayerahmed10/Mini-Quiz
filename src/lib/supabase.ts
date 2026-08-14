@@ -782,6 +782,27 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
  * ==========================================
  */
 
+/**
+ * Helper to normalize category strings across Bengali and English identifiers
+ */
+export function normalizeCourseCategory(cat: string | undefined): string {
+  if (!cat) return 'general';
+  const c = String(cat).trim();
+  if (c.includes('আরবি') || c.includes('প্রভাষক') || c.toLowerCase().includes('arabic')) {
+    return 'arabic_lecturer';
+  }
+  if (c.includes('মৌলভী') || c.includes('মৌলভি') || c.toLowerCase().includes('assistant_moulvi') || c.toLowerCase().includes('moulvi')) {
+    return 'assistant_moulvi';
+  }
+  if (c.includes('ইবতেদায়ী') || c.includes('ইবতেদায়ি') || c.includes('কারী') || c.includes('ক্বারী') || c.toLowerCase().includes('ebtedayi') || c.toLowerCase().includes('qari')) {
+    return 'ebtedayi';
+  }
+  if (c.includes('জেনারেল') || c.toLowerCase().includes('general')) {
+    return 'general';
+  }
+  return c;
+}
+
 export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModule[]; isFromSupabase: boolean; error?: string | null }> {
   let cachedCourses: CourseModule[] = [];
   try {
@@ -803,16 +824,15 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
   }
 
   try {
+    // Select all courses without strict status or ordering constraints that might fail on custom schemas
     const queryPromise = Promise.resolve(
       supabaseInstance
         .from('courses')
         .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
     );
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout', code: 'TIMEOUT' } };
-    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+    const { data, error } = await fetchWithTimeout(queryPromise, 7000, timeoutFallback as any);
 
     if (error || !data || data.length === 0) {
       return {
@@ -822,24 +842,50 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
       };
     }
 
-    const fetchedCourses: CourseModule[] = data.map((item: any) => ({
-      id: String(item.id),
-      title: String(item.title || 'কোর্স'),
-      category: String(item.category || 'general'),
-      badge: String(item.badge || 'রেকর্ড ব্যাচ'),
-      badgeSub: item.badge_sub ? String(item.badge_sub) : undefined,
-      classesCount: Number(item.classes_count || 0),
-      sheetsCount: Number(item.sheets_count || 0),
-      examsCount: Number(item.exams_count || 0),
-      enrolledCount: item.enrolled_count ? String(item.enrolled_count) : '500',
-      price: item.price ? String(item.price) : '৯৫০',
-      accentColor: (item.accent_color || 'purple') as 'emerald' | 'purple' | 'amber',
-      topics: Array.isArray(item.topics) ? item.topics : (typeof item.topics === 'string' ? JSON.parse(item.topics) : []),
-      instructor: item.instructor ? String(item.instructor) : undefined,
-      isEnrolled: Boolean(item.is_enrolled),
-      isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
-      status: item.status || 'active',
-    }));
+    const fetchedCourses: CourseModule[] = data
+      .filter((item: any) => item && item.status !== 'archived' && item.status !== 'inactive')
+      .map((item: any) => {
+        let parsedTopics: string[] = [];
+        if (Array.isArray(item.topics)) {
+          parsedTopics = item.topics.map(String);
+        } else if (typeof item.topics === 'string' && item.topics.trim()) {
+          try {
+            const p = JSON.parse(item.topics);
+            parsedTopics = Array.isArray(p) ? p.map(String) : [String(item.topics)];
+          } catch {
+            parsedTopics = item.topics.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
+
+        if (parsedTopics.length === 0) {
+          parsedTopics = [
+            'সম্পূর্ণ সিলেবাস ভিত্তিক ক্লাস ও শিট',
+            'নিয়মিত মডেল টেস্ট ও সলভ সেশন',
+            'মেধা তালিকা ও বিশ্লেষণমূলক প্রগ্রেস'
+          ];
+        }
+
+        const normalizedCategory = normalizeCourseCategory(item.category);
+
+        return {
+          id: String(item.id),
+          title: String(item.title || 'কোর্স'),
+          category: normalizedCategory,
+          badge: String(item.badge || 'এক্সাম ব্যাচ'),
+          badgeSub: item.badge_sub ? String(item.badge_sub) : (item.category ? String(item.category) : 'প্রস্তুতি কোর্স'),
+          classesCount: Number(item.classes_count || item.classesCount || 0),
+          sheetsCount: Number(item.sheets_count || item.sheetsCount || 0),
+          examsCount: Number(item.exams_count || item.examsCount || 0),
+          enrolledCount: item.enrolled_count ? String(item.enrolled_count) : (item.enrolledCount ? String(item.enrolledCount) : '৫০০'),
+          price: item.price ? String(item.price) : '৯৫০',
+          accentColor: (item.accent_color || item.accentColor || (normalizedCategory === 'arabic_lecturer' ? 'purple' : normalizedCategory === 'assistant_moulvi' ? 'emerald' : 'amber')) as 'emerald' | 'purple' | 'amber',
+          topics: parsedTopics,
+          instructor: item.instructor ? String(item.instructor) : 'উস্তাদ আহমেদ হাসান',
+          isEnrolled: Boolean(item.is_enrolled || item.isEnrolled),
+          isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
+          status: item.status || 'active',
+        };
+      });
 
     try {
       localStorage.setItem('tamreen_courses_cache', JSON.stringify(fetchedCourses));

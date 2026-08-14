@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles,
   GraduationCap,
@@ -18,14 +18,16 @@ import {
   Award,
   CreditCard,
   FileCheck2,
-  Hourglass
+  Hourglass,
+  RefreshCw
 } from 'lucide-react';
 import { CourseModule, CourseEnrollmentRecord } from '../types';
 import { CourseDetailView } from './CourseDetailView';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 import {
   fetchCoursesFromSupabase,
-  fetchEnrollmentsFromSupabase
+  fetchEnrollmentsFromSupabase,
+  normalizeCourseCategory
 } from '../lib/supabase';
 
 interface CoursesPageProps {
@@ -74,13 +76,16 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   const [selectedCourseForDetail, setSelectedCourseForDetail] = useState<CourseModule | null>(null);
   const [enrollmentModalCourse, setEnrollmentModalCourse] = useState<CourseModule | null>(null);
   const [pendingCourseIds, setPendingCourseIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Load courses dynamically from Supabase & Sync Approved/Pending Enrollments
-  useEffect(() => {
-    let isMounted = true;
-    async function loadRemoteCoursesAndEnrollments() {
+  const loadRemoteCoursesAndEnrollments = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) setIsRefreshing(true);
+    else setIsLoading(true);
+
+    try {
       const result = await fetchCoursesFromSupabase();
       const enrollResult = await fetchEnrollmentsFromSupabase();
 
@@ -95,37 +100,46 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
         }
       });
 
-      if (isMounted) {
-        setPendingCourseIds(pendingIds);
-        setCourses(() => {
-          const map = new Map<string, CourseModule>();
+      setPendingCourseIds(pendingIds);
 
-          if (result.courses && result.courses.length > 0) {
-            result.courses.forEach((c) => {
-              // Ignore any legacy default course IDs
-              if (DEFAULT_COURSE_IDS.has(c.id)) return;
-              const isApproved = approvedIds.has(c.id) || c.isEnrolled;
-              map.set(c.id, {
-                ...c,
-                isEnrolled: isApproved,
-                accentColor: isApproved ? 'emerald' : c.accentColor
-              });
-            });
-          }
+      const map = new Map<string, CourseModule>();
 
-          const updatedList = Array.from(map.values());
-          try {
-            localStorage.setItem('tamreen_courses_cache', JSON.stringify(updatedList));
-          } catch {}
-          return updatedList;
+      if (result.courses && result.courses.length > 0) {
+        result.courses.forEach((c) => {
+          // Ignore any legacy default course IDs
+          if (DEFAULT_COURSE_IDS.has(c.id)) return;
+          const isApproved = approvedIds.has(c.id) || c.isEnrolled;
+          const normalizedCategory = normalizeCourseCategory(c.category);
+          map.set(c.id, {
+            ...c,
+            category: normalizedCategory,
+            isEnrolled: isApproved,
+            accentColor: isApproved ? 'emerald' : c.accentColor
+          });
         });
       }
+
+      const updatedList = Array.from(map.values());
+      setCourses(updatedList);
+      try {
+        localStorage.setItem('tamreen_courses_cache', JSON.stringify(updatedList));
+      } catch {}
+
+      if (isManualRefresh) {
+        showToast(updatedList.length > 0 ? `${updatedList.length}টি কোর্স লোড হয়েছে!` : 'ডাটাবেস রিফ্রেশ সম্পন্ন');
+      }
+    } catch (err) {
+      console.error('Error loading courses:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-    loadRemoteCoursesAndEnrollments();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  // Load courses dynamically from Supabase & Sync Approved/Pending Enrollments
+  useEffect(() => {
+    loadRemoteCoursesAndEnrollments(false);
+  }, [loadRemoteCoursesAndEnrollments]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -167,7 +181,10 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
   const filteredCourses = selectedCategory === 'all'
     ? courses
-    : courses.filter((c) => c.category === selectedCategory);
+    : courses.filter((c) => {
+        const norm = normalizeCourseCategory(c.category);
+        return c.category === selectedCategory || norm === selectedCategory;
+      });
 
   const handleOpenEnrollment = (course: CourseModule) => {
     setEnrollmentModalCourse(course);
@@ -239,9 +256,21 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
           <h2 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
             বিষয় নির্বাচন করুন
           </h2>
-          <span className="text-[11px] sm:text-xs font-bold px-3 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full">
-            {filteredCourses.length}টি কোর্স সহজলভ্য
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadRemoteCoursesAndEnrollments(true)}
+              disabled={isRefreshing || isLoading}
+              className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-all cursor-pointer"
+              title="সুপাবেজ থেকে রিফ্রেশ করুন"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRefreshing || isLoading ? 'animate-spin text-emerald-600' : ''}`} />
+              <span>{isRefreshing ? 'রিফ্রেশ হচ্ছে...' : 'রিফ্রেশ'}</span>
+            </button>
+
+            <span className="text-[11px] sm:text-xs font-bold px-3 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full">
+              {filteredCourses.length}টি কোর্স সহজলভ্য
+            </span>
+          </div>
         </div>
 
         {/* Horizontal Scrollable Row of Subject Buttons */}
