@@ -857,30 +857,26 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
           }
         }
 
-        if (parsedTopics.length === 0) {
-          parsedTopics = [
-            'সম্পূর্ণ সিলেবাস ভিত্তিক ক্লাস ও শিট',
-            'নিয়মিত মডেল টেস্ট ও সলভ সেশন',
-            'মেধা তালিকা ও বিশ্লেষণমূলক প্রগ্রেস'
-          ];
-        }
-
         const normalizedCategory = normalizeCourseCategory(item.category);
 
         return {
           id: String(item.id),
           title: String(item.title || 'কোর্স'),
+          subtitle: item.subtitle ? String(item.subtitle) : undefined,
+          description: item.description ? String(item.description) : undefined,
+          syllabus: item.syllabus || undefined,
+          routine: item.routine || undefined,
           category: normalizedCategory,
-          badge: String(item.badge || 'এক্সাম ব্যাচ'),
-          badgeSub: item.badge_sub ? String(item.badge_sub) : (item.category ? String(item.category) : 'প্রস্তুতি কোর্স'),
+          badge: item.badge ? String(item.badge) : (item.category ? String(item.category) : 'কোর্স'),
+          badgeSub: item.badge_sub ? String(item.badge_sub) : undefined,
           classesCount: Number(item.classes_count || item.classesCount || 0),
           sheetsCount: Number(item.sheets_count || item.sheetsCount || 0),
           examsCount: Number(item.exams_count || item.examsCount || 0),
-          enrolledCount: item.enrolled_count ? String(item.enrolled_count) : (item.enrolledCount ? String(item.enrolledCount) : '৫০০'),
-          price: item.price ? String(item.price) : '৯৫০',
+          enrolledCount: item.enrolled_count ? String(item.enrolled_count) : (item.enrolledCount ? String(item.enrolledCount) : undefined),
+          price: item.price ? String(item.price) : '০',
           accentColor: (item.accent_color || item.accentColor || (normalizedCategory === 'arabic_lecturer' ? 'purple' : normalizedCategory === 'assistant_moulvi' ? 'emerald' : 'amber')) as 'emerald' | 'purple' | 'amber',
-          topics: parsedTopics,
-          instructor: item.instructor ? String(item.instructor) : 'উস্তাদ আহমেদ হাসান',
+          topics: parsedTopics.length > 0 ? parsedTopics : undefined,
+          instructor: item.instructor ? String(item.instructor) : undefined,
           isEnrolled: Boolean(item.is_enrolled || item.isEnrolled),
           isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
           status: item.status || 'active',
@@ -1196,49 +1192,30 @@ export async function fetchCourseSheetsFromSupabase(
   }
 
   try {
-    let query = supabaseInstance
+    const { data, error } = await supabaseInstance
       .from('course_sheets')
-      .select('*');
+      .select('*')
+      .or(`course_id.eq.${courseId}${courseTitle ? `,course_title.eq.${courseTitle}` : ''}`);
 
-    if (courseId) {
-      query = query.or(`course_id.eq.${courseId},course_title.eq.${courseTitle || courseId}`);
+    if (error || !data) {
+      return { sheets: [], error: error?.message || null };
     }
 
-    const { data, error } = await query;
-    if (error) {
-      // Fallback: fetch without filter if column names differ
-      const fallback = await supabaseInstance.from('course_sheets').select('*');
-      if (!fallback.error && fallback.data) {
-        const filtered = fallback.data
-          .filter((item: any) => !item.course_id || item.course_id === courseId || item.course_title === courseTitle)
-          .map((item: any) => ({
-            id: String(item.id),
-            course_id: item.course_id ? String(item.course_id) : undefined,
-            title: String(item.title || item.name || 'লেকচার শিট'),
-            name: String(item.name || item.title || 'লেকচার শিট.pdf'),
-            file_url: item.file_url || item.url || undefined,
-            size: item.size || 'PDF Sheet',
-            created_at: item.created_at
-          }));
-        return { sheets: filtered, error: null };
-      }
-      return { sheets: [], error: error.message };
-    }
-
-    const sheets: CourseSheet[] = (data || []).map((item: any) => ({
-      id: String(item.id),
-      course_id: item.course_id ? String(item.course_id) : undefined,
-      title: String(item.title || item.name || 'লেকচার শিট'),
-      name: String(item.name || item.title || 'লেকচার শিট.pdf'),
-      file_url: item.file_url || item.url || undefined,
-      size: item.size || 'PDF Sheet',
-      created_at: item.created_at
-    }));
+    const sheets: CourseSheet[] = data
+      .filter((item: any) => item.course_id === courseId || (courseTitle && item.course_title === courseTitle))
+      .map((item: any) => ({
+        id: String(item.id),
+        course_id: item.course_id ? String(item.course_id) : undefined,
+        title: String(item.title || item.name || 'লেকচার শিট'),
+        name: String(item.name || item.title || 'লেকচার শিট.pdf'),
+        file_url: item.file_url || item.url || undefined,
+        size: item.size || 'PDF',
+        created_at: item.created_at
+      }));
 
     return { sheets, error: null };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return { sheets: [], error: msg };
+    return { sheets: [], error: null };
   }
 }
 
@@ -1251,56 +1228,54 @@ export async function fetchCourseExamsFromSupabase(
   }
 
   try {
-    let query = supabaseInstance
+    // 1. First try course_exams table
+    const { data: courseExamsData, error: courseExamsError } = await supabaseInstance
       .from('course_exams')
-      .select('*');
+      .select('*')
+      .or(`course_id.eq.${courseId}${courseTitle ? `,course_title.eq.${courseTitle}` : ''}`);
 
-    if (courseId) {
-      query = query.or(`course_id.eq.${courseId},course_title.eq.${courseTitle || courseId}`);
+    if (!courseExamsError && courseExamsData && courseExamsData.length > 0) {
+      const exams: CourseExam[] = courseExamsData
+        .filter((item: any) => item.course_id === courseId || (courseTitle && item.course_title === courseTitle))
+        .map((item: any) => ({
+          id: String(item.id),
+          course_id: String(item.course_id || courseId),
+          title: String(item.title || item.name),
+          topic: item.topic || item.subject,
+          date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : undefined),
+          specs: item.specs || (item.question_count ? `${item.question_count}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট` : undefined),
+          question_count: item.total_questions || item.question_count,
+          time_minutes: item.time_minutes,
+          created_at: item.created_at
+        }));
+      return { exams, error: null };
     }
 
-    const { data, error } = await query;
-    if (error) {
-      // Fallback: try querying 'exams' table for course/subject matching
-      const fallback = await supabaseInstance
-        .from('exams')
-        .select('*');
+    // 2. If not found in course_exams, check exams table specifically for course_id === courseId
+    const { data: generalExamsData, error: generalExamsError } = await supabaseInstance
+      .from('exams')
+      .select('*')
+      .eq('course_id', courseId);
 
-      if (!fallback.error && fallback.data) {
-        const filtered = fallback.data
-          .filter((item: any) => item.course_id === courseId || item.subject === courseTitle || !item.course_id)
-          .map((item: any, idx: number) => ({
-            id: String(item.id || `exam_${idx + 1}`),
-            course_id: item.course_id ? String(item.course_id) : courseId,
-            title: String(item.title || item.name || `পরীক্ষা ${idx + 1}`),
-            topic: item.topic || item.subject || 'বিশেষ মডেল টেস্ট',
-            date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : 'তারিখ শীঘ্রই আসবে'),
-            specs: `${item.total_questions || item.question_count || 50}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট`,
-            question_count: item.total_questions || item.question_count || 50,
-            time_minutes: item.time_minutes || 30,
-            created_at: item.created_at
-          }));
-        return { exams: filtered, error: null };
-      }
-      return { exams: [], error: error.message };
+    if (!generalExamsError && generalExamsData && generalExamsData.length > 0) {
+      const exams: CourseExam[] = generalExamsData
+        .map((item: any) => ({
+          id: String(item.id),
+          course_id: String(item.course_id || courseId),
+          title: String(item.title || item.name),
+          topic: item.topic || item.subject,
+          date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : undefined),
+          specs: item.specs || (item.total_questions || item.question_count ? `${item.total_questions || item.question_count}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট` : undefined),
+          question_count: item.total_questions || item.question_count,
+          time_minutes: item.time_minutes,
+          created_at: item.created_at
+        }));
+      return { exams, error: null };
     }
 
-    const exams: CourseExam[] = (data || []).map((item: any, idx: number) => ({
-      id: String(item.id || `exam_${idx + 1}`),
-      course_id: item.course_id ? String(item.course_id) : courseId,
-      title: String(item.title || item.name || `পরীক্ষা ${idx + 1}`),
-      topic: item.topic || item.subject || 'বিশেষ মডেল টেস্ট',
-      date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : 'তারিখ শীঘ্রই আসবে'),
-      specs: item.specs || `${item.total_questions || item.question_count || 50}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট`,
-      question_count: item.total_questions || item.question_count || 50,
-      time_minutes: item.time_minutes || 30,
-      created_at: item.created_at
-    }));
-
-    return { exams, error: null };
+    return { exams: [], error: null };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return { exams: [], error: msg };
+    return { exams: [], error: null };
   }
 }
 

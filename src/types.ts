@@ -64,6 +64,9 @@ export interface CourseModule {
   id: string;
   title: string;
   subtitle?: string;
+  description?: string;
+  syllabus?: string | string[];
+  routine?: string | string[];
   category: string;
   duration?: string;
   lessonsCount?: number;

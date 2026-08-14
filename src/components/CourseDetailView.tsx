@@ -309,27 +309,30 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
           <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-3 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
             {course.subtitle && (
-              <p className="font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+              <p className="font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
                 {course.subtitle}
               </p>
             )}
 
-            {course.topics && course.topics.length > 0 ? (
-              <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
-                <h4 className="font-bold text-[#0B132B] dark:text-white text-sm flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#046A38]" />
-                  <span>কোর্সের মূল আলোচ্য বিষয় ও মডিউলসমূহ</span>
-                </h4>
+            {course.description && (
+              <div className="whitespace-pre-line leading-relaxed">
+                {course.description}
+              </div>
+            )}
+
+            {course.topics && course.topics.length > 0 && (
+              <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
                 <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 pl-2">
                   {course.topics.map((topic, i) => (
                     <li key={i}>{topic}</li>
                   ))}
                 </ul>
               </div>
-            ) : (
-              <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs sm:text-sm space-y-1">
-                <p className="font-bold text-slate-700 dark:text-slate-300">কোনো অতিরিক্ত বিবরণ সংযুক্ত নেই</p>
-                <p>অ্যাডমিন প্যানেল থেকে কোর্সের তথ্য বা বিষয়াবলী আপডেট করলে তা এখানে সরাসরি প্রদর্শিত হবে।</p>
+            )}
+
+            {!course.subtitle && !course.description && (!course.topics || course.topics.length === 0) && (
+              <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                বিবরণ শীঘ্রই আপডেট করা হবে
               </div>
             )}
           </div>
@@ -339,73 +342,54 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       {/* Tab 2: Routine */}
       {activeTab === 'routine' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5" />
+          {course.routine ? (
+            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
+              {Array.isArray(course.routine) ? (
+                <ul className="list-disc list-inside space-y-1.5 pl-2">
+                  {course.routine.map((r, idx) => (
+                    <li key={idx}>{r}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="whitespace-pre-line leading-relaxed">{course.routine}</div>
+              )}
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
-                কোর্স রুটিন ও সময়সূচি
-              </h3>
-              <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                {course.title}
-              </p>
+          ) : (
+            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
+              <Calendar className="w-8 h-8 mx-auto opacity-40" />
+              <p>রুটিন শীঘ্রই আপডেট করা হবে</p>
             </div>
-          </div>
-
-          <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs sm:text-sm space-y-2">
-            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-200/80 dark:border-amber-800">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <h4 className="text-sm sm:text-base font-bold text-[#0B132B] dark:text-white">
-              বর্তমানে কোনো রুটিন আপলোড করা হয়নি
-            </h4>
-            <p className="max-w-md mx-auto text-xs text-slate-500 dark:text-slate-400">
-              নতুন ব্যাচের ক্লাস ও পরীক্ষার রুটিন নির্ধারিত হলে অ্যাডমিন প্যানেল থেকে প্রকাশ করা হবে।
-            </p>
-          </div>
+          )}
         </div>
       )}
 
       {/* Tab 3: Syllabus */}
       {activeTab === 'syllabus' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 flex items-center justify-center shrink-0">
-              <Bookmark className="w-5 h-5" />
+          {course.syllabus ? (
+            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
+              {Array.isArray(course.syllabus) ? (
+                <ul className="list-disc list-inside space-y-1.5 pl-2">
+                  {course.syllabus.map((s, idx) => (
+                    <li key={idx}>{s}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="whitespace-pre-line leading-relaxed">{course.syllabus}</div>
+              )}
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
-                কোর্স সিলেবাস ও নম্বর বণ্টন
-              </h3>
-              <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                {course.title}
-              </p>
-            </div>
-          </div>
-
-          {course.topics && course.topics.length > 0 ? (
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-3 leading-relaxed">
-              <p className="font-bold text-[#0B132B] dark:text-white flex items-center gap-1.5">
-                📖 সিলেবাসের অন্তর্ভুক্ত টপিকসমূহ:
-              </p>
-              <ul className="list-disc list-inside space-y-1 pl-2">
-                {course.topics.map((t, idx) => (
-                  <li key={idx}>{t}</li>
+          ) : course.topics && course.topics.length > 0 ? (
+            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
+              <ul className="list-disc list-inside space-y-1.5 pl-2">
+                {course.topics.map((topic, idx) => (
+                  <li key={idx}>{topic}</li>
                 ))}
               </ul>
             </div>
           ) : (
-            <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs sm:text-sm space-y-2">
-              <div className="w-12 h-12 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-2xl flex items-center justify-center mx-auto border border-purple-200/80 dark:border-purple-800">
-                <Bookmark className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm sm:text-base font-bold text-[#0B132B] dark:text-white">
-                বর্তমানে কোনো সিলেবাস ফাইল নেই
-              </h4>
-              <p className="max-w-md mx-auto text-xs text-slate-500 dark:text-slate-400">
-                সিলেবাসের বিস্তারিত ফাইল বা পিডিএফ সুপাবেজ ডাটাবেসে যুক্ত করার সাথে সাথে এখানে দৃশ্যমান হবে।
-              </p>
+            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
+              <Bookmark className="w-8 h-8 mx-auto opacity-40" />
+              <p>সিলেবাস শীঘ্রই আপডেট করা হবে</p>
             </div>
           )}
         </div>
@@ -444,16 +428,9 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
               লেকচার শিট লোড হচ্ছে...
             </div>
           ) : sheets.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs sm:text-sm space-y-2">
-              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-2xl flex items-center justify-center mx-auto border border-slate-200 dark:border-slate-700">
-                <FolderOpen className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm sm:text-base font-bold text-[#0B132B] dark:text-white">
-                কোনো লেকচার শিট পাওয়া যায়নি
-              </h4>
-              <p className="max-w-md mx-auto text-xs text-slate-500 dark:text-slate-400">
-                সুপাবেজ ডাটাবেসের <code>course_sheets</code> টেবিলে শিট যুক্ত করা হলে তা এখানে স্বয়ংক্রিয়ভাবে প্রদর্শিত হবে।
-              </p>
+            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
+              <BookOpen className="w-8 h-8 mx-auto opacity-40" />
+              <p>লেকচার শিট শীঘ্রই আপডেট করা হবে</p>
             </div>
           ) : (
             sheets.map((sheet, index) => (
@@ -521,18 +498,11 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
               পরীক্ষা তালিকা লোড হচ্ছে...
             </div>
           ) : exams.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 text-center space-y-3 shadow-xs">
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/40 text-[#046A38] dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-base font-black text-[#0B132B] dark:text-white">
-                  বর্তমানে এই কোর্সে কোনো পরীক্ষা যুক্ত করা হয়নি
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                  সুপাবেজের <code>course_exams</code> অথবা <code>exams</code> টেবিলে পরীক্ষা যুক্ত হলে এখানে সরাসরি চলে আসবে।
-                </p>
-              </div>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl py-12 px-4 border border-slate-200 dark:border-slate-800 text-center space-y-2 shadow-xs">
+              <CheckCircle2 className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500 opacity-40" />
+              <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
+                পরীক্ষা শীঘ্রই আপডেট করা হবে
+              </p>
             </div>
           ) : (
             exams.map((exam, idx) => (
