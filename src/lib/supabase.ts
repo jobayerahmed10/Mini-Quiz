@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Question, CourseModule, CourseEnrollmentRecord } from '../types';
+import { Question, CourseModule, CourseEnrollmentRecord, CourseSheet, CourseExam } from '../types';
 import { detectQuestionSubject } from './subjects';
 
 /**
@@ -1181,6 +1181,127 @@ export async function fetchEnrollmentsFromSupabase(
 ): Promise<{ enrollments: CourseEnrollmentRecord[]; error?: string | null }> {
   const res = await fetchCourseApplicationsFromSupabase(phoneNumber);
   return { enrollments: res.applications, error: res.error };
+}
+
+// =========================================================
+// Course Sheets & Course Exams Functions (public.course_sheets, public.course_exams)
+// =========================================================
+
+export async function fetchCourseSheetsFromSupabase(
+  courseId: string,
+  courseTitle?: string
+): Promise<{ sheets: CourseSheet[]; error?: string | null }> {
+  if (!supabaseInstance) {
+    return { sheets: [], error: null };
+  }
+
+  try {
+    let query = supabaseInstance
+      .from('course_sheets')
+      .select('*');
+
+    if (courseId) {
+      query = query.or(`course_id.eq.${courseId},course_title.eq.${courseTitle || courseId}`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      // Fallback: fetch without filter if column names differ
+      const fallback = await supabaseInstance.from('course_sheets').select('*');
+      if (!fallback.error && fallback.data) {
+        const filtered = fallback.data
+          .filter((item: any) => !item.course_id || item.course_id === courseId || item.course_title === courseTitle)
+          .map((item: any) => ({
+            id: String(item.id),
+            course_id: item.course_id ? String(item.course_id) : undefined,
+            title: String(item.title || item.name || 'লেকচার শিট'),
+            name: String(item.name || item.title || 'লেকচার শিট.pdf'),
+            file_url: item.file_url || item.url || undefined,
+            size: item.size || 'PDF Sheet',
+            created_at: item.created_at
+          }));
+        return { sheets: filtered, error: null };
+      }
+      return { sheets: [], error: error.message };
+    }
+
+    const sheets: CourseSheet[] = (data || []).map((item: any) => ({
+      id: String(item.id),
+      course_id: item.course_id ? String(item.course_id) : undefined,
+      title: String(item.title || item.name || 'লেকচার শিট'),
+      name: String(item.name || item.title || 'লেকচার শিট.pdf'),
+      file_url: item.file_url || item.url || undefined,
+      size: item.size || 'PDF Sheet',
+      created_at: item.created_at
+    }));
+
+    return { sheets, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { sheets: [], error: msg };
+  }
+}
+
+export async function fetchCourseExamsFromSupabase(
+  courseId: string,
+  courseTitle?: string
+): Promise<{ exams: CourseExam[]; error?: string | null }> {
+  if (!supabaseInstance) {
+    return { exams: [], error: null };
+  }
+
+  try {
+    let query = supabaseInstance
+      .from('course_exams')
+      .select('*');
+
+    if (courseId) {
+      query = query.or(`course_id.eq.${courseId},course_title.eq.${courseTitle || courseId}`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      // Fallback: try querying 'exams' table for course/subject matching
+      const fallback = await supabaseInstance
+        .from('exams')
+        .select('*');
+
+      if (!fallback.error && fallback.data) {
+        const filtered = fallback.data
+          .filter((item: any) => item.course_id === courseId || item.subject === courseTitle || !item.course_id)
+          .map((item: any, idx: number) => ({
+            id: String(item.id || `exam_${idx + 1}`),
+            course_id: item.course_id ? String(item.course_id) : courseId,
+            title: String(item.title || item.name || `পরীক্ষা ${idx + 1}`),
+            topic: item.topic || item.subject || 'বিশেষ মডেল টেস্ট',
+            date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : 'তারিখ শীঘ্রই আসবে'),
+            specs: `${item.total_questions || item.question_count || 50}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট`,
+            question_count: item.total_questions || item.question_count || 50,
+            time_minutes: item.time_minutes || 30,
+            created_at: item.created_at
+          }));
+        return { exams: filtered, error: null };
+      }
+      return { exams: [], error: error.message };
+    }
+
+    const exams: CourseExam[] = (data || []).map((item: any, idx: number) => ({
+      id: String(item.id || `exam_${idx + 1}`),
+      course_id: item.course_id ? String(item.course_id) : courseId,
+      title: String(item.title || item.name || `পরীক্ষা ${idx + 1}`),
+      topic: item.topic || item.subject || 'বিশেষ মডেল টেস্ট',
+      date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : 'তারিখ শীঘ্রই আসবে'),
+      specs: item.specs || `${item.total_questions || item.question_count || 50}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট`,
+      question_count: item.total_questions || item.question_count || 50,
+      time_minutes: item.time_minutes || 30,
+      created_at: item.created_at
+    }));
+
+    return { exams, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { exams: [], error: msg };
+  }
 }
 
 

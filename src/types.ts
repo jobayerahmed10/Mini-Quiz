@@ -122,6 +122,29 @@ export interface PastPaper {
   passingMarks: number;
 }
 
+export interface CourseSheet {
+  id: string;
+  course_id?: string;
+  title: string;
+  name?: string;
+  file_url?: string;
+  size?: string;
+  created_at?: string;
+}
+
+export interface CourseExam {
+  id: string;
+  course_id?: string;
+  title: string;
+  topic?: string;
+  date?: string;
+  specs?: string;
+  question_count?: number;
+  time_minutes?: number;
+  score?: string | null;
+  created_at?: string;
+}
+
 export interface CourseEnrollmentRecord {
   id?: string;
   course_id: string;
