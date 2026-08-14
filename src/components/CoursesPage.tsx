@@ -35,152 +35,18 @@ interface CoursesPageProps {
   onOpenLeaderboard?: (examId?: string) => void;
 }
 
-const INITIAL_COURSES: CourseModule[] = [
-  {
-    id: 'assistant_moulvi_subjective',
-    title: 'সহকারী মৌলভী সাবজেক্টিভ কোর্স',
-    category: 'assistant_moulvi',
-    badge: 'রেকর্ড ব্যাচ',
-    badgeSub: 'সহকারী মৌলভী...',
-    classesCount: 36,
-    sheetsCount: 36,
-    examsCount: 20,
-    isEnrolled: true,
-    accentColor: 'emerald',
-    enrolledCount: '1280',
-    price: '৮৫০',
-    instructor: 'মাওলানা ড. আহমেদ হাসান',
-    topics: [
-      'আল কুরআন, তাফসির ও সিহাহ সিত্তা',
-      'ফিকহ ও উসুলুল ফিকহ স্পেশাল নোট',
-      '৩৬টি এক্সক্লুসিভ পিডিএফ হ্যান্ডনোট',
-      '২০টি লাইভ ও আর্কাইভ সলভ পরীক্ষা'
-    ]
-  },
-  {
-    id: 'arabic_lecturer_subjective',
-    title: 'আরবি প্রভাষক সাবজেক্টিভ কোর্স',
-    category: 'arabic_lecturer',
-    badge: 'রেকর্ড ব্যাচ',
-    badgeSub: 'আরবি প্রভাষক...',
-    classesCount: 42,
-    sheetsCount: 45,
-    examsCount: 30,
-    isEnrolled: false,
-    accentColor: 'purple',
-    enrolledCount: '722',
-    price: '৯৫০',
-    instructor: 'মাওলানা ড. আহমেদ হাসান',
-    topics: [
-      '৪২টি হাই-ডেফিনিশন সাবজেক্টিভ ক্লাস',
-      'আরবি সাহিত্য, বালাগাত ও মানতিক',
-      '৪৫টি মাস্টার লেকচার শিট ও হ্যান্ডনোট',
-      '৩০টি বিসিএস ও প্রভাষক আদলে পরীক্ষা'
-    ]
-  },
-  {
-    id: 'ebtedayi_qari_course',
-    title: 'ইবতেদায়ী মৌলবি ও কারী শিক্ষক কোর্স',
-    category: 'ebtedayi',
-    badge: 'ফ্রি এক্সাম ব্যাচ',
-    badgeSub: 'ইবতেদায়ী মৌলবি ...',
-    classesCount: 28,
-    sheetsCount: 25,
-    examsCount: 18,
-    isEnrolled: false,
-    accentColor: 'amber',
-    enrolledCount: '1850',
-    price: '৫০০',
-    instructor: 'মাওলানা হাফেজ কারী আব্দুল্লাহ',
-    topics: [
-      'তাজবিদ ও কেরাত বিশেষ প্রশ্নব্যাংক',
-      'উসুলুত তাফসির ও আরবি ব্যাকরণ',
-      '২৫টি স্পেশাল হ্যান্ডনোট লেকচার শিট',
-      '১৮টি পূর্ণাঙ্গ সলভ মডেল টেস্ট'
-    ]
-  },
-  {
-    id: 'general_master_course',
-    title: 'জেনারেল সাবজেক্ট মাস্টারকোর্স (বাংলা, ইংরেজি, গণিত)',
-    category: 'general',
-    badge: 'রেকর্ড ব্যাচ',
-    badgeSub: 'জেনারেল সাবজেক্ট...',
-    classesCount: 40,
-    sheetsCount: 40,
-    examsCount: 25,
-    isEnrolled: false,
-    accentColor: 'purple',
-    enrolledCount: '3400',
-    price: '৬৫০',
-    instructor: 'প্রফেসর ড. রফিকুল ইসলাম',
-    topics: [
-      'বাংলা ব্যাকরণ ও সাহিত্য মাস্টার ক্লাস',
-      'English Grammar & Vocabulary Shortcut',
-      'গাণিতিক যুক্তি ও সাধারণ জ্ঞান শিট',
-      '২৫টি এক্সক্লুসিভ রিয়েল এক্সাম'
-    ]
-  },
-  {
-    id: 'ebtedayi_qari_batch1',
-    title: 'ইবতেদায়ি ক্বারী এক্সাম ব্যাচ-১',
-    category: 'ebtedayi',
-    badge: 'এক্সাম ব্যাচ-১',
-    badgeSub: 'ইবতেদায়ী কারী',
-    classesCount: 0,
-    sheetsCount: 30,
-    examsCount: 30,
-    isEnrolled: true,
-    accentColor: 'emerald',
-    enrolledCount: '920',
-    price: '৪৫০',
-    instructor: 'মাওলানা হাফেজ কারী আব্দুল্লাহ',
-    topics: [
-      '৩০টি স্পেশাল লেকচার শিট',
-      '৩০টি বিষয়ভিত্তিক ও পূর্ণাঙ্গ মডেল টেস্ট',
-      'মেরিট পজিশন ও নেগেটিভ মার্কিং এনালাইসিস'
-    ]
-  },
-  {
-    id: 'assistant_moulvi_batch1',
-    title: 'সহকারী মৌলভী এক্সাম ব্যাচ- ১',
-    category: 'assistant_moulvi',
-    badge: 'এক্সাম ব্যাচ-১',
-    badgeSub: 'সহকারী মৌলভী',
-    classesCount: 15,
-    sheetsCount: 36,
-    examsCount: 34,
-    isEnrolled: false,
-    accentColor: 'amber',
-    enrolledCount: '1450',
-    price: '৫৫০',
-    instructor: 'মাওলানা ড. আহমেদ হাসান',
-    topics: [
-      '১৫টি স্পেশাল গাইডেন্স ও সলভ ক্লাস',
-      '৩৬টি পিডিএফ হ্যান্ডনোট শিট',
-      '৩৪টি সরাসরি ও আর্কাইভ পরীক্ষা'
-    ]
-  },
-  {
-    id: 'arabic_lecturer_batch1',
-    title: 'আরবি প্রভাষক এক্সাম ব্যাচ- ১',
-    category: 'arabic_lecturer',
-    badge: 'এক্সাম ব্যাচ-১',
-    badgeSub: 'আরবি প্রভাষক',
-    classesCount: 20,
-    sheetsCount: 25,
-    examsCount: 30,
-    isEnrolled: false,
-    accentColor: 'purple',
-    enrolledCount: '2150',
-    price: '৬৫০',
-    instructor: 'মাওলানা ড. আহমেদ হাসান',
-    topics: [
-      '২০টি সলভ ও প্রাকটিস ক্লাস',
-      '২৫টি বিশেষ হ্যান্ডনোট শিট',
-      '৩০টি পূর্ণাঙ্গ মেগা মডেল টেস্ট'
-    ]
-  }
-];
+const INITIAL_COURSES: CourseModule[] = [];
+
+// List of default course IDs to filter out from legacy local storage cache
+const DEFAULT_COURSE_IDS = new Set([
+  'assistant_moulvi_subjective',
+  'arabic_lecturer_subjective',
+  'ebtedayi_qari_course',
+  'general_master_course',
+  'ebtedayi_qari_batch1',
+  'assistant_moulvi_batch1',
+  'arabic_lecturer_batch1'
+]);
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({
   onSelectCourse,
@@ -193,7 +59,11 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
       const raw = localStorage.getItem('tamreen_courses_cache');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filter out legacy default courses
+          const cleaned = parsed.filter((c: CourseModule) => c && c.id && !DEFAULT_COURSE_IDS.has(c.id));
+          return cleaned;
+        }
       }
     } catch {}
     return INITIAL_COURSES;
@@ -227,19 +97,13 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
       if (isMounted) {
         setPendingCourseIds(pendingIds);
-        setCourses((prev) => {
+        setCourses(() => {
           const map = new Map<string, CourseModule>();
-          prev.forEach((c) => {
-            const isApproved = approvedIds.has(c.id) || c.isEnrolled;
-            map.set(c.id, {
-              ...c,
-              isEnrolled: isApproved,
-              accentColor: isApproved ? 'emerald' : c.accentColor
-            });
-          });
 
           if (result.courses && result.courses.length > 0) {
             result.courses.forEach((c) => {
+              // Ignore any legacy default course IDs
+              if (DEFAULT_COURSE_IDS.has(c.id)) return;
               const isApproved = approvedIds.has(c.id) || c.isEnrolled;
               map.set(c.id, {
                 ...c,
@@ -249,7 +113,11 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
             });
           }
 
-          return Array.from(map.values());
+          const updatedList = Array.from(map.values());
+          try {
+            localStorage.setItem('tamreen_courses_cache', JSON.stringify(updatedList));
+          } catch {}
+          return updatedList;
         });
       }
     }
@@ -405,7 +273,32 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
       {/* Course Cards List */}
       <div className="space-y-3">
-        {filteredCourses.map((course) => {
+        {filteredCourses.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
+            <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 text-[#046A38] dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800/60">
+              <GraduationCap className="w-8 h-8" />
+            </div>
+            <div className="max-w-md mx-auto space-y-1.5">
+              <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
+                বর্তমানে কোনো কোর্স পাওয়া যায়নি
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                {selectedCategory !== 'all' 
+                  ? 'এই ক্যাটাগরিতে কোনো কোর্স নেই। সকল বিষয় নির্বাচন করে দেখতে পারেন।' 
+                  : 'সুপাবেজ ডাটাবেসে নতুন কোর্স যুক্ত হলে তা স্বয়ংক্রিয়ভাবে এখানে প্রদর্শিত হবে।'}
+              </p>
+            </div>
+            {selectedCategory !== 'all' && (
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className="px-4 py-2 bg-[#046A38] hover:bg-[#03522b] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs transition-all"
+              >
+                সকল কোর্স দেখুন
+              </button>
+            )}
+          </div>
+        ) : (
+          filteredCourses.map((course) => {
           const isEnrolled = course.isEnrolled;
 
           const borderAccentClass = isEnrolled
@@ -526,7 +419,8 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
 
       {/* Course Detail Modal */}
