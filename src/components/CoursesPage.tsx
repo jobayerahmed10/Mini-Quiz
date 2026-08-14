@@ -27,7 +27,8 @@ import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 import {
   fetchCoursesFromSupabase,
   fetchEnrollmentsFromSupabase,
-  normalizeCourseCategory
+  normalizeCourseCategory,
+  subscribeToCoursesTable
 } from '../lib/supabase';
 
 interface CoursesPageProps {
@@ -38,17 +39,6 @@ interface CoursesPageProps {
 }
 
 const INITIAL_COURSES: CourseModule[] = [];
-
-// List of default course IDs to filter out from legacy local storage cache
-const DEFAULT_COURSE_IDS = new Set([
-  'assistant_moulvi_subjective',
-  'arabic_lecturer_subjective',
-  'ebtedayi_qari_course',
-  'general_master_course',
-  'ebtedayi_qari_batch1',
-  'assistant_moulvi_batch1',
-  'arabic_lecturer_batch1'
-]);
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({
   onSelectCourse,
@@ -62,9 +52,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // Filter out legacy default courses
-          const cleaned = parsed.filter((c: CourseModule) => c && c.id && !DEFAULT_COURSE_IDS.has(c.id));
-          return cleaned;
+          return parsed;
         }
       }
     } catch {}
@@ -106,8 +94,6 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
       if (result.courses && result.courses.length > 0) {
         result.courses.forEach((c) => {
-          // Ignore any legacy default course IDs
-          if (DEFAULT_COURSE_IDS.has(c.id)) return;
           const isApproved = approvedIds.has(c.id) || c.isEnrolled;
           const normalizedCategory = normalizeCourseCategory(c.category);
           map.set(c.id, {
@@ -136,9 +122,28 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
     }
   }, []);
 
-  // Load courses dynamically from Supabase & Sync Approved/Pending Enrollments
+  // Load courses dynamically from Supabase & Subscribe to Realtime DB updates
   useEffect(() => {
     loadRemoteCoursesAndEnrollments(false);
+
+    // Realtime Supabase table synchronization
+    const unsubscribe = subscribeToCoursesTable(() => {
+      loadRemoteCoursesAndEnrollments(false);
+    });
+
+    // Auto-refresh when tab gains focus (user returns from Admin panel / Supabase)
+    const handleFocus = () => {
+      loadRemoteCoursesAndEnrollments(false);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [loadRemoteCoursesAndEnrollments]);
 
   const showToast = (msg: string) => {

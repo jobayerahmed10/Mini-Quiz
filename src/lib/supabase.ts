@@ -809,7 +809,7 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
     const raw = localStorage.getItem('tamreen_courses_cache');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         cachedCourses = parsed;
       }
     }
@@ -824,25 +824,22 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
   }
 
   try {
-    // Select all courses without strict status or ordering constraints that might fail on custom schemas
-    const queryPromise = Promise.resolve(
-      supabaseInstance
-        .from('courses')
-        .select('*')
-    );
+    // Select all courses directly from Supabase
+    const { data, error } = await supabaseInstance
+      .from('courses')
+      .select('*');
 
-    const timeoutFallback = { data: null, error: { message: 'Network Timeout', code: 'TIMEOUT' } };
-    const { data, error } = await fetchWithTimeout(queryPromise, 7000, timeoutFallback as any);
-
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.warn('Supabase courses query notice:', error.message);
       return {
         courses: cachedCourses,
-        isFromSupabase: true,
-        error: error ? error.message : null,
+        isFromSupabase: false,
+        error: error.message,
       };
     }
 
-    const fetchedCourses: CourseModule[] = data
+    // When data is returned (even if empty array []), parse and update cache
+    const fetchedCourses: CourseModule[] = (data || [])
       .filter((item: any) => item && item.status !== 'archived' && item.status !== 'inactive')
       .map((item: any) => {
         let parsedTopics: string[] = [];
@@ -857,32 +854,34 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
           }
         }
 
-        const normalizedCategory = normalizeCourseCategory(item.category);
+        const rawCat = item.category || item.subject || item.course_category || 'general';
+        const normalizedCategory = normalizeCourseCategory(rawCat);
 
         return {
-          id: String(item.id),
-          title: String(item.title || 'কোর্স'),
-          subtitle: item.subtitle ? String(item.subtitle) : undefined,
-          description: item.description ? String(item.description) : undefined,
-          syllabus: item.syllabus || undefined,
-          routine: item.routine || undefined,
+          id: String(item.id || item.course_id || item.uuid || `course_${Date.now()}`),
+          title: String(item.title || item.name || item.course_title || item.course_name || 'কোর্স'),
+          subtitle: item.subtitle ? String(item.subtitle) : (item.sub_title ? String(item.sub_title) : undefined),
+          description: item.description ? String(item.description) : (item.details ? String(item.details) : (item.about ? String(item.about) : undefined)),
+          syllabus: item.syllabus || item.course_syllabus || undefined,
+          routine: item.routine || item.course_routine || item.schedule || undefined,
           category: normalizedCategory,
-          badge: item.badge ? String(item.badge) : (item.category ? String(item.category) : 'কোর্স'),
-          badgeSub: item.badge_sub ? String(item.badge_sub) : undefined,
-          classesCount: Number(item.classes_count || item.classesCount || 0),
-          sheetsCount: Number(item.sheets_count || item.sheetsCount || 0),
-          examsCount: Number(item.exams_count || item.examsCount || 0),
-          enrolledCount: item.enrolled_count ? String(item.enrolled_count) : (item.enrolledCount ? String(item.enrolledCount) : undefined),
-          price: item.price ? String(item.price) : '০',
+          badge: item.badge ? String(item.badge) : (item.batch ? String(item.batch) : (item.category ? String(item.category) : 'কোর্স')),
+          badgeSub: item.badge_sub ? String(item.badge_sub) : (item.batch_sub ? String(item.batch_sub) : undefined),
+          classesCount: Number(item.classes_count || item.classesCount || item.total_classes || 0),
+          sheetsCount: Number(item.sheets_count || item.sheetsCount || item.total_sheets || 0),
+          examsCount: Number(item.exams_count || item.examsCount || item.total_exams || 0),
+          enrolledCount: item.enrolled_count !== undefined && item.enrolled_count !== null ? String(item.enrolled_count) : (item.enrolledCount !== undefined ? String(item.enrolledCount) : undefined),
+          price: item.price !== undefined && item.price !== null ? String(item.price) : (item.fee !== undefined ? String(item.fee) : '০'),
           accentColor: (item.accent_color || item.accentColor || (normalizedCategory === 'arabic_lecturer' ? 'purple' : normalizedCategory === 'assistant_moulvi' ? 'emerald' : 'amber')) as 'emerald' | 'purple' | 'amber',
           topics: parsedTopics.length > 0 ? parsedTopics : undefined,
-          instructor: item.instructor ? String(item.instructor) : undefined,
+          instructor: item.instructor ? String(item.instructor) : (item.teacher ? String(item.teacher) : (item.ustad ? String(item.ustad) : undefined)),
           isEnrolled: Boolean(item.is_enrolled || item.isEnrolled),
           isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
           status: item.status || 'active',
         };
       });
 
+    // Update localStorage cache directly with fresh database state
     try {
       localStorage.setItem('tamreen_courses_cache', JSON.stringify(fetchedCourses));
     } catch {}
@@ -896,9 +895,35 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
     const msg = err instanceof Error ? err.message : 'Unknown error';
     return {
       courses: cachedCourses,
-      isFromSupabase: true,
+      isFromSupabase: false,
       error: msg,
     };
+  }
+}
+
+/**
+ * Realtime listener for course database changes
+ */
+export function subscribeToCoursesTable(onCoursesChange: () => void): () => void {
+  if (!supabaseInstance) return () => {};
+
+  try {
+    const channel = supabaseInstance
+      .channel('courses_live_sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'courses' },
+        () => {
+          onCoursesChange();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseInstance.removeChannel(channel);
+    };
+  } catch {
+    return () => {};
   }
 }
 
@@ -1035,6 +1060,17 @@ export async function updateCourseInSupabase(id: string, updates: Partial<Course
 }
 
 export async function deleteCourseFromSupabase(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const raw = localStorage.getItem('tamreen_courses_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((c: any) => c && String(c.id) !== String(id));
+        localStorage.setItem('tamreen_courses_cache', JSON.stringify(filtered));
+      }
+    }
+  } catch {}
+
   if (!supabaseInstance) {
     return { success: true };
   }
