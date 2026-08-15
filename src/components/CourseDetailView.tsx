@@ -26,7 +26,11 @@ import {
 } from 'lucide-react';
 import { CourseModule, CourseEnrollmentRecord, CourseSheet, CourseExam } from '../types';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
-import { fetchCourseSheetsFromSupabase, fetchCourseExamsFromSupabase } from '../lib/supabase';
+import {
+  fetchCourseSheetsFromSupabase,
+  fetchCourseExamsFromSupabase,
+  subscribeToCourseDetails
+} from '../lib/supabase';
 
 interface CourseDetailViewProps {
   course: CourseModule;
@@ -83,6 +87,24 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
   useEffect(() => {
     loadData();
+
+    // Subscribe to realtime database changes on course_exams, course_sheets, courses
+    const unsubscribe = subscribeToCourseDetails(() => {
+      loadData();
+    });
+
+    const handleFocus = () => {
+      loadData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [loadData]);
 
   const handleDownload = (fileName: string, fileUrl?: string) => {
@@ -308,6 +330,34 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
           </div>
 
           <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-3 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
+            {/* Quick Specs Overview Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 text-xs">
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">কোর্স ধরণ</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{course.badge || 'স্পেশাল ব্যাচ'}</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">প্রভাষক/উস্তাদ</span>
+                <span className="font-bold text-[#046A38] dark:text-emerald-400">{course.instructor || 'অভিজ্ঞ প্যানেল'}</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">ভর্তি ফি</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">৳{course.price || '০'}</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">মোট ক্লাস</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{classesCount}টি</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">লেকচার শিট</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{sheetsCount}টি</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">মডেল টেস্ট/পরীক্ষা</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{examsCount}টি</span>
+              </div>
+            </div>
+
             {course.subtitle && (
               <p className="font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
                 {course.subtitle}
@@ -315,24 +365,19 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
             )}
 
             {course.description && (
-              <div className="whitespace-pre-line leading-relaxed">
+              <div className="whitespace-pre-line leading-relaxed bg-white dark:bg-slate-800/30 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                 {course.description}
               </div>
             )}
 
             {course.topics && course.topics.length > 0 && (
               <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">মূল আলোচ্য বিষয়সমূহ:</p>
                 <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 pl-2">
                   {course.topics.map((topic, i) => (
                     <li key={i}>{topic}</li>
                   ))}
                 </ul>
-              </div>
-            )}
-
-            {!course.subtitle && !course.description && (!course.topics || course.topics.length === 0) && (
-              <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
-                বিবরণ শীঘ্রই আপডেট করা হবে
               </div>
             )}
           </div>

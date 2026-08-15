@@ -1228,24 +1228,50 @@ export async function fetchCourseSheetsFromSupabase(
   }
 
   try {
+    const targetId = String(courseId || '').trim().toLowerCase();
+    const targetTitle = String(courseTitle || '').trim().toLowerCase();
+
+    // Query course_sheets safely without strict .or() that fails on non-existent columns
     const { data, error } = await supabaseInstance
       .from('course_sheets')
-      .select('*')
-      .or(`course_id.eq.${courseId}${courseTitle ? `,course_title.eq.${courseTitle}` : ''}`);
+      .select('*');
 
     if (error || !data) {
       return { sheets: [], error: error?.message || null };
     }
 
     const sheets: CourseSheet[] = data
-      .filter((item: any) => item.course_id === courseId || (courseTitle && item.course_title === courseTitle))
-      .map((item: any) => ({
-        id: String(item.id),
-        course_id: item.course_id ? String(item.course_id) : undefined,
-        title: String(item.title || item.name || 'লেকচার শিট'),
-        name: String(item.name || item.title || 'লেকচার শিট.pdf'),
-        file_url: item.file_url || item.url || undefined,
-        size: item.size || 'PDF',
+      .filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || item.course_uuid || '').trim().toLowerCase();
+        const itemTitle = String(item.course_title || item.courseName || item.course || '').trim().toLowerCase();
+        const itemSubject = String(item.subject || '').trim().toLowerCase();
+
+        // 1. Direct course ID match
+        if (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) {
+          return true;
+        }
+        // 2. Title match
+        if (itemTitle && targetTitle && (itemTitle === targetTitle || targetTitle.includes(itemTitle) || itemTitle.includes(targetTitle))) {
+          return true;
+        }
+        // 3. Subject match
+        if (itemSubject && targetTitle && (itemSubject === targetTitle || targetTitle.includes(itemSubject) || itemSubject.includes(targetTitle))) {
+          return true;
+        }
+        // 4. If itemCourseId stored course title
+        if (itemCourseId && targetTitle && (itemCourseId === targetTitle || targetTitle.includes(itemCourseId) || itemCourseId.includes(targetTitle))) {
+          return true;
+        }
+        return false;
+      })
+      .map((item: any, idx: number) => ({
+        id: String(item.id || `sheet_${idx + 1}`),
+        course_id: item.course_id ? String(item.course_id) : courseId,
+        title: String(item.title || item.name || item.sheet_title || `লেকচার শিট ${idx + 1}`),
+        name: String(item.name || item.title || item.sheet_title || `লেকচার শিট.pdf`),
+        file_url: item.file_url || item.url || item.pdf_url || item.link || undefined,
+        size: item.size || 'PDF Sheet',
         created_at: item.created_at
       }));
 
@@ -1264,54 +1290,128 @@ export async function fetchCourseExamsFromSupabase(
   }
 
   try {
-    // 1. First try course_exams table
+    const targetId = String(courseId || '').trim().toLowerCase();
+    const targetTitle = String(courseTitle || '').trim().toLowerCase();
+
+    // 1. First fetch all course_exams safely without column-specific PostgREST filters
     const { data: courseExamsData, error: courseExamsError } = await supabaseInstance
       .from('course_exams')
-      .select('*')
-      .or(`course_id.eq.${courseId}${courseTitle ? `,course_title.eq.${courseTitle}` : ''}`);
+      .select('*');
 
     if (!courseExamsError && courseExamsData && courseExamsData.length > 0) {
-      const exams: CourseExam[] = courseExamsData
-        .filter((item: any) => item.course_id === courseId || (courseTitle && item.course_title === courseTitle))
-        .map((item: any) => ({
-          id: String(item.id),
-          course_id: String(item.course_id || courseId),
-          title: String(item.title || item.name),
-          topic: item.topic || item.subject,
-          date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : undefined),
-          specs: item.specs || (item.question_count ? `${item.question_count}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট` : undefined),
-          question_count: item.total_questions || item.question_count,
-          time_minutes: item.time_minutes,
-          created_at: item.created_at
-        }));
-      return { exams, error: null };
-    }
+      const matchedExams = courseExamsData.filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || item.course_uuid || '').trim().toLowerCase();
+        const itemCourseTitle = String(item.course_title || item.courseName || item.course || '').trim().toLowerCase();
+        const itemSubject = String(item.subject || '').trim().toLowerCase();
 
-    // 2. If not found in course_exams, check exams table specifically for course_id === courseId
-    const { data: generalExamsData, error: generalExamsError } = await supabaseInstance
-      .from('exams')
-      .select('*')
-      .eq('course_id', courseId);
+        // 1. Exact ID / UUID match (e.g. 49e2-86ea-71...)
+        if (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) {
+          return true;
+        }
+        // 2. Title match
+        if (itemCourseTitle && targetTitle && (itemCourseTitle === targetTitle || targetTitle.includes(itemCourseTitle) || itemCourseTitle.includes(targetTitle))) {
+          return true;
+        }
+        // 3. Subject match
+        if (itemSubject && targetTitle && (itemSubject === targetTitle || targetTitle.includes(itemSubject) || itemSubject.includes(targetTitle))) {
+          return true;
+        }
+        // 4. Course title stored in course_id
+        if (itemCourseId && targetTitle && (itemCourseId === targetTitle || targetTitle.includes(itemCourseId) || itemCourseId.includes(targetTitle))) {
+          return true;
+        }
+        return false;
+      });
 
-    if (!generalExamsError && generalExamsData && generalExamsData.length > 0) {
-      const exams: CourseExam[] = generalExamsData
-        .map((item: any) => ({
-          id: String(item.id),
+      if (matchedExams.length > 0) {
+        const exams: CourseExam[] = matchedExams.map((item: any, idx: number) => ({
+          id: String(item.id || `exam_${idx + 1}`),
           course_id: String(item.course_id || courseId),
-          title: String(item.title || item.name),
-          topic: item.topic || item.subject,
+          title: String(item.title || item.name || item.exam_title || `পরীক্ষা -০${idx + 1}`),
+          topic: item.topic || item.subject || item.chapter || 'মডেল টেস্ট',
           date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : undefined),
           specs: item.specs || (item.total_questions || item.question_count ? `${item.total_questions || item.question_count}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট` : undefined),
-          question_count: item.total_questions || item.question_count,
-          time_minutes: item.time_minutes,
+          question_count: Number(item.total_questions || item.question_count || 50),
+          time_minutes: Number(item.time_minutes || item.duration || 30),
           created_at: item.created_at
         }));
-      return { exams, error: null };
+        return { exams, error: null };
+      }
+    }
+
+    // 2. Fallback check on 'exams' table for course_id === courseId
+    const { data: generalExamsData, error: generalExamsError } = await supabaseInstance
+      .from('exams')
+      .select('*');
+
+    if (!generalExamsError && generalExamsData && generalExamsData.length > 0) {
+      const matchedGeneral = generalExamsData.filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || '').trim().toLowerCase();
+        const itemSubject = String(item.subject || item.category || '').trim().toLowerCase();
+        if (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) {
+          return true;
+        }
+        if (itemSubject && targetTitle && (itemSubject === targetTitle || targetTitle.includes(itemSubject))) {
+          return true;
+        }
+        return false;
+      });
+
+      if (matchedGeneral.length > 0) {
+        const exams: CourseExam[] = matchedGeneral.map((item: any, idx: number) => ({
+          id: String(item.id || `gen_exam_${idx + 1}`),
+          course_id: String(item.course_id || courseId),
+          title: String(item.title || item.name || `পরীক্ষা -০${idx + 1}`),
+          topic: item.topic || item.subject || item.category || 'মডেল টেস্ট',
+          date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('bn-BD') : undefined),
+          specs: item.specs || (item.total_questions || item.question_count ? `${item.total_questions || item.question_count}টি প্রশ্ন • ${item.time_minutes || 30} মিনিট` : undefined),
+          question_count: Number(item.total_questions || item.question_count || 50),
+          time_minutes: Number(item.time_minutes || 30),
+          created_at: item.created_at
+        }));
+        return { exams, error: null };
+      }
     }
 
     return { exams: [], error: null };
   } catch (err: unknown) {
     return { exams: [], error: null };
+  }
+}
+
+/**
+ * Realtime listener for course-specific updates (exams, sheets, courses)
+ */
+export function subscribeToCourseDetails(onChange: () => void): () => void {
+  if (!supabaseInstance) return () => {};
+
+  try {
+    const channel = supabaseInstance
+      .channel('course_details_live_sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'course_exams' },
+        () => onChange()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'course_sheets' },
+        () => onChange()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'courses' },
+        () => onChange()
+      )
+      .subscribe();
+
+    return () => {
+      supabaseInstance.removeChannel(channel);
+    };
+  } catch {
+    return () => {};
   }
 }
 
