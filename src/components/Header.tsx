@@ -95,20 +95,20 @@ export const Header: React.FC<HeaderProps> = ({
             title="হোম পেজে যান"
           >
             {/* Green Squircle Logo Box with Golden Graduation Cap */}
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-[16px] sm:rounded-[18px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
-              <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-[#EAB308]" strokeWidth={2.3} />
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] sm:rounded-[20px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
+              <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-[#EAB308]" strokeWidth={2.3} />
             </div>
 
             <div className="min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={`font-hind font-extrabold text-xl sm:text-2xl md:text-[26px] tracking-tight whitespace-nowrap leading-snug py-0.5 ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
+              <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
+                <span className={`font-hind font-extrabold text-2xl sm:text-[28px] md:text-[30px] tracking-tight whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
                   আত-তামরীন
                 </span>
-                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-normal shrink-0">
+                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-tight shrink-0">
                   একাডেমি
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs font-hind font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-normal tracking-normal truncate">
+              <p className="text-[11px] sm:text-xs font-hind font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-tight tracking-normal truncate">
                 প্রস্তুতি হোক আরও স্মার্ট
               </p>
             </div>
