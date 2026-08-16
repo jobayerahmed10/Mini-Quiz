@@ -1,5 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Question, CourseModule, CourseEnrollmentRecord, CourseSheet, CourseExam } from '../types';
+import {
+  Question,
+  CourseModule,
+  CourseEnrollmentRecord,
+  CourseSheet,
+  CourseExam,
+  CourseRoutineItem,
+  CourseSyllabusItem
+} from '../types';
 import { detectQuestionSubject } from './subjects';
 
 /**
@@ -857,24 +865,47 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
         const rawCat = item.category || item.subject || item.course_category || 'general';
         const normalizedCategory = normalizeCourseCategory(rawCat);
 
+        // Detect routine and routine url
+        const rawRoutine = item.routine || item.course_routine || item.schedule || item.routine_text || item.class_routine || item.exam_routine || undefined;
+        let routineUrl = item.routine_url || item.routine_link || item.routine_file || item.routine_pdf || undefined;
+        if (!routineUrl && typeof rawRoutine === 'string' && (rawRoutine.startsWith('http://') || rawRoutine.startsWith('https://'))) {
+          routineUrl = rawRoutine;
+        }
+
+        // Detect syllabus and syllabus url
+        const rawSyllabus = item.syllabus || item.course_syllabus || item.syllabus_text || item.curriculum || item.outline || undefined;
+        let syllabusUrl = item.syllabus_url || item.syllabus_link || item.syllabus_file || item.syllabus_pdf || undefined;
+        if (!syllabusUrl && typeof rawSyllabus === 'string' && (rawSyllabus.startsWith('http://') || rawSyllabus.startsWith('https://'))) {
+          syllabusUrl = rawSyllabus;
+        }
+
+        const driveLink = item.drive_link || item.google_drive || item.drive || item.materials_link || undefined;
+        const liveClassUrl = item.live_class_url || item.zoom_link || item.meet_link || item.live_link || item.class_link || undefined;
+        const whatsappGroup = item.whatsapp_group || item.whatsapp_link || item.whatsapp || item.telegram_group || undefined;
+
         return {
           id: String(item.id || item.course_id || item.uuid || `course_${Date.now()}`),
           title: String(item.title || item.name || item.course_title || item.course_name || 'কোর্স'),
           subtitle: item.subtitle ? String(item.subtitle) : (item.sub_title ? String(item.sub_title) : undefined),
-          description: item.description ? String(item.description) : (item.details ? String(item.details) : (item.about ? String(item.about) : undefined)),
-          syllabus: item.syllabus || item.course_syllabus || undefined,
-          routine: item.routine || item.course_routine || item.schedule || undefined,
+          description: item.description ? String(item.description) : (item.details ? String(item.details) : (item.about ? String(item.about) : (item.overview ? String(item.overview) : undefined))),
+          syllabus: rawSyllabus,
+          routine: rawRoutine,
+          routineUrl,
+          syllabusUrl,
+          driveLink,
+          liveClassUrl,
+          whatsappGroup,
           category: normalizedCategory,
           badge: item.badge ? String(item.badge) : (item.batch ? String(item.batch) : (item.category ? String(item.category) : 'কোর্স')),
           badgeSub: item.badge_sub ? String(item.badge_sub) : (item.batch_sub ? String(item.batch_sub) : undefined),
-          classesCount: Number(item.classes_count || item.classesCount || item.total_classes || 0),
-          sheetsCount: Number(item.sheets_count || item.sheetsCount || item.total_sheets || 0),
-          examsCount: Number(item.exams_count || item.examsCount || item.total_exams || 0),
-          enrolledCount: item.enrolled_count !== undefined && item.enrolled_count !== null ? String(item.enrolled_count) : (item.enrolledCount !== undefined ? String(item.enrolledCount) : undefined),
-          price: item.price !== undefined && item.price !== null ? String(item.price) : (item.fee !== undefined ? String(item.fee) : '০'),
+          classesCount: Number(item.classes_count || item.classesCount || item.total_classes || item.classes || 0),
+          sheetsCount: Number(item.sheets_count || item.sheetsCount || item.total_sheets || item.sheets || 0),
+          examsCount: Number(item.exams_count || item.examsCount || item.total_exams || item.exams || 0),
+          enrolledCount: item.enrolled_count !== undefined && item.enrolled_count !== null ? String(item.enrolled_count) : (item.enrolledCount !== undefined ? String(item.enrolledCount) : (item.students_count ? String(item.students_count) : undefined)),
+          price: item.price !== undefined && item.price !== null ? String(item.price) : (item.fee !== undefined ? String(item.fee) : (item.cost !== undefined ? String(item.cost) : '০')),
           accentColor: (item.accent_color || item.accentColor || (normalizedCategory === 'arabic_lecturer' ? 'purple' : normalizedCategory === 'assistant_moulvi' ? 'emerald' : 'amber')) as 'emerald' | 'purple' | 'amber',
           topics: parsedTopics.length > 0 ? parsedTopics : undefined,
-          instructor: item.instructor ? String(item.instructor) : (item.teacher ? String(item.teacher) : (item.ustad ? String(item.ustad) : undefined)),
+          instructor: item.instructor ? String(item.instructor) : (item.teacher ? String(item.teacher) : (item.ustad ? String(item.ustad) : (item.mentor ? String(item.mentor) : undefined))),
           isEnrolled: Boolean(item.is_enrolled || item.isEnrolled),
           isLocked: item.is_locked !== undefined ? Boolean(item.is_locked) : false,
           status: item.status || 'active',
@@ -1099,52 +1130,107 @@ export async function deleteCourseFromSupabase(id: string): Promise<{ success: b
 
 export async function submitEnrollmentToSupabase(
   enrollment: CourseEnrollmentRecord
-): Promise<{ success: boolean; data?: CourseEnrollmentRecord; error?: string }> {
+): Promise<{ success: boolean; data?: CourseEnrollmentRecord; error?: string; isLocalFallback?: boolean }> {
   const payload = {
-    course_id: enrollment.course_id,
-    course_title: enrollment.course_title,
-    student_name: enrollment.student_name,
-    phone_number: enrollment.phone_number,
-    email: enrollment.email || null,
-    payment_method: enrollment.payment_method,
-    amount: enrollment.amount,
-    transaction_id: enrollment.transaction_id,
+    course_id: String(enrollment.course_id),
+    course_title: String(enrollment.course_title),
+    student_name: String(enrollment.student_name).trim(),
+    phone_number: String(enrollment.phone_number).trim(),
+    email: enrollment.email ? String(enrollment.email).trim() : null,
+    payment_method: enrollment.payment_method || 'bkash',
+    amount: String(enrollment.amount || '৯৫০'),
+    transaction_id: String(enrollment.transaction_id || '').trim().toUpperCase(),
     status: enrollment.status || 'pending',
     created_at: enrollment.created_at || new Date().toISOString()
   };
 
   if (!supabaseInstance) {
-    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
   }
 
   try {
-    // Attempt inserting into course_applications table
-    const { data: appData, error: appErr } = await supabaseInstance
+    // Primary: insert into course_applications
+    const { data: insertedData, error: insertError } = await supabaseInstance
       .from('course_applications')
       .insert([payload])
-      .select()
-      .single();
+      .select();
 
-    if (!appErr && appData) {
-      return { success: true, data: appData as CourseEnrollmentRecord };
+    if (!insertError && insertedData && insertedData.length > 0) {
+      return { success: true, data: insertedData[0] as CourseEnrollmentRecord };
     }
 
-    // Fallback: try inserting into course_enrollments
-    const { data, error } = await supabaseInstance
-      .from('course_enrollments')
-      .insert([payload])
-      .select()
-      .single();
+    // If .select() failed (e.g. RLS allows INSERT but blocks SELECT), try bare insert without .select()
+    if (insertError) {
+      console.warn('course_applications insert with select error:', insertError);
+      
+      const { error: bareError } = await supabaseInstance
+        .from('course_applications')
+        .insert([payload]);
 
-    if (error) {
-      console.warn('Supabase course enrollment insert error:', error.message);
-      return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+      if (!bareError) {
+        return { success: true, data: { ...payload, id: `app_${Date.now()}` } };
+      }
+
+      console.error('course_applications bare insert error:', bareError);
+
+      // Fallback: try course_enrollments table
+      const { data: enrData, error: enrError } = await supabaseInstance
+        .from('course_enrollments')
+        .insert([payload])
+        .select();
+
+      if (!enrError && enrData && enrData.length > 0) {
+        return { success: true, data: enrData[0] as CourseEnrollmentRecord };
+      }
+
+      return {
+        success: false,
+        error: insertError.message || bareError.message || enrError?.message || 'Database RLS error',
+        data: { ...payload, id: `local_enr_${Date.now()}` },
+        isLocalFallback: true
+      };
     }
 
-    return { success: true, data: data as CourseEnrollmentRecord };
+    return { success: true, data: { ...payload, id: `app_${Date.now()}` } };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` } };
+    return { success: false, error: msg, data: { ...payload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
+  }
+}
+
+export async function updateEnrollmentStatusInSupabase(
+  id: string,
+  newStatus: 'pending' | 'approved' | 'rejected'
+): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseInstance) return { success: true };
+  try {
+    const { error: err1 } = await supabaseInstance
+      .from('course_applications')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (!err1) return { success: true };
+
+    const { error: err2 } = await supabaseInstance
+      .from('course_enrollments')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (!err2) return { success: true };
+    return { success: false, error: err1.message || err2.message };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function deleteEnrollmentFromSupabase(id: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseInstance) return { success: true };
+  try {
+    await supabaseInstance.from('course_applications').delete().eq('id', id);
+    await supabaseInstance.from('course_enrollments').delete().eq('id', id);
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
   }
 }
 
@@ -1382,7 +1468,151 @@ export async function fetchCourseExamsFromSupabase(
 }
 
 /**
- * Realtime listener for course-specific updates (exams, sheets, courses)
+ * Fetch course routines from dedicated table if available (course_routines / routines)
+ */
+export async function fetchCourseRoutinesFromSupabase(
+  courseId: string,
+  courseTitle?: string
+): Promise<{ routines: CourseRoutineItem[]; error?: string | null }> {
+  if (!supabaseInstance) {
+    return { routines: [], error: null };
+  }
+
+  try {
+    const targetId = String(courseId || '').trim().toLowerCase();
+    const targetTitle = String(courseTitle || '').trim().toLowerCase();
+
+    // 1. Try course_routines
+    const { data: routineData, error: routineError } = await supabaseInstance
+      .from('course_routines')
+      .select('*');
+
+    if (!routineError && routineData && routineData.length > 0) {
+      const matched = routineData.filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || '').trim().toLowerCase();
+        const itemTitle = String(item.course_title || item.courseName || item.subject || '').trim().toLowerCase();
+        return (
+          (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) ||
+          (itemTitle && targetTitle && (itemTitle === targetTitle || targetTitle.includes(itemTitle) || itemTitle.includes(targetTitle))) ||
+          (itemCourseId && targetTitle && (itemCourseId === targetTitle || targetTitle.includes(itemCourseId)))
+        );
+      });
+
+      if (matched.length > 0) {
+        return {
+          routines: matched.map((r: any, idx: number) => ({
+            id: String(r.id || `routine_${idx + 1}`),
+            course_id: String(r.course_id || courseId),
+            day: r.day || r.date || r.schedule_day,
+            time: r.time || r.schedule_time || r.class_time,
+            subject: r.subject || r.course_title || r.title,
+            topic: r.topic || r.chapter || r.lesson,
+            instructor: r.instructor || r.teacher || r.ustad,
+            room_or_link: r.room_or_link || r.live_link || r.link,
+            notes: r.notes || r.description
+          })),
+          error: null
+        };
+      }
+    }
+
+    // 2. Try routines table
+    const { data: generalRoutines, error: generalError } = await supabaseInstance
+      .from('routines')
+      .select('*');
+
+    if (!generalError && generalRoutines && generalRoutines.length > 0) {
+      const matched = generalRoutines.filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || '').trim().toLowerCase();
+        const itemTitle = String(item.course_title || item.subject || item.title || '').trim().toLowerCase();
+        return (
+          (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) ||
+          (itemTitle && targetTitle && (itemTitle === targetTitle || targetTitle.includes(itemTitle)))
+        );
+      });
+
+      if (matched.length > 0) {
+        return {
+          routines: matched.map((r: any, idx: number) => ({
+            id: String(r.id || `routine_${idx + 1}`),
+            course_id: String(r.course_id || courseId),
+            day: r.day || r.date,
+            time: r.time || r.class_time,
+            subject: r.subject || r.title,
+            topic: r.topic || r.lesson,
+            instructor: r.instructor || r.teacher,
+            room_or_link: r.link || r.live_link,
+            notes: r.notes || r.description
+          })),
+          error: null
+        };
+      }
+    }
+
+    return { routines: [], error: null };
+  } catch {
+    return { routines: [], error: null };
+  }
+}
+
+/**
+ * Fetch course syllabus from dedicated table if available (course_syllabus / syllabuses)
+ */
+export async function fetchCourseSyllabusFromSupabase(
+  courseId: string,
+  courseTitle?: string
+): Promise<{ syllabusList: CourseSyllabusItem[]; error?: string | null }> {
+  if (!supabaseInstance) {
+    return { syllabusList: [], error: null };
+  }
+
+  try {
+    const targetId = String(courseId || '').trim().toLowerCase();
+    const targetTitle = String(courseTitle || '').trim().toLowerCase();
+
+    // 1. Try course_syllabus table
+    const { data, error } = await supabaseInstance
+      .from('course_syllabus')
+      .select('*');
+
+    if (!error && data && data.length > 0) {
+      const matched = data.filter((item: any) => {
+        if (!item) return false;
+        const itemCourseId = String(item.course_id || item.courseId || '').trim().toLowerCase();
+        const itemTitle = String(item.course_title || item.subject || item.courseName || '').trim().toLowerCase();
+        return (
+          (itemCourseId && (itemCourseId === targetId || targetId.includes(itemCourseId) || itemCourseId.includes(targetId))) ||
+          (itemTitle && targetTitle && (itemTitle === targetTitle || targetTitle.includes(itemTitle) || itemTitle.includes(targetTitle))) ||
+          (itemCourseId && targetTitle && (itemCourseId === targetTitle || targetTitle.includes(itemCourseId)))
+        );
+      });
+
+      if (matched.length > 0) {
+        return {
+          syllabusList: matched.map((s: any, idx: number) => ({
+            id: String(s.id || `syl_${idx + 1}`),
+            course_id: String(s.course_id || courseId),
+            chapter: s.chapter || s.module || s.part || `অধ্যায় - ০${idx + 1}`,
+            subject: s.subject || s.title,
+            topic: s.topic || s.title || s.name,
+            details: s.details || s.description || s.summary,
+            classes_count: Number(s.classes_count || s.total_classes || 0)
+          })),
+          error: null
+        };
+      }
+    }
+
+    return { syllabusList: [], error: null };
+  } catch {
+    return { syllabusList: [], error: null };
+  }
+}
+
+/**
+ * Realtime listener for course-specific updates (exams, sheets, courses, routines, syllabus)
  */
 export function subscribeToCourseDetails(onChange: () => void): () => void {
   if (!supabaseInstance) return () => {};
@@ -1403,6 +1633,16 @@ export function subscribeToCourseDetails(onChange: () => void): () => void {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'courses' },
+        () => onChange()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'course_routines' },
+        () => onChange()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'course_syllabus' },
         () => onChange()
       )
       .subscribe();

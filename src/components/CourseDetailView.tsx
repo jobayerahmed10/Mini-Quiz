@@ -22,13 +22,26 @@ import {
   Lock,
   RefreshCw,
   FolderOpen,
-  HelpCircle
+  HelpCircle,
+  ExternalLink,
+  Video,
+  MessageCircle,
+  Copy
 } from 'lucide-react';
-import { CourseModule, CourseEnrollmentRecord, CourseSheet, CourseExam } from '../types';
+import {
+  CourseModule,
+  CourseEnrollmentRecord,
+  CourseSheet,
+  CourseExam,
+  CourseRoutineItem,
+  CourseSyllabusItem
+} from '../types';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 import {
   fetchCourseSheetsFromSupabase,
   fetchCourseExamsFromSupabase,
+  fetchCourseRoutinesFromSupabase,
+  fetchCourseSyllabusFromSupabase,
   subscribeToCourseDetails
 } from '../lib/supabase';
 
@@ -57,8 +70,12 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   // Dynamic Supabase data state
   const [sheets, setSheets] = useState<CourseSheet[]>([]);
   const [exams, setExams] = useState<CourseExam[]>([]);
+  const [routines, setRoutines] = useState<CourseRoutineItem[]>([]);
+  const [syllabusList, setSyllabusList] = useState<CourseSyllabusItem[]>([]);
   const [isLoadingSheets, setIsLoadingSheets] = useState<boolean>(false);
   const [isLoadingExams, setIsLoadingExams] = useState<boolean>(false);
+  const [isLoadingRoutines, setIsLoadingRoutines] = useState<boolean>(false);
+  const [isLoadingSyllabus, setIsLoadingSyllabus] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -70,25 +87,33 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   const loadData = useCallback(async () => {
     setIsLoadingSheets(true);
     setIsLoadingExams(true);
+    setIsLoadingRoutines(true);
+    setIsLoadingSyllabus(true);
     try {
-      const [sheetRes, examRes] = await Promise.all([
+      const [sheetRes, examRes, routineRes, syllabusRes] = await Promise.all([
         fetchCourseSheetsFromSupabase(course.id, course.title),
-        fetchCourseExamsFromSupabase(course.id, course.title)
+        fetchCourseExamsFromSupabase(course.id, course.title),
+        fetchCourseRoutinesFromSupabase(course.id, course.title),
+        fetchCourseSyllabusFromSupabase(course.id, course.title)
       ]);
       setSheets(sheetRes.sheets || []);
       setExams(examRes.exams || []);
+      setRoutines(routineRes.routines || []);
+      setSyllabusList(syllabusRes.syllabusList || []);
     } catch (e) {
       console.error('Error loading course assets:', e);
     } finally {
       setIsLoadingSheets(false);
       setIsLoadingExams(false);
+      setIsLoadingRoutines(false);
+      setIsLoadingSyllabus(false);
     }
   }, [course.id, course.title]);
 
   useEffect(() => {
     loadData();
 
-    // Subscribe to realtime database changes on course_exams, course_sheets, courses
+    // Subscribe to realtime database changes on course_exams, course_sheets, courses, routines, syllabus
     const unsubscribe = subscribeToCourseDetails(() => {
       loadData();
     });
@@ -110,9 +135,16 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   const handleDownload = (fileName: string, fileUrl?: string) => {
     if (fileUrl) {
       window.open(fileUrl, '_blank');
-      showToast(`${fileName} ডাউনলোড শুরু হয়েছে!`);
+      showToast(`${fileName} ডাউনলোড/ওপেন করা হচ্ছে...`);
     } else {
       showToast(`${fileName} ডাউনলোড শুরু হচ্ছে...`);
+    }
+  };
+
+  const handleCopyLink = (url: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      showToast('লিংক কপি করা হয়েছে!');
     }
   };
 
@@ -129,6 +161,19 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   const examsCount = course.examsCount && course.examsCount > 0 ? course.examsCount : exams.length;
   const classesCount = course.classesCount || 0;
   const enrolledCount = course.enrolledCount || '০';
+
+  const hasRoutineData = Boolean(
+    course.routineUrl ||
+    routines.length > 0 ||
+    course.routine
+  );
+
+  const hasSyllabusData = Boolean(
+    course.syllabusUrl ||
+    syllabusList.length > 0 ||
+    course.syllabus ||
+    (course.topics && course.topics.length > 0)
+  );
 
   return (
     <div className={`max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 animate-fade-in ${!course.isEnrolled ? 'pb-24' : ''}`}>
@@ -315,21 +360,31 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       {/* Tab 1: Details */}
       {activeTab === 'details' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#E8F8F5] dark:bg-emerald-950/60 text-[#046A38] dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#E8F8F5] dark:bg-emerald-950/60 text-[#046A38] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
+                  কোর্স সম্পর্কে বিস্তারিত
+                </h3>
+                <p className="text-xs font-bold text-[#046A38] dark:text-emerald-400">
+                  {course.title}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
-                কোর্স সম্পর্কে বিস্তারিত
-              </h3>
-              <p className="text-xs font-bold text-[#046A38] dark:text-emerald-400">
-                {course.title}
-              </p>
-            </div>
+
+            <button
+              onClick={loadData}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+              title="রিফ্রেশ"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-3 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
+          <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-3.5 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
             {/* Quick Specs Overview Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 text-xs">
               <div>
@@ -357,6 +412,39 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                 <span className="font-bold text-slate-800 dark:text-slate-200">{examsCount}টি</span>
               </div>
             </div>
+
+            {/* Interactive Action Link Buttons (if provided from admin / Supabase) */}
+            {(course.liveClassUrl || course.driveLink || course.whatsappGroup) && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {course.liveClassUrl && (
+                  <button
+                    onClick={() => window.open(course.liveClassUrl, '_blank')}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span>লাইভ ক্লাসে যুক্ত হোন</span>
+                  </button>
+                )}
+                {course.driveLink && (
+                  <button
+                    onClick={() => window.open(course.driveLink, '_blank')}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    <span>গুগল ড্রাইভ স্টাডি ফাইল</span>
+                  </button>
+                )}
+                {course.whatsappGroup && (
+                  <button
+                    onClick={() => window.open(course.whatsappGroup, '_blank')}
+                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>হোয়াটসঅ্যাপ ব্যাচ গ্রুপ</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {course.subtitle && (
               <p className="font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
@@ -387,56 +475,290 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       {/* Tab 2: Routine */}
       {activeTab === 'routine' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          {course.routine ? (
-            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
-              {Array.isArray(course.routine) ? (
-                <ul className="list-disc list-inside space-y-1.5 pl-2">
-                  {course.routine.map((r, idx) => (
-                    <li key={idx}>{r}</li>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#E8F8F5] dark:bg-emerald-950/60 text-[#046A38] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
+                  কোর্স ক্লাস ও পরীক্ষার রুটিন
+                </h3>
+                <p className="text-xs font-bold text-[#046A38] dark:text-emerald-400">
+                  {course.title}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={loadData}
+              disabled={isLoadingRoutines}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+              title="রুটিন রিফ্রেশ"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRoutines ? 'animate-spin text-emerald-600' : ''}`} />
+            </button>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            {/* If Routine PDF or URL Link is provided in Admin */}
+            {course.routineUrl && (
+              <div className="neu-card bg-emerald-50/70 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200">
+                      অফিসিয়াল রুটিন ফাইল / পিডিএফ
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                      এডমিন প্যানেল থেকে আপলোডকৃত ফাইল
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDownload('ক্লাস রুটিন', course.routineUrl)}
+                    className="px-3.5 py-2 rounded-xl bg-[#046A38] hover:bg-[#03522b] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>রুটিন দেখুন / ডাউনলোড</span>
+                  </button>
+                  <button
+                    onClick={() => handleCopyLink(course.routineUrl!)}
+                    className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+                    title="লিংক কপি করুন"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* If routines table rows exist in Supabase */}
+            {routines.length > 0 && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">সাপ্তাহিক সময়সূচি:</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {routines.map((r, idx) => (
+                    <div
+                      key={r.id || idx}
+                      className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-100 dark:bg-emerald-950 text-[#046A38] dark:text-emerald-400">
+                          {r.day || `দিন - ০${idx + 1}`}
+                        </span>
+                        {r.time && (
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{r.time}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h5 className="text-xs sm:text-sm font-bold text-[#0B132B] dark:text-white">
+                          {r.subject || r.topic || 'ক্লাস সেশন'}
+                        </h5>
+                        {r.topic && r.topic !== r.subject && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            টপিক: {r.topic}
+                          </p>
+                        )}
+                      </div>
+
+                      {r.instructor && (
+                        <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          উস্তাদ: {r.instructor}
+                        </p>
+                      )}
+
+                      {r.room_or_link && (
+                        <button
+                          onClick={() => window.open(r.room_or_link, '_blank')}
+                          className="w-full mt-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                          <span>ক্লাসে যোগ দিন</span>
+                        </button>
+                      )}
+                    </div>
                   ))}
-                </ul>
-              ) : (
-                <div className="whitespace-pre-line leading-relaxed">{course.routine}</div>
-              )}
-            </div>
-          ) : (
-            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
-              <Calendar className="w-8 h-8 mx-auto opacity-40" />
-              <p>রুটিন শীঘ্রই আপডেট করা হবে</p>
-            </div>
-          )}
+                </div>
+              </div>
+            )}
+
+            {/* If routine text or list is present in courses.routine column */}
+            {course.routine && (
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">রুটিন বিবরণ:</h4>
+                <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                  {Array.isArray(course.routine) ? (
+                    <ul className="list-disc list-inside space-y-1.5 pl-1">
+                      {course.routine.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="whitespace-pre-line leading-relaxed">{course.routine}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Empty fallback if nothing configured yet in Supabase */}
+            {!hasRoutineData && (
+              <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
+                <Calendar className="w-8 h-8 mx-auto opacity-40" />
+                <p>এডমিন প্যানেল থেকে রুটিন যুক্ত করা হলে এখানে প্রদর্শিত হবে</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Tab 3: Syllabus */}
       {activeTab === 'syllabus' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          {course.syllabus ? (
-            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
-              {Array.isArray(course.syllabus) ? (
-                <ul className="list-disc list-inside space-y-1.5 pl-2">
-                  {course.syllabus.map((s, idx) => (
-                    <li key={idx}>{s}</li>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#E8F8F5] dark:bg-emerald-950/60 text-[#046A38] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Bookmark className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
+                  সম্পূর্ণ কোর্স সিলেবাস
+                </h3>
+                <p className="text-xs font-bold text-[#046A38] dark:text-emerald-400">
+                  {course.title}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={loadData}
+              disabled={isLoadingSyllabus}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+              title="সিলেবাস রিফ্রেশ"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSyllabus ? 'animate-spin text-emerald-600' : ''}`} />
+            </button>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            {/* If Syllabus PDF or URL Link is provided in Admin */}
+            {course.syllabusUrl && (
+              <div className="neu-card bg-emerald-50/70 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                    <Bookmark className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200">
+                      অফিসিয়াল সিলেবাস ফাইল / পিডিএফ
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                      এডমিন প্যানেল থেকে আপলোডকৃত সিলেবাস
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDownload('কোর্স সিলেবাস', course.syllabusUrl)}
+                    className="px-3.5 py-2 rounded-xl bg-[#046A38] hover:bg-[#03522b] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>সিলেবাস দেখুন / ডাউনলোড</span>
+                  </button>
+                  <button
+                    onClick={() => handleCopyLink(course.syllabusUrl!)}
+                    className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+                    title="লিংক কপি করুন"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* If course_syllabus table rows exist in Supabase */}
+            {syllabusList.length > 0 && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">অধ্যায়ভিত্তিক সিলেবাস:</h4>
+                <div className="space-y-2.5">
+                  {syllabusList.map((s, idx) => (
+                    <div
+                      key={s.id || idx}
+                      className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 dark:bg-emerald-950 text-[#046A38] dark:text-emerald-400">
+                          {s.chapter || `মডিউল - ০${idx + 1}`}
+                        </span>
+                        {s.classes_count && s.classes_count > 0 ? (
+                          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                            {s.classes_count}টি ক্লাস
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <h5 className="text-xs sm:text-sm font-bold text-[#0B132B] dark:text-white">
+                        {s.topic || s.subject || 'সিলেবাস টপিক'}
+                      </h5>
+
+                      {s.details && (
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                          {s.details}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* If syllabus text or array exists in courses.syllabus */}
+            {course.syllabus && (
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">সিলেবাস বিবরণ:</h4>
+                <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                  {Array.isArray(course.syllabus) ? (
+                    <ul className="list-disc list-inside space-y-1.5 pl-1">
+                      {course.syllabus.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="whitespace-pre-line leading-relaxed">{course.syllabus}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* If topics exist */}
+            {!course.syllabus && syllabusList.length === 0 && course.topics && course.topics.length > 0 && (
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">মূল আলোচ্য সূচি:</h4>
+                <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 pl-1">
+                  {course.topics.map((topic, idx) => (
+                    <li key={idx}>{topic}</li>
                   ))}
                 </ul>
-              ) : (
-                <div className="whitespace-pre-line leading-relaxed">{course.syllabus}</div>
-              )}
-            </div>
-          ) : course.topics && course.topics.length > 0 ? (
-            <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2">
-              <ul className="list-disc list-inside space-y-1.5 pl-2">
-                {course.topics.map((topic, idx) => (
-                  <li key={idx}>{topic}</li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
-              <Bookmark className="w-8 h-8 mx-auto opacity-40" />
-              <p>সিলেবাস শীঘ্রই আপডেট করা হবে</p>
-            </div>
-          )}
+              </div>
+            )}
+
+            {/* Empty fallback */}
+            {!hasSyllabusData && (
+              <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm space-y-2">
+                <Bookmark className="w-8 h-8 mx-auto opacity-40" />
+                <p>এডমিন প্যানেল থেকে সিলেবাস যুক্ত করা হলে এখানে প্রদর্শিত হবে</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

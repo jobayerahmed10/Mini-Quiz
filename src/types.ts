@@ -60,6 +60,28 @@ export type TabRoute = 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects
 
 export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard' | 'profile';
 
+export interface CourseRoutineItem {
+  id?: string;
+  course_id?: string;
+  day?: string;
+  time?: string;
+  subject?: string;
+  topic?: string;
+  instructor?: string;
+  room_or_link?: string;
+  notes?: string;
+}
+
+export interface CourseSyllabusItem {
+  id?: string;
+  course_id?: string;
+  chapter?: string;
+  subject?: string;
+  topic?: string;
+  details?: string;
+  classes_count?: number;
+}
+
 export interface CourseModule {
   id: string;
   title: string;
@@ -67,6 +89,11 @@ export interface CourseModule {
   description?: string;
   syllabus?: string | string[];
   routine?: string | string[];
+  routineUrl?: string;
+  syllabusUrl?: string;
+  driveLink?: string;
+  liveClassUrl?: string;
+  whatsappGroup?: string;
   category: string;
   duration?: string;
   lessonsCount?: number;
