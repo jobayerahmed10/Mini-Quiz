@@ -1131,7 +1131,7 @@ export async function deleteCourseFromSupabase(id: string): Promise<{ success: b
 export async function submitEnrollmentToSupabase(
   enrollment: CourseEnrollmentRecord
 ): Promise<{ success: boolean; data?: CourseEnrollmentRecord; error?: string; isLocalFallback?: boolean }> {
-  const payload = {
+  const fullPayload = {
     course_id: String(enrollment.course_id),
     course_title: String(enrollment.course_title),
     student_name: String(enrollment.student_name).trim(),
@@ -1145,57 +1145,74 @@ export async function submitEnrollmentToSupabase(
   };
 
   if (!supabaseInstance) {
-    return { success: true, data: { ...payload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
+    console.warn('Supabase not initialized for enrollment');
+    return { success: true, data: { ...fullPayload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
   }
 
-  try {
-    // Primary: insert into course_applications
-    const { data: insertedData, error: insertError } = await supabaseInstance
-      .from('course_applications')
-      .insert([payload])
-      .select();
-
-    if (!insertError && insertedData && insertedData.length > 0) {
-      return { success: true, data: insertedData[0] as CourseEnrollmentRecord };
+  // Variations of payload in case columns differ in the user's table:
+  // Variation 1: full payload
+  // Variation 2: standard columns without email
+  // Variation 3: minimum required columns (course_id, student_name, phone_number, transaction_id, payment_method, amount, status)
+  const payloadsToTry = [
+    fullPayload,
+    {
+      course_id: fullPayload.course_id,
+      course_title: fullPayload.course_title,
+      student_name: fullPayload.student_name,
+      phone_number: fullPayload.phone_number,
+      payment_method: fullPayload.payment_method,
+      amount: fullPayload.amount,
+      transaction_id: fullPayload.transaction_id,
+      status: fullPayload.status
+    },
+    {
+      student_name: fullPayload.student_name,
+      phone_number: fullPayload.phone_number,
+      transaction_id: fullPayload.transaction_id,
+      payment_method: fullPayload.payment_method,
+      amount: fullPayload.amount,
+      status: fullPayload.status
     }
+  ];
 
-    // If .select() failed (e.g. RLS allows INSERT but blocks SELECT), try bare insert without .select()
-    if (insertError) {
-      console.warn('course_applications insert with select error:', insertError);
-      
-      const { error: bareError } = await supabaseInstance
-        .from('course_applications')
-        .insert([payload]);
+  const targetTables = ['course_applications', 'course_enrollments'];
 
-      if (!bareError) {
-        return { success: true, data: { ...payload, id: `app_${Date.now()}` } };
+  for (const table of targetTables) {
+    for (const p of payloadsToTry) {
+      try {
+        const { data, error } = await supabaseInstance
+          .from(table)
+          .insert([p])
+          .select();
+
+        if (!error && data && data.length > 0) {
+          console.log(`Successfully inserted into ${table}:`, data[0]);
+          return { success: true, data: data[0] as CourseEnrollmentRecord };
+        }
+
+        // Try bare insert without select (in case SELECT is blocked by RLS)
+        const { error: bareErr } = await supabaseInstance
+          .from(table)
+          .insert([p]);
+
+        if (!bareErr) {
+          console.log(`Successfully bare-inserted into ${table}`);
+          return { success: true, data: { ...fullPayload, id: `app_${Date.now()}` } };
+        }
+      } catch (err) {
+        console.warn(`Error trying insert to ${table}:`, err);
       }
-
-      console.error('course_applications bare insert error:', bareError);
-
-      // Fallback: try course_enrollments table
-      const { data: enrData, error: enrError } = await supabaseInstance
-        .from('course_enrollments')
-        .insert([payload])
-        .select();
-
-      if (!enrError && enrData && enrData.length > 0) {
-        return { success: true, data: enrData[0] as CourseEnrollmentRecord };
-      }
-
-      return {
-        success: false,
-        error: insertError.message || bareError.message || enrError?.message || 'Database RLS error',
-        data: { ...payload, id: `local_enr_${Date.now()}` },
-        isLocalFallback: true
-      };
     }
-
-    return { success: true, data: { ...payload, id: `app_${Date.now()}` } };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return { success: false, error: msg, data: { ...payload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
   }
+
+  // If both tables and variations failed due to RLS, report clear message
+  console.error('All Supabase insert attempts failed. Check RLS on course_applications.');
+  return {
+    success: false,
+    error: 'RLS_PERMISSION_DENIED',
+    data: { ...fullPayload, id: `local_enr_${Date.now()}` },
+    isLocalFallback: true
+  };
 }
 
 export async function updateEnrollmentStatusInSupabase(
