@@ -382,6 +382,7 @@ export default function App() {
 
             {activeTab === 'courses' && (
               <CoursesPage
+                questions={questions}
                 onStartExam={(opts) => handleStartPractice(opts)}
                 onReviewAnswers={(opts) => handleReviewAnswers(opts)}
                 onOpenLeaderboard={handleOpenLeaderboard}

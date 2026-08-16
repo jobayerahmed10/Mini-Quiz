@@ -21,7 +21,7 @@ import {
   Hourglass,
   RefreshCw
 } from 'lucide-react';
-import { CourseModule, CourseEnrollmentRecord } from '../types';
+import { CourseModule, CourseEnrollmentRecord, Question } from '../types';
 import { CourseDetailView } from './CourseDetailView';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 import {
@@ -32,6 +32,7 @@ import {
 } from '../lib/supabase';
 
 interface CoursesPageProps {
+  questions?: Question[];
   onSelectCourse?: (courseId: string) => void;
   onStartExam?: (opts: { subject: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string }) => void;
   onReviewAnswers?: (opts: { examId?: string; subject?: string; examType?: string }) => void;
@@ -41,6 +42,7 @@ interface CoursesPageProps {
 const INITIAL_COURSES: CourseModule[] = [];
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({
+  questions = [],
   onSelectCourse,
   onStartExam,
   onReviewAnswers,
@@ -213,6 +215,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
     return (
       <CourseDetailView
         course={selectedCourseForDetail}
+        questions={questions}
         onBack={() => setSelectedCourseForDetail(null)}
         onStartExam={(opts) => {
           if (onStartExam) onStartExam(opts);
