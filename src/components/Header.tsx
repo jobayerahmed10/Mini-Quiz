@@ -101,14 +101,14 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={`font-tiro font-black text-xl sm:text-2xl md:text-[26px] tracking-tight truncate leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
+                <span className={`font-hind font-extrabold text-xl sm:text-2xl md:text-[26px] tracking-tight whitespace-nowrap leading-snug py-0.5 ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
                   আত-তামরীন
                 </span>
-                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-bold text-[10px] sm:text-xs px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-normal shrink-0">
+                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-normal shrink-0">
                   একাডেমি
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-tight tracking-normal truncate">
+              <p className="text-[11px] sm:text-xs font-hind font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-normal tracking-normal truncate">
                 প্রস্তুতি হোক আরও স্মার্ট
               </p>
             </div>
