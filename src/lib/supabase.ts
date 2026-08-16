@@ -1131,54 +1131,212 @@ export async function deleteCourseFromSupabase(id: string): Promise<{ success: b
 export async function submitEnrollmentToSupabase(
   enrollment: CourseEnrollmentRecord
 ): Promise<{ success: boolean; data?: CourseEnrollmentRecord; error?: string; isLocalFallback?: boolean }> {
-  const fullPayload = {
+  // Convert Bengali numerals to standard English numbers
+  const bnToEn = (str: string): string => {
+    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(str || '')
+      .replace(/[০-৯]/g, (d) => String(bnDigits.indexOf(d)))
+      .trim();
+  };
+
+  const rawPhone = bnToEn(enrollment.phone_number);
+  const rawTrx = String(enrollment.transaction_id || '').trim().toUpperCase();
+  const rawAmountStr = bnToEn(enrollment.amount || '950').replace(/[^0-9.]/g, '') || '950';
+  const numAmount = parseFloat(rawAmountStr) || 950;
+  const generatedUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
+
+  const baseData = {
     course_id: String(enrollment.course_id),
     course_title: String(enrollment.course_title),
     student_name: String(enrollment.student_name).trim(),
-    phone_number: String(enrollment.phone_number).trim(),
+    phone_number: rawPhone,
     email: enrollment.email ? String(enrollment.email).trim() : null,
     payment_method: enrollment.payment_method || 'bkash',
-    amount: String(enrollment.amount || '৯৫০'),
-    transaction_id: String(enrollment.transaction_id || '').trim().toUpperCase(),
+    amount: rawAmountStr,
+    transaction_id: rawTrx,
     status: enrollment.status || 'pending',
     created_at: enrollment.created_at || new Date().toISOString()
   };
 
   if (!supabaseInstance) {
     console.warn('Supabase not initialized for enrollment');
-    return { success: true, data: { ...fullPayload, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
+    return { success: true, data: { ...baseData, id: `local_enr_${Date.now()}` }, isLocalFallback: true };
   }
 
-  // Variations of payload in case columns differ in the user's table:
-  // Variation 1: full payload
-  // Variation 2: standard columns without email
-  // Variation 3: minimum required columns (course_id, student_name, phone_number, transaction_id, payment_method, amount, status)
-  const payloadsToTry = [
-    fullPayload,
+  const targetTables = ['course_applications', 'course_enrollments', 'applications', 'enrollments', 'admissions'];
+
+  // Strategy 1: Dynamic schema detection from existing rows
+  for (const table of targetTables) {
+    try {
+      const { data: sampleRows, error: sampleErr } = await supabaseInstance
+        .from(table)
+        .select('*')
+        .limit(1);
+
+      if (!sampleErr && sampleRows) {
+        let dynamicPayload: Record<string, any> = {};
+        
+        if (sampleRows.length > 0) {
+          const sample = sampleRows[0];
+          const cols = Object.keys(sample);
+
+          // Map student name
+          if (cols.includes('student_name')) dynamicPayload.student_name = baseData.student_name;
+          else if (cols.includes('name')) dynamicPayload.name = baseData.student_name;
+          else if (cols.includes('full_name')) dynamicPayload.full_name = baseData.student_name;
+          else if (cols.includes('studentName')) dynamicPayload.studentName = baseData.student_name;
+
+          // Map phone
+          if (cols.includes('phone_number')) dynamicPayload.phone_number = baseData.phone_number;
+          else if (cols.includes('phone')) dynamicPayload.phone = baseData.phone_number;
+          else if (cols.includes('mobile')) dynamicPayload.mobile = baseData.phone_number;
+          else if (cols.includes('phoneNumber')) dynamicPayload.phoneNumber = baseData.phone_number;
+
+          // Map transaction ID
+          if (cols.includes('transaction_id')) dynamicPayload.transaction_id = baseData.transaction_id;
+          else if (cols.includes('trx_id')) dynamicPayload.trx_id = baseData.transaction_id;
+          else if (cols.includes('trxid')) dynamicPayload.trxid = baseData.transaction_id;
+          else if (cols.includes('transactionId')) dynamicPayload.transactionId = baseData.transaction_id;
+
+          // Map payment method
+          if (cols.includes('payment_method')) dynamicPayload.payment_method = baseData.payment_method;
+          else if (cols.includes('method')) dynamicPayload.method = baseData.payment_method;
+          else if (cols.includes('paymentMethod')) dynamicPayload.paymentMethod = baseData.payment_method;
+
+          // Map amount (detect type from sample)
+          const sampleAmtType = typeof sample.amount;
+          if (cols.includes('amount')) {
+            dynamicPayload.amount = sampleAmtType === 'number' ? numAmount : rawAmountStr;
+          } else if (cols.includes('price')) {
+            dynamicPayload.price = typeof sample.price === 'number' ? numAmount : rawAmountStr;
+          } else if (cols.includes('fee')) {
+            dynamicPayload.fee = typeof sample.fee === 'number' ? numAmount : rawAmountStr;
+          }
+
+          // Map course
+          if (cols.includes('course_id')) dynamicPayload.course_id = baseData.course_id;
+          else if (cols.includes('courseId')) dynamicPayload.courseId = baseData.course_id;
+
+          if (cols.includes('course_title')) dynamicPayload.course_title = baseData.course_title;
+          else if (cols.includes('course_name')) dynamicPayload.course_name = baseData.course_title;
+          else if (cols.includes('courseTitle')) dynamicPayload.courseTitle = baseData.course_title;
+
+          // Map status
+          if (cols.includes('status')) dynamicPayload.status = baseData.status;
+
+          // Map email
+          if (cols.includes('email') && baseData.email) dynamicPayload.email = baseData.email;
+
+          // Map created_at
+          if (cols.includes('created_at')) dynamicPayload.created_at = baseData.created_at;
+
+          // If id column exists and is not auto-generated
+          if (cols.includes('id') && generatedUuid && typeof sample.id === 'string' && sample.id.includes('-')) {
+            dynamicPayload.id = generatedUuid;
+          }
+        }
+
+        // If dynamic payload has key info, try inserting it
+        if (Object.keys(dynamicPayload).length >= 3) {
+          const { data: dynData, error: dynErr } = await supabaseInstance
+            .from(table)
+            .insert([dynamicPayload])
+            .select();
+
+          if (!dynErr && dynData && dynData.length > 0) {
+            console.log(`Successfully dynamically inserted into ${table}:`, dynData[0]);
+            return { success: true, data: { ...baseData, id: String(dynData[0].id || generatedUuid || Date.now()) } };
+          }
+
+          const { error: dynBareErr } = await supabaseInstance
+            .from(table)
+            .insert([dynamicPayload]);
+
+          if (!dynBareErr) {
+            console.log(`Successfully bare-inserted into ${table} via dynamic mapping`);
+            return { success: true, data: { ...baseData, id: String(generatedUuid || Date.now()) } };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`Dynamic check failed for table ${table}:`, e);
+    }
+  }
+
+  // Strategy 2: Permutation payloads covering all standard schema types
+  const candidatePayloads = [
+    // Standard schema with string amount
     {
-      course_id: fullPayload.course_id,
-      course_title: fullPayload.course_title,
-      student_name: fullPayload.student_name,
-      phone_number: fullPayload.phone_number,
-      payment_method: fullPayload.payment_method,
-      amount: fullPayload.amount,
-      transaction_id: fullPayload.transaction_id,
-      status: fullPayload.status
+      course_id: baseData.course_id,
+      course_title: baseData.course_title,
+      student_name: baseData.student_name,
+      phone_number: baseData.phone_number,
+      email: baseData.email,
+      payment_method: baseData.payment_method,
+      amount: rawAmountStr,
+      transaction_id: baseData.transaction_id,
+      status: baseData.status,
+      created_at: baseData.created_at
     },
+    // Standard schema with numeric amount
     {
-      student_name: fullPayload.student_name,
-      phone_number: fullPayload.phone_number,
-      transaction_id: fullPayload.transaction_id,
-      payment_method: fullPayload.payment_method,
-      amount: fullPayload.amount,
-      status: fullPayload.status
+      course_id: baseData.course_id,
+      course_title: baseData.course_title,
+      student_name: baseData.student_name,
+      phone_number: baseData.phone_number,
+      email: baseData.email,
+      payment_method: baseData.payment_method,
+      amount: numAmount,
+      transaction_id: baseData.transaction_id,
+      status: baseData.status,
+      created_at: baseData.created_at
+    },
+    // Standard schema with UUID
+    ...(generatedUuid ? [{
+      id: generatedUuid,
+      course_id: baseData.course_id,
+      course_title: baseData.course_title,
+      student_name: baseData.student_name,
+      phone_number: baseData.phone_number,
+      payment_method: baseData.payment_method,
+      amount: rawAmountStr,
+      transaction_id: baseData.transaction_id,
+      status: baseData.status
+    }] : []),
+    // Compact schema without email / title
+    {
+      course_id: baseData.course_id,
+      student_name: baseData.student_name,
+      phone_number: baseData.phone_number,
+      payment_method: baseData.payment_method,
+      amount: rawAmountStr,
+      transaction_id: baseData.transaction_id,
+      status: baseData.status
+    },
+    // Short column names (name, phone, trx_id)
+    {
+      name: baseData.student_name,
+      phone: baseData.phone_number,
+      trx_id: baseData.transaction_id,
+      payment_method: baseData.payment_method,
+      amount: rawAmountStr,
+      status: baseData.status
+    },
+    // Short column names with numeric amount
+    {
+      name: baseData.student_name,
+      phone: baseData.phone_number,
+      trx_id: baseData.transaction_id,
+      method: baseData.payment_method,
+      amount: numAmount,
+      status: baseData.status
     }
   ];
 
-  const targetTables = ['course_applications', 'course_enrollments'];
+  let lastErrorMsg = '';
 
   for (const table of targetTables) {
-    for (const p of payloadsToTry) {
+    for (const p of candidatePayloads) {
       try {
         const { data, error } = await supabaseInstance
           .from(table)
@@ -1186,31 +1344,36 @@ export async function submitEnrollmentToSupabase(
           .select();
 
         if (!error && data && data.length > 0) {
-          console.log(`Successfully inserted into ${table}:`, data[0]);
-          return { success: true, data: data[0] as CourseEnrollmentRecord };
+          console.log(`Successfully inserted enrollment to ${table}:`, data[0]);
+          return { success: true, data: { ...baseData, id: String(data[0].id || Date.now()) } };
         }
 
-        // Try bare insert without select (in case SELECT is blocked by RLS)
+        if (error) {
+          lastErrorMsg = error.message;
+        }
+
+        // Try bare insert without select
         const { error: bareErr } = await supabaseInstance
           .from(table)
           .insert([p]);
 
         if (!bareErr) {
-          console.log(`Successfully bare-inserted into ${table}`);
-          return { success: true, data: { ...fullPayload, id: `app_${Date.now()}` } };
+          console.log(`Successfully bare-inserted enrollment to ${table}`);
+          return { success: true, data: { ...baseData, id: String(generatedUuid || Date.now()) } };
+        } else {
+          lastErrorMsg = bareErr.message;
         }
-      } catch (err) {
-        console.warn(`Error trying insert to ${table}:`, err);
+      } catch (err: any) {
+        lastErrorMsg = err?.message || 'Database error';
       }
     }
   }
 
-  // If both tables and variations failed due to RLS, report clear message
-  console.error('All Supabase insert attempts failed. Check RLS on course_applications.');
+  console.error('All Supabase insert attempts failed:', lastErrorMsg);
   return {
     success: false,
-    error: 'RLS_PERMISSION_DENIED',
-    data: { ...fullPayload, id: `local_enr_${Date.now()}` },
+    error: lastErrorMsg || 'Database insert error',
+    data: { ...baseData, id: `local_enr_${Date.now()}` },
     isLocalFallback: true
   };
 }
