@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3 } from 'lucide-react';
+import { BookOpenCheck, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3, GraduationCap } from 'lucide-react';
 import { PageRoute } from '../types';
 import { getUserProfile } from '../lib/utils';
 import { AtTamreenLogo } from './AtTamreenLogo';
@@ -67,54 +67,59 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 border-b ${
-      isDarkMode ? 'bg-[#0B132B]/90 border-slate-800 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xs'
+      isDarkMode ? 'bg-[#0B132B]/90 border-slate-800 text-white' : 'bg-[#F0F4F8]/95 border-slate-200/80 text-slate-900 shadow-xs'
     }`}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 sm:h-18 flex items-center justify-between gap-2">
         {/* Top Left Area (Back Button + Brand Logo) */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           {/* Top-Left Back Button when inside sub-page or non-home tab */}
           {(currentPage !== 'home' || (activeTab && activeTab !== 'exam')) && (
             <button
               onClick={onGoBack || onNavigateHome}
-              className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all border shrink-0 active:scale-95 shadow-xs ${
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all border shrink-0 active:scale-95 shadow-xs ${
                 isDarkMode
                   ? 'bg-slate-800 text-amber-400 border-slate-700 hover:bg-slate-700'
-                  : 'bg-slate-100 text-[#0B132B] border-slate-300 hover:bg-slate-200'
+                  : 'bg-white text-[#0B132B] border-slate-300 hover:bg-slate-100'
               }`}
               title="পিছনে ফিরে যান"
             >
-              <ArrowLeft className="w-4 h-4 text-amber-500 shrink-0" />
+              <ArrowLeft className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span className="font-extrabold hidden xs:inline">পিছনে</span>
             </button>
           )}
 
-          {/* Brand Name (Logo removed as requested, text enlarged) */}
+          {/* Exact Brand Logo + Title + Subtitle */}
           <button
             onClick={onNavigateHome}
-            className="flex items-center text-left group focus:outline-hidden cursor-pointer min-w-0"
+            className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-hidden cursor-pointer min-w-0"
             title="হোম পেজে যান"
           >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={`font-tiro font-black text-2xl sm:text-3xl lg:text-4xl tracking-wide truncate leading-snug drop-shadow-xs ${isDarkMode ? 'text-white' : 'text-[#0B132B]'}`}>
-                  <span className="typo-gradient-brand">আত-তামরীন</span>{' '}
-                  <span className="typo-gradient-gold font-anek font-extrabold text-base sm:text-2xl px-2.5 py-0.5 rounded-xl bg-amber-500/10 dark:bg-amber-400/20 border border-amber-500/30 inline-block align-middle ml-1">
-                    একাডেমি
-                  </span>
+            {/* Green Squircle Logo Box with Golden Graduation Cap */}
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-[16px] sm:rounded-[18px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
+              <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-[#EAB308]" strokeWidth={2.3} />
+            </div>
+
+            <div className="min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className={`font-tiro font-black text-xl sm:text-2xl md:text-[26px] tracking-tight truncate leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
+                  আত-তামরীন
+                </span>
+                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-bold text-[10px] sm:text-xs px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-normal shrink-0">
+                  একাডেমি
                 </span>
               </div>
-              <p className={`text-xs sm:text-sm font-bold tracking-wide hidden sm:block truncate mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                শিক্ষক নিবন্ধন ও বিষয়ভিত্তিক জব প্রস্তুতি প্ল্যাটফর্ম
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-tight tracking-normal truncate">
+                প্রস্তুতি হোক আরও স্মার্ট
               </p>
             </div>
           </button>
         </div>
 
         {/* Action Controls Header Right */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           {/* Active Subject Indicator Pill */}
           {selectedSubject && selectedSubject !== 'all' && (
-            <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 border rounded-full text-xs font-bold ${
+            <div className={`hidden lg:flex items-center gap-2 px-3 py-1 border rounded-full text-xs font-bold ${
               isDarkMode ? 'bg-slate-800/80 border-slate-700 text-amber-300' : 'bg-slate-100 border-slate-300 text-[#0B132B]'
             }`}>
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
@@ -122,16 +127,22 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Font Settings Neumorphic Button */}
+          {/* Font Settings Button with Orange T */}
           <div className="relative">
             <button
               onClick={() => setShowFontMenu(!showFontMenu)}
-              className={`neu-btn p-2.5 rounded-2xl flex items-center justify-center cursor-pointer transition-all ${
-                showFontMenu ? 'neu-btn-active' : ''
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all border shadow-xs active:scale-95 ${
+                showFontMenu
+                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/30'
+                  : isDarkMode
+                  ? 'bg-slate-800/90 hover:bg-slate-700 border-slate-700'
+                  : 'bg-white hover:bg-slate-50 border-slate-200/90'
               }`}
               title="ফন্ট স্টাইল, আরবি ফন্ট ও হরকত সেটিং"
             >
-              <Type className="w-4 h-4 text-amber-500" />
+              <span className="text-[#E65100] dark:text-[#FB923C] font-black text-lg sm:text-xl leading-none font-sans">
+                T
+              </span>
             </button>
 
             {/* Font Options Popover Dropdown */}
@@ -285,20 +296,20 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Dark Mode Neumorphic Toggle Button */}
+          {/* Dark Mode Toggle Button (Moon / Sun) */}
           <button
             onClick={onToggleDarkMode}
-            className="neu-btn p-2.5 rounded-2xl flex items-center justify-center cursor-pointer transition-all"
-            title={isDarkMode ? "লাইটে মোডে পরিবর্তন করুন" : "ডার্ক মোডে পরিবর্তন করুন"}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all border shadow-xs active:scale-95 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200/90 dark:border-slate-700"
+            title={isDarkMode ? "লাইট মোডে পরিবর্তন করুন" : "ডার্ক মোডে পরিবর্তন করুন"}
           >
             {isDarkMode ? (
-              <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+              <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 animate-spin-slow" />
             ) : (
-              <Moon className="w-4 h-4 text-[#0B132B]" />
+              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-[#1E293B] dark:text-slate-200" strokeWidth={2.2} />
             )}
           </button>
 
-          {/* User Profile / Top-Right Menu Button */}
+          {/* User Profile / Circular Avatar Button */}
           <div className="relative">
             <button
               onClick={() => {
@@ -309,35 +320,20 @@ export const Header: React.FC<HeaderProps> = ({
                 }
                 setShowFontMenu(false);
               }}
-              className={`p-1.5 sm:px-3 sm:py-2 rounded-2xl flex items-center gap-2 cursor-pointer transition-all border shadow-xs active:scale-95 ${
-                showUserMenu
-                  ? 'bg-[#0b705c] text-white border-[#0b705c]'
-                  : isDarkMode
-                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
-                  : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-              }`}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-amber-100 dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
               title="ব্যবহারকারীর প্রোফাইল ও মেনু"
             >
               {userProfile?.avatar ? (
                 <img
                   src={userProfile.avatar}
-                  alt={userProfile.name}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-amber-400 shrink-0"
+                  alt={userProfile.name || 'User'}
+                  className="w-full h-full rounded-full object-cover"
                 />
               ) : (
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#0b705c] text-amber-300 flex items-center justify-center font-black text-xs shrink-0 border border-emerald-400">
-                  <User className="w-4 h-4" />
+                <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
+                  <User className="w-4 h-4 text-amber-300" />
                 </div>
               )}
-              <div className="text-left hidden md:block min-w-0 max-w-[110px]">
-                <span className="block text-xs font-black truncate leading-tight font-tiro text-emerald-800 dark:text-emerald-300">
-                  {userProfile?.name || 'প্রোফাইল'}
-                </span>
-                <span className="block text-[9px] opacity-75 font-bold truncate">
-                  {userProfile?.phone ? userProfile.phone : 'মেনু ও তথ্য'}
-                </span>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 opacity-70 shrink-0 hidden sm:block" />
             </button>
 
             {/* Top Right User Menu Dropdown Popover */}
