@@ -24,6 +24,7 @@ import {
 import { CourseModule, CourseEnrollmentRecord, Question } from '../types';
 import { CourseDetailView } from './CourseDetailView';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
+import { formatCoursePrice } from '../lib/utils';
 import {
   fetchCoursesFromSupabase,
   fetchEnrollmentsFromSupabase,
@@ -441,7 +442,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                   ) : (
                     <>
                       <div className="text-xs sm:text-base font-black text-[#0B132B] dark:text-white">
-                        ৳{course.price || '৯৫০'}
+                        {formatCoursePrice(course.price)}
                       </div>
 
                       <button
@@ -549,7 +550,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                     className="flex-1 py-2.5 bg-[#046A38] hover:bg-[#03522b] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-all active:scale-95"
                   >
                     <CreditCard className="w-4 h-4 text-amber-300" />
-                    এখনই ভর্তি হন (৳{activeCourseModal.price || '৯৫০'})
+                    এখনই ভর্তি হন ({formatCoursePrice(activeCourseModal.price)})
                   </button>
                   <button
                     onClick={() => setActiveCourseModal(null)}

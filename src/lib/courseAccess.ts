@@ -1,4 +1,5 @@
 import { CourseModule } from '../types';
+import { formatCoursePrice } from './utils';
 
 export interface CourseFeatureAccessResult {
   canAccess: boolean;
@@ -75,7 +76,7 @@ export function checkCourseAccess(
     isEnrolled: false,
     reason: 'PREMIUM_LOCKED',
     message: `এই ${featureText} আপনাকে কোর্সে ভর্তি হতে হবে।`,
-    actionButtonText: `এখনই ভর্তি হন (৳${course.price || '৯৫০'})`
+    actionButtonText: `এখনই ভর্তি হন (${formatCoursePrice(course.price)})`
   };
 }
 

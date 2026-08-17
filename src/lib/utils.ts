@@ -446,4 +446,36 @@ export function isArabicText(text?: string, subject?: string): boolean {
   return arabicRegex.test(text);
 }
 
+/**
+ * Formats a course price cleanly ensuring the Taka symbol (৳) appears exactly once.
+ * Handles strings that already contain '৳', English/Bengali digits, and free indicators.
+ * E.g., '৳৯৫০' -> '৳৯৫০', '৯৫০' -> '৳৯৫০', '৳ 950' -> '৳৯৫০', 950 -> '৳৯৫০', '0' -> 'বিনামূল্যে'
+ */
+export function formatCoursePrice(price?: string | number | null): string {
+  if (price === null || price === undefined || price === '') {
+    return '৳৯৫০';
+  }
+  const str = String(price).trim();
+  if (str === '০' || str === '0' || str === 'ফ্রি' || str === 'বিনামূল্যে') {
+    return 'বিনামূল্যে';
+  }
+  // Strip any leading ৳, Tk, TK, টাকা and extra whitespace/symbols
+  const cleanStr = str.replace(/^(৳|Tk\.?|TK\.?|টাকা)\s*/gi, '').trim();
+  if (!cleanStr) return '৳৯৫০';
+  return `৳${toBengaliNumeral(cleanStr)}`;
+}
+
+/**
+ * Returns clean price digits/amount without currency symbol for transaction payloads
+ */
+export function getCleanPriceAmount(price?: string | number | null): string {
+  if (price === null || price === undefined || price === '') {
+    return '৯৫০';
+  }
+  const str = String(price).trim();
+  const cleanStr = str.replace(/^(৳|Tk\.?|TK\.?|টাকা)\s*/gi, '').trim();
+  return cleanStr ? toBengaliNumeral(cleanStr) : '৯৫০';
+}
+
+
 

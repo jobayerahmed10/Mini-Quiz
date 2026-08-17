@@ -39,6 +39,7 @@ import {
 } from '../types';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
 import { UserRegistrationModal } from './UserRegistrationModal';
+import { formatCoursePrice } from '../lib/utils';
 import {
   fetchCourseSheetsFromSupabase,
   fetchCourseExamsFromSupabase,
@@ -302,7 +303,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
             className="px-4 py-2 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
           >
             <CreditCard className="w-4 h-4 text-amber-300" />
-            <span>ভর্তি হন (৳{course.price || '৯৫০'})</span>
+            <span>ভর্তি হন ({formatCoursePrice(course.price)})</span>
           </button>
         )}
       </div>
@@ -484,7 +485,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
               </div>
               <div>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">ভর্তি ফি</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">৳{course.price || '০'}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{formatCoursePrice(course.price)}</span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">মোট ক্লাস</span>
@@ -1231,7 +1232,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-1">
               <span className="text-lg sm:text-xl font-black text-[#0B132B] dark:text-white">
-                ৳{course.price || '৯৫০'}
+                {formatCoursePrice(course.price)}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">
                 কোর্স ফি
