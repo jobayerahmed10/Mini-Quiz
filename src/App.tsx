@@ -13,7 +13,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
-import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, LeaderboardEntry } from './lib/supabase';
+import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, submitExamResultToSupabase, LeaderboardEntry } from './lib/supabase';
 import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId } from './lib/utils';
 
 export default function App() {
@@ -172,19 +172,20 @@ export default function App() {
     setQuizResult(result);
     setResultViewMode('summary');
 
-    // Create & save Leaderboard Entry
+    // Create & save Leaderboard Entry & Exam Result
     const userProfile = getUserProfile();
     const userName = userProfile?.name?.trim() || 'পরীক্ষার্থী';
     const userAvatar = userProfile?.avatar;
 
     const examId = activeExamId || selectedSubject || 'general';
     const examTitle = activeExamTitle || (typeof activeExamId === 'string' && activeExamId !== selectedSubject ? activeExamId : selectedSubject) || 'মডেল টেস্ট';
+    const userId = getUserUniqueId();
 
     const entry: LeaderboardEntry = {
       id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       exam_id: examId,
       exam_title: examTitle,
-      user_id: getUserUniqueId(),
+      user_id: userId,
       user_name: userName,
       user_avatar: userAvatar,
       score: correctCount,
@@ -196,6 +197,22 @@ export default function App() {
     };
 
     saveLeaderboardEntryToSupabase(entry);
+
+    // Also persist structured exam result to Supabase exam_results & profiles
+    submitExamResultToSupabase({
+      exam_id: examId,
+      exam_title: examTitle,
+      is_free: true,
+      user_id: userId,
+      full_name: userName,
+      avatar_url: userAvatar,
+      score: correctCount,
+      total_marks: totalQuestions,
+      correct_answers: correctCount,
+      wrong_answers: wrongCount,
+      time_taken_seconds: 0,
+      submitted_at: entry.created_at,
+    });
 
     // Mark specific active exam as completed and persist result
     if (activeExamId) {

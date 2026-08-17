@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X } from 'lucide-react';
 import { toBengaliNumeral, getUserProfile, getUserUniqueId } from '../lib/utils';
-import { LeaderboardEntry, fetchLeaderboardEntriesFromSupabase, fetchExamsFromSupabase, ExamItem } from '../lib/supabase';
+import { 
+  LeaderboardEntry, 
+  fetchLeaderboardEntriesFromSupabase, 
+  fetchExamsFromSupabase, 
+  ExamItem,
+  getExamLeaderboard,
+  getFreeOverallLeaderboard,
+  ExamLeaderboardItem,
+  FreeOverallLeaderboardItem
+} from '../lib/supabase';
 
 export type LeaderboardFilterType = 'today' | 'this_week' | 'this_month' | 'all_time' | 'this_exam';
 
@@ -296,12 +305,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   }, [effectiveExamOnlyMode, selectedExamId]);
 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [rpcRankedList, setRpcRankedList] = useState<LeaderboardDisplayItem[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [examList, setExamList] = useState<ExamItem[]>(propsExams || []);
 
+  const currentUserId = getUserUniqueId();
   const userProfile = getUserProfile();
   const userName = userProfile?.name?.trim() || 'পরীক্ষার্থী';
   const userAvatar = userProfile?.avatar || '';
+  const normalizedCurrentUserName = (userName || '').toLowerCase().trim();
 
   // Load Exam List
   useEffect(() => {
@@ -316,18 +328,93 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     }
   }, [propsExams]);
 
-  // Fetch Leaderboard entries from Supabase / localStorage
-  const loadLeaderboardData = async () => {
+  const currentFilter = effectiveExamOnlyMode ? 'this_exam' : filterType;
+  const currentExamObj = examList.find((e) => e.id === selectedExamId);
+  const selectedExamTitle = currentExamObj ? currentExamObj.title : (selectedExamId === 'all' ? 'সকল বিষয় / মডেল টেস্ট' : selectedExamId);
+
+  // Fetch Leaderboard entries via secure database RPCs / fallback
+  const loadLeaderboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await fetchLeaderboardEntriesFromSupabase('all');
-      setEntries(data);
+      if (currentFilter === 'this_exam' && selectedExamId && selectedExamId !== 'all') {
+        // A. Call secure Exam-Specific Leaderboard RPC
+        const examRows = await getExamLeaderboard(selectedExamId);
+        if (examRows && examRows.length > 0) {
+          const mapped: LeaderboardDisplayItem[] = examRows.map((row) => {
+            const isCurr = Boolean(
+              (row.user_id && currentUserId && row.user_id === currentUserId) ||
+              (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
+            );
+            const cleanName = isCurr ? (userName || row.full_name) : row.full_name;
+            const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
+            const totalQ = Number(row.total_marks || (row.correct_answers + row.wrong_answers) || 0);
+
+            return {
+              id: `rpc_exam_${row.user_id}_${row.rank}`,
+              rank: Number(row.rank),
+              userName: cleanName,
+              userAvatar: cleanAvatar,
+              isCurrentUser: isCurr,
+              testCount: 1,
+              avgAccuracy: totalQ > 0 ? Math.round((Number(row.score || row.correct_answers) / totalQ) * 100) : 100,
+              points: Number(row.score ?? row.correct_answers ?? 0),
+              totalQuestions: totalQ,
+              correctCount: Number(row.correct_answers ?? row.score ?? 0),
+              wrongCount: Number(row.wrong_answers ?? 0),
+              score: Number(row.score ?? 0),
+              timeTakenSeconds: Number(row.time_taken_seconds ?? 0),
+              examTitle: selectedExamTitle,
+              createdAt: new Date().toISOString(),
+            };
+          });
+          setRpcRankedList(mapped);
+        } else {
+          setRpcRankedList(null);
+        }
+      } else {
+        // B. Call secure Free Overall Leaderboard RPC
+        const freeRows = await getFreeOverallLeaderboard(currentFilter);
+        if (freeRows && freeRows.length > 0) {
+          const mapped: LeaderboardDisplayItem[] = freeRows.map((row) => {
+            const isCurr = Boolean(
+              (row.user_id && currentUserId && row.user_id === currentUserId) ||
+              (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
+            );
+            const cleanName = isCurr ? (userName || row.full_name) : row.full_name;
+            const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
+
+            return {
+              id: `rpc_free_${row.user_id}_${row.rank}`,
+              rank: Number(row.rank),
+              userName: cleanName,
+              userAvatar: cleanAvatar,
+              isCurrentUser: isCurr,
+              testCount: Number(row.free_exam_count || 1),
+              avgAccuracy: Math.round(Number(row.average_percentage || 0)),
+              points: Number(row.total_points || 0),
+              totalQuestions: 0,
+              correctCount: Number(row.total_points || 0),
+              wrongCount: 0,
+              score: Number(row.total_points || 0),
+              createdAt: new Date().toISOString(),
+            };
+          });
+          setRpcRankedList(mapped);
+        } else {
+          setRpcRankedList(null);
+        }
+      }
+
+      // Also sync fallback entries
+      const fallbackEntries = await fetchLeaderboardEntriesFromSupabase('all');
+      setEntries(fallbackEntries);
     } catch {
       setEntries([]);
+      setRpcRankedList(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentFilter, selectedExamId, selectedExamTitle, currentUserId, userName, userAvatar, normalizedCurrentUserName]);
 
   useEffect(() => {
     loadLeaderboardData();
@@ -355,18 +442,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       }
       if (bc) bc.close();
     };
-  }, []);
-
-  const currentFilter = effectiveExamOnlyMode ? 'this_exam' : filterType;
+  }, [loadLeaderboardData]);
 
   // Compute ranked list based on current filter & selected exam
-  const rankedList = computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar, examList);
+  const rankedList = (rpcRankedList && rpcRankedList.length > 0)
+    ? rpcRankedList
+    : computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar, examList);
+
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
-
-  // Selected Exam Title display
-  const currentExamObj = examList.find((e) => e.id === selectedExamId);
-  const selectedExamTitle = currentExamObj ? currentExamObj.title : (selectedExamId === 'all' ? 'সকল বিষয় / মডেল টেস্ট' : selectedExamId);
 
   return (
     <div className="space-y-6">

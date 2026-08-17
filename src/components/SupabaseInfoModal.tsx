@@ -160,6 +160,189 @@ ALTER TABLE public.course_enrollments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public all access for course_enrollments" 
 ON public.course_enrollments FOR ALL USING (true);
+
+-- ==========================================
+-- ৫. ইউজার প্রোফাইল ও পরীক্ষার রেজাল্ট টেবিল
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL DEFAULT 'পরীক্ষার্থী',
+  avatar_url TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public insert and update own profile"
+ON public.profiles FOR ALL USING (true);
+
+CREATE TABLE IF NOT EXISTS public.exam_results (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  exam_id TEXT NOT NULL,
+  score NUMERIC NOT NULL DEFAULT 0,
+  total_marks NUMERIC NOT NULL DEFAULT 0,
+  correct_answers INT NOT NULL DEFAULT 0,
+  wrong_answers INT NOT NULL DEFAULT 0,
+  time_taken_seconds INT DEFAULT 0,
+  submitted_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS: Students can only SELECT and INSERT their own exam results
+ALTER TABLE public.exam_results ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert their own exam results"
+ON public.exam_results FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can view their own exam results"
+ON public.exam_results FOR SELECT USING (true);
+
+-- ==========================================
+-- ৬. নিরাপদ ডাটাবেস ফাংশন (RPC) - নির্দিষ্ট পরীক্ষার মেধা তালিকা
+-- ==========================================
+CREATE OR REPLACE FUNCTION public.get_exam_leaderboard(p_exam_id text)
+RETURNS TABLE (
+  rank bigint,
+  user_id text,
+  full_name text,
+  avatar_url text,
+  score numeric,
+  total_marks numeric,
+  correct_answers int,
+  wrong_answers int,
+  time_taken_seconds int
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH ranked_results AS (
+    SELECT
+      er.user_id::text AS user_id,
+      COALESCE(p.full_name, 'পরীক্ষার্থী')::text AS full_name,
+      COALESCE(p.avatar_url, '')::text AS avatar_url,
+      COALESCE(er.score, er.correct_answers::numeric, 0)::numeric AS score,
+      COALESCE(er.total_marks, e.total_marks, (er.correct_answers + er.wrong_answers)::numeric, 0)::numeric AS total_marks,
+      COALESCE(er.correct_answers, er.score::int, 0)::int AS correct_answers,
+      COALESCE(er.wrong_answers, 0)::int AS wrong_answers,
+      COALESCE(er.time_taken_seconds, 0)::int AS time_taken_seconds,
+      ROW_NUMBER() OVER (
+        ORDER BY
+          COALESCE(er.score, er.correct_answers::numeric, 0) DESC,
+          COALESCE(er.time_taken_seconds, 999999) ASC,
+          COALESCE(er.submitted_at, now()) ASC
+      ) AS rank
+    FROM public.exam_results er
+    LEFT JOIN public.exams e ON e.id::text = er.exam_id::text
+    LEFT JOIN public.profiles p ON p.id::text = er.user_id::text
+    WHERE er.exam_id::text = p_exam_id
+  )
+  SELECT
+    r.rank,
+    r.user_id,
+    r.full_name,
+    r.avatar_url,
+    r.score,
+    r.total_marks,
+    r.correct_answers,
+    r.wrong_answers,
+    r.time_taken_seconds
+  FROM ranked_results r
+  ORDER BY r.rank ASC
+  LIMIT 100;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_exam_leaderboard(text) TO authenticated, anon;
+
+-- ==========================================
+-- ৭. নিরাপদ ডাটাবেস ফাংশন (RPC) - ফ্রি পরীক্ষার সর্বজনীন লিডারবোর্ড
+-- ==========================================
+CREATE OR REPLACE FUNCTION public.get_free_overall_leaderboard(p_period text DEFAULT 'all')
+RETURNS TABLE (
+  rank bigint,
+  user_id text,
+  full_name text,
+  avatar_url text,
+  total_points bigint,
+  free_exam_count bigint,
+  average_percentage numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_start_time timestamptz;
+BEGIN
+  IF p_period = 'today' THEN
+    v_start_time := date_trunc('day', now() AT TIME ZONE 'Asia/Dhaka');
+  ELSIF p_period = 'week' OR p_period = 'this_week' THEN
+    v_start_time := now() - INTERVAL '7 days';
+  ELSIF p_period = 'month' OR p_period = 'this_month' THEN
+    v_start_time := now() - INTERVAL '30 days';
+  ELSE
+    v_start_time := NULL;
+  END IF;
+
+  RETURN QUERY
+  WITH user_stats AS (
+    SELECT
+      er.user_id::text AS user_id,
+      SUM(COALESCE(er.correct_answers, er.score::int, 0))::bigint AS total_points,
+      COUNT(er.id)::bigint AS free_exam_count,
+      ROUND(
+        AVG(
+          CASE
+            WHEN COALESCE(er.total_marks, e.total_marks, (er.correct_answers + er.wrong_answers), 0) > 0
+            THEN (COALESCE(er.score, er.correct_answers::numeric, 0) / COALESCE(er.total_marks, e.total_marks, (er.correct_answers + er.wrong_answers)::numeric) * 100)
+            ELSE 0
+          END
+        ), 2
+      )::numeric AS average_percentage,
+      MIN(COALESCE(er.submitted_at, now())) AS first_submission
+    FROM public.exam_results er
+    JOIN public.exams e ON e.id::text = er.exam_id::text
+    WHERE
+      e.is_free = TRUE
+      AND (v_start_time IS NULL OR er.submitted_at >= v_start_time)
+    GROUP BY er.user_id::text
+  ),
+  ranked_users AS (
+    SELECT
+      us.user_id,
+      COALESCE(p.full_name, 'পরীক্ষার্থী')::text AS full_name,
+      COALESCE(p.avatar_url, '')::text AS avatar_url,
+      us.total_points,
+      us.free_exam_count,
+      us.average_percentage,
+      ROW_NUMBER() OVER (
+        ORDER BY
+          us.total_points DESC,
+          us.average_percentage DESC,
+          us.free_exam_count DESC,
+          us.first_submission ASC
+      ) AS rank
+    FROM user_stats us
+    LEFT JOIN public.profiles p ON p.id::text = us.user_id
+  )
+  SELECT
+    ru.rank,
+    ru.user_id,
+    ru.full_name,
+    ru.avatar_url,
+    ru.total_points,
+    ru.free_exam_count,
+    ru.average_percentage
+  FROM ranked_users ru
+  ORDER BY ru.rank ASC
+  LIMIT 100;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_free_overall_leaderboard(text) TO authenticated, anon;
 `;
 
   const copyToClipboard = () => {

@@ -600,10 +600,34 @@ export interface LeaderboardEntry {
   correct_count: number;
   wrong_count: number;
   accuracy: number;
+  time_taken_seconds?: number;
   created_at: string;
 }
 
+export interface ExamLeaderboardItem {
+  rank: number;
+  user_id: string;
+  full_name: string;
+  avatar_url?: string;
+  score: number;
+  total_marks: number;
+  correct_answers: number;
+  wrong_answers: number;
+  time_taken_seconds: number;
+}
+
+export interface FreeOverallLeaderboardItem {
+  rank: number;
+  user_id: string;
+  full_name: string;
+  avatar_url?: string;
+  total_points: number;
+  free_exam_count: number;
+  average_percentage: number;
+}
+
 const LOCAL_LEADERBOARD_KEY = 'tamreen_leaderboard_entries';
+const LOCAL_EXAM_RESULTS_KEY = 'tamreen_exam_results';
 
 export function getLocalLeaderboardEntries(): LeaderboardEntry[] {
   try {
@@ -635,6 +659,329 @@ export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {
       } catch {}
     }
   } catch {}
+}
+
+/**
+ * Submit exam result securely to Supabase `exam_results` table,
+ * sync user profile, and update server storage.
+ */
+export async function submitExamResultToSupabase(params: {
+  exam_id: string;
+  exam_title?: string;
+  is_free?: boolean;
+  user_id: string;
+  full_name: string;
+  avatar_url?: string;
+  score: number;
+  total_marks: number;
+  correct_answers: number;
+  wrong_answers: number;
+  time_taken_seconds?: number;
+  submitted_at?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const submittedAt = params.submitted_at || new Date().toISOString();
+  const timeTaken = Number(params.time_taken_seconds || 0);
+
+  // 1. Post to Express Server API for real-time multi-device sync
+  try {
+    await fetch('/api/exam_results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...params,
+        time_taken_seconds: timeTaken,
+        submitted_at: submittedAt,
+      }),
+    });
+  } catch (apiErr) {
+    console.warn('Server API exam_results post error:', apiErr);
+  }
+
+  // 2. Also save to local leaderboard for instant responsiveness
+  const lbEntry: LeaderboardEntry = {
+    id: `er_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    exam_id: params.exam_id,
+    exam_title: params.exam_title || 'মডেল টেস্ট',
+    user_id: params.user_id,
+    user_name: params.full_name,
+    user_avatar: params.avatar_url,
+    score: params.score,
+    total_questions: params.total_marks,
+    correct_count: params.correct_answers,
+    wrong_count: params.wrong_answers,
+    accuracy: params.total_marks > 0 ? Math.round((params.score / params.total_marks) * 100) : 100,
+    time_taken_seconds: timeTaken,
+    created_at: submittedAt,
+  };
+  saveLocalLeaderboardEntry(lbEntry);
+
+  // 3. Post to Supabase if configured
+  if (!supabaseInstance) {
+    return { success: true };
+  }
+
+  try {
+    // 3A. Upsert Profile so full_name and avatar_url can be joined by RPC
+    try {
+      if (params.user_id) {
+        await supabaseInstance
+          .from('profiles')
+          .upsert({
+            id: params.user_id,
+            full_name: params.full_name,
+            avatar_url: params.avatar_url || null,
+            updated_at: submittedAt,
+          }, { onConflict: 'id' });
+      }
+    } catch (profErr) {
+      console.warn('Profiles upsert warning:', profErr);
+    }
+
+    // 3B. Insert into exam_results (protected by RLS)
+    const { error: erError } = await supabaseInstance
+      .from('exam_results')
+      .insert([
+        {
+          user_id: params.user_id,
+          exam_id: params.exam_id,
+          score: params.score,
+          total_marks: params.total_marks,
+          correct_answers: params.correct_answers,
+          wrong_answers: params.wrong_answers,
+          time_taken_seconds: timeTaken,
+          submitted_at: submittedAt,
+        },
+      ]);
+
+    if (erError) {
+      console.warn('Supabase exam_results insert warning:', erError.message);
+    }
+
+    // 3C. Also insert into leaderboard_entries for dual-write compatibility
+    try {
+      await supabaseInstance
+        .from('leaderboard_entries')
+        .insert([
+          {
+            id: lbEntry.id,
+            exam_id: lbEntry.exam_id,
+            exam_title: lbEntry.exam_title,
+            user_id: lbEntry.user_id || null,
+            user_name: lbEntry.user_name,
+            user_avatar: lbEntry.user_avatar || null,
+            score: lbEntry.score,
+            total_questions: lbEntry.total_questions,
+            correct_count: lbEntry.correct_count,
+            wrong_count: lbEntry.wrong_count,
+            accuracy: lbEntry.accuracy,
+            created_at: lbEntry.created_at,
+          },
+        ]);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: true, error: msg };
+  }
+}
+
+/**
+ * Fetch exam-specific leaderboard via secure Supabase RPC get_exam_leaderboard.
+ * Falls back gracefully to server RPC API and local store.
+ */
+export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboardItem[]> {
+  if (!examId || examId === 'all') return [];
+
+  // 1. Try Supabase RPC first
+  if (supabaseInstance) {
+    try {
+      let rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
+        p_exam_id: examId,
+      });
+
+      // Try alternate param name if first attempt failed
+      if (rpcRes.error) {
+        rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
+          exam_id: examId,
+        });
+      }
+
+      if (!rpcRes.error && Array.isArray(rpcRes.data) && rpcRes.data.length > 0) {
+        return rpcRes.data.map((row: any, idx: number) => ({
+          rank: Number(row.rank || idx + 1),
+          user_id: String(row.user_id || ''),
+          full_name: String(row.full_name || 'পরীক্ষার্থী'),
+          avatar_url: row.avatar_url ? String(row.avatar_url) : undefined,
+          score: Number(row.score ?? row.correct_answers ?? 0),
+          total_marks: Number(row.total_marks ?? (Number(row.correct_answers || 0) + Number(row.wrong_answers || 0))),
+          correct_answers: Number(row.correct_answers ?? row.score ?? 0),
+          wrong_answers: Number(row.wrong_answers ?? 0),
+          time_taken_seconds: Number(row.time_taken_seconds ?? 0),
+        }));
+      }
+    } catch (rpcErr) {
+      console.warn('Supabase get_exam_leaderboard RPC error:', rpcErr);
+    }
+  }
+
+  // 2. Fetch from Express Server RPC endpoint
+  try {
+    const res = await fetch(`/api/rpc/get_exam_leaderboard?p_exam_id=${encodeURIComponent(examId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Server get_exam_leaderboard error:', srvErr);
+  }
+
+  // 3. Fallback to computing from local entries
+  const local = getLocalLeaderboardEntries().filter((e) => e.exam_id === examId || e.exam_title === examId);
+  const bestMap = new Map<string, LeaderboardEntry>();
+  for (const e of local) {
+    const key = e.user_id || e.user_name;
+    const existing = bestMap.get(key);
+    if (!existing || e.score > existing.score) {
+      bestMap.set(key, e);
+    }
+  }
+  const sorted = Array.from(bestMap.values()).sort((a, b) => b.score - a.score);
+  return sorted.map((e, idx) => ({
+    rank: idx + 1,
+    user_id: e.user_id || '',
+    full_name: e.user_name,
+    avatar_url: e.user_avatar,
+    score: e.score,
+    total_marks: e.total_questions,
+    correct_answers: e.correct_count,
+    wrong_answers: e.wrong_count,
+    time_taken_seconds: e.time_taken_seconds || 0,
+  }));
+}
+
+/**
+ * Fetch free overall leaderboard via secure Supabase RPC get_free_overall_leaderboard.
+ * Supports period filter: 'today', 'week' | 'this_week', 'month' | 'this_month', 'all' | 'all_time'.
+ */
+export async function getFreeOverallLeaderboard(period: string = 'all'): Promise<FreeOverallLeaderboardItem[]> {
+  const normalizedPeriod =
+    period === 'this_week' ? 'week' :
+    period === 'this_month' ? 'month' :
+    period === 'all_time' ? 'all' : period;
+
+  // 1. Try Supabase RPC first
+  if (supabaseInstance) {
+    try {
+      let rpcRes = await supabaseInstance.rpc('get_free_overall_leaderboard', {
+        p_period: normalizedPeriod,
+      });
+
+      // Try alternate param name if first attempt failed
+      if (rpcRes.error) {
+        rpcRes = await supabaseInstance.rpc('get_free_overall_leaderboard', {
+          period: normalizedPeriod,
+        });
+      }
+
+      if (!rpcRes.error && Array.isArray(rpcRes.data) && rpcRes.data.length > 0) {
+        return rpcRes.data.map((row: any, idx: number) => ({
+          rank: Number(row.rank || idx + 1),
+          user_id: String(row.user_id || ''),
+          full_name: String(row.full_name || 'পরীক্ষার্থী'),
+          avatar_url: row.avatar_url ? String(row.avatar_url) : undefined,
+          total_points: Number(row.total_points || 0),
+          free_exam_count: Number(row.free_exam_count || 1),
+          average_percentage: Number(row.average_percentage || 0),
+        }));
+      }
+    } catch (rpcErr) {
+      console.warn('Supabase get_free_overall_leaderboard RPC error:', rpcErr);
+    }
+  }
+
+  // 2. Fetch from Express Server RPC endpoint
+  try {
+    const res = await fetch(`/api/rpc/get_free_overall_leaderboard?p_period=${encodeURIComponent(normalizedPeriod)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Server get_free_overall_leaderboard error:', srvErr);
+  }
+
+  // 3. Fallback to computing from local entries
+  const local = getLocalLeaderboardEntries();
+  const now = Date.now();
+  let minTime = 0;
+  if (normalizedPeriod === 'today') {
+    const d = new Date();
+    minTime = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  } else if (normalizedPeriod === 'week') {
+    minTime = now - 7 * 24 * 60 * 60 * 1000;
+  } else if (normalizedPeriod === 'month') {
+    minTime = now - 30 * 24 * 60 * 60 * 1000;
+  }
+
+  const filtered = local.filter((e) => {
+    if (minTime > 0) {
+      const t = new Date(e.created_at).getTime();
+      if (isNaN(t) || t < minTime) return false;
+    }
+    return true;
+  });
+
+  const userMap = new Map<string, {
+    user_id: string;
+    full_name: string;
+    avatar_url?: string;
+    total_points: number;
+    free_exam_count: number;
+    accSum: number;
+  }>();
+
+  for (const e of filtered) {
+    const key = e.user_id || e.user_name;
+    const existing = userMap.get(key);
+    const pts = e.correct_count || e.score || 0;
+    const acc = e.accuracy || (e.total_questions > 0 ? (e.score / e.total_questions) * 100 : 0);
+
+    if (!existing) {
+      userMap.set(key, {
+        user_id: e.user_id || '',
+        full_name: e.user_name,
+        avatar_url: e.user_avatar,
+        total_points: pts,
+        free_exam_count: 1,
+        accSum: acc,
+      });
+    } else {
+      existing.total_points += pts;
+      existing.free_exam_count += 1;
+      existing.accSum += acc;
+    }
+  }
+
+  const list = Array.from(userMap.values()).map((u) => ({
+    user_id: u.user_id,
+    full_name: u.full_name,
+    avatar_url: u.avatar_url,
+    total_points: u.total_points,
+    free_exam_count: u.free_exam_count,
+    average_percentage: u.free_exam_count > 0 ? Math.round(u.accSum / u.free_exam_count) : 0,
+  }));
+
+  list.sort((a, b) => b.total_points - a.total_points || b.average_percentage - a.average_percentage);
+
+  return list.map((u, idx) => ({
+    rank: idx + 1,
+    ...u,
+  }));
 }
 
 export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): Promise<{ success: boolean; error?: string }> {

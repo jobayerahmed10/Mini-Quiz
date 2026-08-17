@@ -426,8 +426,12 @@ const PREMIUM_STORAGE_KEY = 'tamreen_is_premium';
 
 export function isUserPremium(): boolean {
   try {
+    const status = localStorage.getItem('tamreen_premium_status');
+    if (status === 'approved') return true;
+    if (status === 'pending' || status === 'rejected') return false;
+
     const data = localStorage.getItem(PREMIUM_STORAGE_KEY);
-    if (data === null) return true; // Default to active premium as seen in screenshot
+    if (data === null) return true; // Default for preview
     return data === 'true';
   } catch {
     return true;
@@ -437,8 +441,10 @@ export function isUserPremium(): boolean {
 export function setUserPremium(isPremium: boolean): void {
   try {
     localStorage.setItem(PREMIUM_STORAGE_KEY, isPremium ? 'true' : 'false');
+    localStorage.setItem('tamreen_premium_status', isPremium ? 'approved' : 'none');
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tamreen_premium_updated', { detail: isPremium }));
+      window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: isPremium ? 'approved' : 'none' }));
     }
   } catch {}
 }

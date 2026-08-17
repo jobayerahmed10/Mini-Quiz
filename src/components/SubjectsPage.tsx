@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BookOpen, 
   Bookmark, 
@@ -26,10 +26,17 @@ import {
   Unlock,
   ChevronRight,
   ShieldAlert,
-  Zap
+  Zap,
+  CreditCard,
+  AlertCircle,
+  FileCheck2,
+  Settings
 } from 'lucide-react';
 import { SUBJECT_CATEGORIES } from '../lib/subjects';
-import { isUserPremium, setUserPremium, toBengaliNumeral } from '../lib/utils';
+import { isUserPremium, setUserPremium, toBengaliNumeral, getUserProfile } from '../lib/utils';
+import { fetchEnrollmentsFromSupabase } from '../lib/supabase';
+import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
+import { CourseEnrollmentRecord } from '../types';
 
 interface SubjectsPageProps {
   onSelectSubject: (options: { subject: string; questionCount?: number; timeMinutes?: number }) => void;
@@ -59,28 +66,107 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
   const [questionCount, setQuestionCount] = useState<number>(25);
   const [timeMinutes, setTimeMinutes] = useState<number>(20);
   
-  // Premium status state
-  const [isPremium, setIsPremiumState] = useState<boolean>(() => isUserPremium());
-  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
-  const [attemptedSubject, setAttemptedSubject] = useState<string>('');
+  // Premium status state: 'approved' | 'pending' | 'none' | 'rejected'
+  const [premiumStatus, setPremiumStatus] = useState<'approved' | 'pending' | 'none' | 'rejected'>(() => {
+    if (isUserPremium()) return 'approved';
+    const cachedStatus = localStorage.getItem('tamreen_premium_status');
+    if (cachedStatus === 'pending') return 'pending';
+    if (cachedStatus === 'rejected') return 'rejected';
+    return 'none';
+  });
 
-  useEffect(() => {
-    const handlePremiumUpdate = (e: any) => {
-      if (typeof e.detail === 'boolean') {
-        setIsPremiumState(e.detail);
+  const isPremium = premiumStatus === 'approved';
+  const isPending = premiumStatus === 'pending';
+
+  // Modals
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [attemptedSubject, setAttemptedSubject] = useState<string>('');
+  const [pendingTrxId, setPendingTrxId] = useState<string>(() => localStorage.getItem('tamreen_premium_trx') || '');
+
+  // Check enrollment from Supabase & LocalStorage
+  const checkRemotePremiumStatus = useCallback(async () => {
+    try {
+      const res = await fetchEnrollmentsFromSupabase();
+      const user = getUserProfile();
+      const userPhone = user?.phone?.trim();
+
+      const allEnrollments: CourseEnrollmentRecord[] = res.enrollments || [];
+      
+      // Also check local
+      try {
+        const local = JSON.parse(localStorage.getItem('tamreen_enrollments') || '[]');
+        if (Array.isArray(local)) {
+          local.forEach(l => {
+            if (!allEnrollments.some(e => e.transaction_id === l.transaction_id)) {
+              allEnrollments.push(l);
+            }
+          });
+        }
+      } catch {}
+
+      // Find premium application
+      const premiumApp = allEnrollments.find(e => 
+        e.course_id === 'tamreen_premium_package' || 
+        e.course_title.includes('১৫টি বিষয়ভিত্তিক') ||
+        (userPhone && e.phone_number === userPhone && e.course_id === 'tamreen_premium_package')
+      );
+
+      if (premiumApp) {
+        if (premiumApp.status === 'approved') {
+          setPremiumStatus('approved');
+          setUserPremium(true);
+          localStorage.setItem('tamreen_premium_status', 'approved');
+        } else if (premiumApp.status === 'pending') {
+          setPremiumStatus('pending');
+          setUserPremium(false);
+          localStorage.setItem('tamreen_premium_status', 'pending');
+          if (premiumApp.transaction_id) {
+            setPendingTrxId(premiumApp.transaction_id);
+            localStorage.setItem('tamreen_premium_trx', premiumApp.transaction_id);
+          }
+        } else if (premiumApp.status === 'rejected') {
+          setPremiumStatus('rejected');
+          setUserPremium(false);
+          localStorage.setItem('tamreen_premium_status', 'rejected');
+        }
       } else {
-        setIsPremiumState(isUserPremium());
+        // Fallback to local isUserPremium
+        if (isUserPremium()) {
+          setPremiumStatus('approved');
+        } else {
+          const localStatus = localStorage.getItem('tamreen_premium_status');
+          if (localStatus === 'pending') setPremiumStatus('pending');
+          else setPremiumStatus('none');
+        }
       }
-    };
-    window.addEventListener('tamreen_premium_updated', handlePremiumUpdate);
-    return () => window.removeEventListener('tamreen_premium_updated', handlePremiumUpdate);
+    } catch (err) {
+      console.error('Error verifying premium status:', err);
+    }
   }, []);
 
-  const togglePremium = () => {
-    const newState = !isPremium;
-    setUserPremium(newState);
-    setIsPremiumState(newState);
-  };
+  useEffect(() => {
+    checkRemotePremiumStatus();
+
+    const handlePremiumUpdate = (e: any) => {
+      if (typeof e.detail === 'boolean') {
+        setPremiumStatus(e.detail ? 'approved' : 'none');
+      } else if (typeof e.detail === 'string') {
+        setPremiumStatus(e.detail as any);
+      } else {
+        checkRemotePremiumStatus();
+      }
+    };
+
+    window.addEventListener('tamreen_premium_updated', handlePremiumUpdate);
+    window.addEventListener('tamreen_premium_status_changed', handlePremiumUpdate);
+    window.addEventListener('tamreen_enrollments_updated', checkRemotePremiumStatus);
+
+    return () => {
+      window.removeEventListener('tamreen_premium_updated', handlePremiumUpdate);
+      window.removeEventListener('tamreen_premium_status_changed', handlePremiumUpdate);
+      window.removeEventListener('tamreen_enrollments_updated', checkRemotePremiumStatus);
+    };
+  }, [checkRemotePremiumStatus]);
 
   const fifteenSubjects = SUBJECT_CATEGORIES.filter(s => s.id !== 'all');
 
@@ -90,11 +176,19 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
   );
 
   const handleSubjectClick = (subjectName: string) => {
-    if (!isPremium) {
+    if (isPending) {
       setAttemptedSubject(subjectName);
-      setShowUnlockModal(true);
+      setShowPaymentModal(false);
+      alert('আপনার বিকাশ/নগদ TrxID পেমেন্ট আবেদনটি বর্তমানে যাচাইাধীন (Pending) রয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই এই বিষয়টি স্বয়ংক্রিয়ভাবে খুলে যাবে।');
       return;
     }
+
+    if (!isPremium) {
+      setAttemptedSubject(subjectName);
+      setShowPaymentModal(true);
+      return;
+    }
+
     setSelectedSubject(subjectName);
   };
 
@@ -107,60 +201,62 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
     });
   };
 
+  const handlePaymentSuccess = (record: CourseEnrollmentRecord) => {
+    setPremiumStatus('pending');
+    setPendingTrxId(record.transaction_id);
+    localStorage.setItem('tamreen_premium_status', 'pending');
+    localStorage.setItem('tamreen_premium_trx', record.transaction_id);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-5 mb-24 space-y-5">
       
-      {/* 1. TOP GREEN THEMED CARD (Exact match to User Request & Screenshots) */}
+      {/* 1. TOP GREEN THEMED CARD */}
       <div className="neu-card !rounded-3xl p-5 sm:p-7 relative overflow-hidden border border-emerald-300/70 dark:border-emerald-700/50 bg-gradient-to-b from-[#F0FDF4]/90 via-[#F8FAFC]/90 to-white dark:from-[#06291C]/60 dark:via-[#0A1A2F]/80 dark:to-[#0B132B]">
         
         {/* Pills Header Row */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Pill 1: Active Package */}
-            <span className={`text-xs font-black px-3.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs border ${
-              isPremium 
-                ? 'bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60' 
-                : 'bg-amber-100/90 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60'
-            }`}>
+            {/* Pill 1: Status Pill (Clickable) */}
+            <button
+              type="button"
+              onClick={() => setShowPaymentModal(true)}
+              className={`text-xs font-black px-3.5 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-xs border cursor-pointer hover:scale-[1.03] active:scale-95 transition-all ${
+                isPremium
+                  ? 'bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60'
+                  : isPending
+                  ? 'bg-amber-100/95 dark:bg-amber-950/90 text-amber-900 dark:text-amber-300 border-amber-400 dark:border-amber-700 animate-pulse'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-amber-400'
+              }`}
+            >
               {isPremium ? (
                 <>
                   <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                  <span>সক্রিয় প্যাকেজ: বাৎসরিক প্যাকেজ</span>
+                  <span>সক্রিয় প্যাকেজ: বাৎসরিক প্যাকেজ (সক্রিয়)</span>
+                </>
+              ) : isPending ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                  <span>পেমেন্ট যাচাইাধীন (Pending)</span>
                 </>
               ) : (
                 <>
-                  <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>ফ্রি অ্যাকাউন্ট (লকড)</span>
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>ফ্রি একাউন্ট (প্যাকেজ আনলক করুন)</span>
                 </>
               )}
-            </span>
+            </button>
 
             {/* Pill 2: 15 Subjects Special Preparation */}
-            <span className="text-xs font-black px-3.5 py-1 bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setShowPaymentModal(true)}
+              className="text-xs font-black px-3.5 py-1.5 bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-full inline-flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.03] active:scale-95 transition-all"
+            >
               <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>১৫টি বিষয়ভিত্তিক বিশেষ প্রস্তুতি</span>
-            </span>
+              <span>১৫টি বিষয়ভিত্তিক বিশেষ প্যাকেজ</span>
+            </button>
           </div>
-
-          {/* Quick Demo Toggle Switch for Testing Locked vs Unlocked */}
-          <button
-            type="button"
-            onClick={togglePremium}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-[#064E3B] flex items-center gap-1.5 cursor-pointer transition-all shadow-xs ml-auto"
-            title="প্রিমিয়াম ও ফ্রি লক অবস্থা পরীক্ষা করতে ক্লিক করুন"
-          >
-            {isPremium ? (
-              <>
-                <Unlock className="w-3 h-3 text-emerald-600" />
-                <span>মোড: প্রিমিয়াম (লক পরীক্ষা)</span>
-              </>
-            ) : (
-              <>
-                <Lock className="w-3 h-3 text-amber-600" />
-                <span>মোড: ফ্রি (আনলক করুন)</span>
-              </>
-            )}
-          </button>
         </div>
 
         {/* Heading in Bold Green */}
@@ -172,8 +268,10 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-1.5 leading-relaxed">
           {isPremium ? (
             'আপনার প্রিমিয়াম প্যাকেজের আওতায় সকল বিষয়ের ৫,০০০+ প্রশ্নব্যাংক সম্পূর্ণ আনলক রয়েছে। নিচের যেকোনো বিষয়ে ক্লিক করে কাস্টম প্রশ্ন সংখ্যা ও মোড অনুযায়ী অনুশীলন শুরু করুন।'
+          ) : isPending ? (
+            `আপনার বিকাশ/নগদ TrxID (${pendingTrxId || 'যাচাইাধীন'}) ডাটাবেসে সফলভাবে জমা হয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই ১৫টি বিষয়ের সম্পূর্ণ প্রশ্নব্যাংক সক্রিয় হয়ে যাবে।`
           ) : (
-            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। সম্পূর্ণ ১৫টি বিষয়ের ৫,০০০+ প্রশ্নব্যাংক ও ব্যাখ্যাসহ কাস্টম অনুশীলন আনলক করতে প্রিমিয়াম প্যাকেজ গ্রহণ করুন।'
+            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। বিকাশ বা নগদ নম্বরে ৩৫০ টাকা পাঠিয়ে TrxID প্রদান করুন। এডমিন অনুমোদন করলেই সকল বিষয়ের প্রশ্নব্যাংক আনলক হয়ে যাবে।'
           )}
         </p>
 
@@ -186,7 +284,16 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                   <Check className="w-3 h-3 stroke-[3]" />
                 </div>
                 <span>১৫টি বিষয়ের সকল প্রশ্ন ও ব্যাখ্যা সম্পূর্ণ আনলকড</span>
-                <span className="text-slate-500 dark:text-slate-400 font-medium">(মেয়াদ: ১৮ আগস্ট, ২০২৭)</span>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">(মেয়াদ: বাৎসরিক আনলিমিটেড)</span>
+              </>
+            ) : isPending ? (
+              <>
+                <div className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 animate-spin">
+                  <Clock className="w-2.5 h-2.5" />
+                </div>
+                <span className="text-amber-800 dark:text-amber-300">
+                  আবেদন স্ট্যাটাস: পেন্ডিং (এডমিন যাচাই চলছে)
+                </span>
               </>
             ) : (
               <>
@@ -198,20 +305,21 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
             )}
           </div>
 
-          <button
-            onClick={() => {
-              if (isPremium) {
-                if (onOpenCourses) onOpenCourses();
-                else togglePremium();
-              } else {
-                setShowUnlockModal(true);
-              }
-            }}
-            className="neu-pill !rounded-2xl px-4 py-2 text-xs font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-400 active:scale-95 transition-all shadow-xs border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90"
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-            <span>{isPremium ? 'প্যাকেজ পরিবর্তন / রিনিউ' : 'প্রিমিয়াম আনলক করুন'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="neu-pill !rounded-2xl px-4 py-2 text-xs font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-400 active:scale-95 transition-all shadow-xs border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+              <span>
+                {isPremium
+                  ? 'প্যাকেজ বিবরণ'
+                  : isPending
+                  ? 'পেমেন্ট তথ্য দেখুন'
+                  : 'বিকাশে টাকা পাঠিয়ে আনলক করুন'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -227,9 +335,9 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         />
       </div>
 
-      {/* 3. LIST OF 15 SUBJECT CARDS (Single Column Full Width as in Screenshot 1 & 2) */}
+      {/* 3. LIST OF 15 SUBJECT CARDS */}
       <div className="space-y-3 sm:space-y-3.5">
-        {filteredSubjects.map((sub, idx) => {
+        {filteredSubjects.map((sub) => {
           const IconComponent = ICON_MAP[sub.iconName] || BookOpen;
 
           return (
@@ -239,6 +347,8 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
               className={`neu-card !rounded-3xl p-3.5 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group border ${
                 isPremium 
                   ? 'border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-400/60' 
+                  : isPending
+                  ? 'border-amber-300/80 dark:border-amber-800/80 hover:border-amber-400'
                   : 'border-slate-200/70 dark:border-slate-800/70 hover:border-amber-400/60'
               }`}
             >
@@ -259,7 +369,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                 </div>
               </div>
 
-              {/* Right: Green Practice Button / Locked Button */}
+              {/* Right: Green Practice Button / Locked Button / Pending Button */}
               <div className="shrink-0">
                 {isPremium ? (
                   <button
@@ -272,6 +382,18 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                   >
                     <span>অনুশীলন শুরু</span>
                     <ChevronRight className="w-4 h-4 text-[#046A38] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                ) : isPending ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSubjectClick(sub.name);
+                    }}
+                    className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-800 dark:text-amber-300 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-400/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/50 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>যাচাইাধীন</span>
                   </button>
                 ) : (
                   <button
@@ -395,75 +517,15 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         </div>
       )}
 
-      {/* 5. PREMIUM MEMBERSHIP LOCKED POPUP MODAL */}
-      {showUnlockModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="neu-card max-w-md w-full p-6 relative shadow-2xl space-y-5 bg-white dark:bg-[#121E36] border border-amber-300 dark:border-amber-700/80">
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowUnlockModal(false)}
-              className="absolute right-4 top-4 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center cursor-pointer transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Icon Header */}
-            <div className="text-center pt-2">
-              <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 border border-amber-300 dark:border-amber-700 mx-auto flex items-center justify-center mb-3 shadow-inner">
-                <Crown className="w-8 h-8 fill-amber-400 text-amber-500 animate-bounce" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white font-hind">
-                প্রিমিয়াম মেম্বারশিপ প্রয়োজন
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                {attemptedSubject ? `"${attemptedSubject}" সহ সকল ১৫টি বিষয়ের প্রশ্নব্যাংক আনলক করতে বাৎসরিক প্যাকেজ সক্রিয় করুন।` : 'সকল বিষয়ের প্রশ্নব্যাংক ও ব্যাখ্যা আনলক করতে প্রিমিয়াম প্যাকেজ গ্রহণ করুন।'}
-              </p>
-            </div>
-
-            {/* Features List */}
-            <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-4 space-y-2.5 border border-slate-200 dark:border-slate-700 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>১৫টি বিষয়ের ৫,০০০+ অধ্যায়ভিত্তিক প্রশ্ন ও ব্যাখ্যা</span>
-              </div>
-              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>সীমাহীন কাস্টম বিষয়ভিত্তিক মডেল টেস্ট</span>
-              </div>
-              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>তামরীন AI ইনস্ট্যান্ট ডাউট সলভ ও পূর্ণাঙ্গ মেধা তালিকা</span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setUserPremium(true);
-                  setIsPremiumState(true);
-                  setShowUnlockModal(false);
-                }}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
-              >
-                <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
-                <span>বাৎসরিক প্যাকেজ সক্রিয় করুন (আনলক)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowUnlockModal(false)}
-                className="w-full py-2.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
-              >
-                পরে করবো
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* 5. MULTI-STEP PAYMENT ENROLLMENT MODAL */}
+      {showPaymentModal && (
+        <PremiumEnrollmentModal
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
       )}
 
     </div>
   );
 };
+

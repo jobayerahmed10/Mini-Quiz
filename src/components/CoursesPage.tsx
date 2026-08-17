@@ -19,11 +19,14 @@ import {
   CreditCard,
   FileCheck2,
   Hourglass,
-  RefreshCw
+  RefreshCw,
+  Crown,
+  Lock
 } from 'lucide-react';
 import { CourseModule, CourseEnrollmentRecord, Question } from '../types';
 import { CourseDetailView } from './CourseDetailView';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
+import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 import { formatCoursePrice } from '../lib/utils';
 import {
   fetchCoursesFromSupabase,
@@ -40,7 +43,72 @@ interface CoursesPageProps {
   onOpenLeaderboard?: (examId?: string) => void;
 }
 
-const INITIAL_COURSES: CourseModule[] = [];
+const INITIAL_COURSES: CourseModule[] = [
+  {
+    id: 'course-arabic-lecturer',
+    title: '১৯তম NTRCA প্রভাষক (আরবি) পূর্ণাঙ্গ প্রস্তুতি ব্যাচ',
+    subtitle: 'মাদ্রাসা প্রভাষক আরবি লিখিত ও প্রিলিমিনারি স্পেশাল কোর্স',
+    category: 'arabic_lecturer',
+    badge: 'প্রভাষক',
+    badgeSub: 'আরবি প্রভাষক',
+    price: '১২০০',
+    accentColor: 'emerald',
+    enrolledCount: '৩৮৫',
+    classesCount: 45,
+    sheetsCount: 32,
+    examsCount: 20,
+    topics: ['আরবি সাহিত্য ও ইতিহাস', 'বালাগাত ও মানতিক', 'নাহু ও সরফ বিশদ আলোচনা', 'বিগত ১০ বছরের প্রশ্ন সমাধান', '২০টি স্পেশাল মডেল টেস্ট'],
+    instructor: 'মাওলানা ড. আব্দুল্লাহ আল-মামুন'
+  },
+  {
+    id: 'course-assistant-moulvi',
+    title: '১৯তম NTRCA সহকারী মৌলভী পূর্ণাঙ্গ কোর্স',
+    subtitle: 'আল হাদিস, উসুলুল হাদিস, ফিকহ ও আরবি ব্যাকরণ স্পেশাল',
+    category: 'assistant_moulvi',
+    badge: 'সহকারী মৌলভী',
+    badgeSub: 'সহকারী মৌলভী',
+    price: '১০০০',
+    accentColor: 'amber',
+    enrolledCount: '৫২০',
+    classesCount: 40,
+    sheetsCount: 28,
+    examsCount: 16,
+    topics: ['কুরআন মাজিদ ও তাজবীদ', 'আল-হাদিস ও উসুলুল হাদিস', 'ফিকহ ও উসুলুল ফিকহ', 'আরবি দ্বিতীয় পত্র ব্যাকরণ', 'স্পেশাল রিভিশন মডেল টেস্ট'],
+    instructor: 'মাওলানা মুফতি হাবিবুর রহমান'
+  },
+  {
+    id: 'course-ebtedayi',
+    title: 'ইবতেদায়ী মৌলবি ও ক্বারী শিক্ষক স্পেশাল কোর্স',
+    subtitle: 'ইবতেদায়ী প্রধান ও সহকারী মৌলবি শিক্ষক নিবন্ধন প্রস্তুতি',
+    category: 'ebtedayi',
+    badge: 'ইবতেদায়ী',
+    badgeSub: 'মৌলবি ও ক্বারী',
+    price: '৮৫০',
+    accentColor: 'amber',
+    enrolledCount: '২৯০',
+    classesCount: 35,
+    sheetsCount: 22,
+    examsCount: 12,
+    topics: ['আকাইদ ও ফিকহ প্রস্তুতি', 'তাজবীদ ও কিরাত বিশ্লেষণ', 'বাংলা, ইংরেজি ও গণিত বেসিক', 'অধ্যায়ভিত্তিক প্রশ্ন সমাধান'],
+    instructor: 'মাওলানা ক্বারী মাহফুজুর রহমান'
+  },
+  {
+    id: 'course-general-subjects',
+    title: 'জেনারেল বিষয় (বাংলা, ইংরেজি, গণিত ও জিকে) ক্র্যাশ কোর্স',
+    subtitle: 'স্কুল ও কলেজ পর্যায়ের আবশ্যিক ১০০ নম্বরের পূর্ণাঙ্গ প্রস্তুতি',
+    category: 'general',
+    badge: 'জেনারেল',
+    badgeSub: 'আবশ্যিক বিষয়',
+    price: '৯৫০',
+    accentColor: 'purple',
+    enrolledCount: '৭৫০',
+    classesCount: 55,
+    sheetsCount: 40,
+    examsCount: 25,
+    topics: ['বাংলা ব্যাকরণ ও সাহিত্য', 'ইংরেজি গ্রামার ও ভোকাবুলারি', 'পাটিগণিত, বীজগণিত ও জ্যামিতি', 'বাংলাদেশ ও আন্তর্জাতিক বিষয়াবলি', 'সাম্প্রতিক তথ্য ও মডেল টেস্ট'],
+    instructor: 'বিশেষজ্ঞ জেনারেল শিক্ষক প্যানেল'
+  }
+];
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({
   questions = [],
@@ -54,7 +122,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
       const raw = localStorage.getItem('tamreen_courses_cache');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
@@ -66,6 +134,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   const [activeCourseModal, setActiveCourseModal] = useState<CourseModule | null>(null);
   const [selectedCourseForDetail, setSelectedCourseForDetail] = useState<CourseModule | null>(null);
   const [enrollmentModalCourse, setEnrollmentModalCourse] = useState<CourseModule | null>(null);
+  const [showPremiumPackageModal, setShowPremiumPackageModal] = useState<boolean>(false);
   const [pendingCourseIds, setPendingCourseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -250,12 +319,55 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
             <span>তামরীন একাডেমি</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-white">
-            আমাদের কোর্স সমূহ
+            আমাদের কোর্স ও প্যাকেজ সমূহ
           </h1>
         </div>
 
         <div className="w-11 h-11 sm:w-12 sm:h-12 bg-white/10 backdrop-blur-xs text-white rounded-2xl flex items-center justify-center border border-white/20 shrink-0 shadow-inner">
           <GraduationCap className="w-6 h-6 text-emerald-100" />
+        </div>
+      </div>
+
+      {/* Special Premium Package Banner Card */}
+      <div 
+        onClick={() => setShowPremiumPackageModal(true)}
+        className="rounded-3xl bg-gradient-to-r from-[#063b22] via-[#046A38] to-[#022b17] p-4 sm:p-5 text-white shadow-lg relative overflow-hidden border border-emerald-400/40 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1">
+                <Crown className="w-3 h-3 fill-slate-950" />
+                বিশেষ মেম্বারশিপ প্যাকেজ
+              </span>
+              <span className="text-[11px] font-bold text-emerald-200">
+                ১৫টি বিষয়ের পূর্ণাঙ্গ প্রশ্নব্যাংক
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-white font-hind leading-tight group-hover:text-amber-200 transition-colors">
+              ১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি ও আনলিমিটেড মডেল টেস্ট
+            </h3>
+            <p className="text-xs text-emerald-100/90 font-medium">
+              বাৎসরিক আনলিমিটেড অ্যাক্সেস • ৫,০০০+ ব্যাখ্যাসহ প্রশ্ন • তামরীন এআই ডাউট সলভ
+            </p>
+          </div>
+
+          <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/15">
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] text-emerald-200 block">এককালীন অফার</span>
+              <span className="text-xl sm:text-2xl font-black text-amber-300 font-hind">৳ ৩৫০</span>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPremiumPackageModal(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all"
+            >
+              <Crown className="w-3.5 h-3.5 fill-slate-950" />
+              <span>প্যাকেজ বিবরণ</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -348,7 +460,8 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
           return (
             <div
               key={course.id}
-              className={`neu-card rounded-2xl p-2.5 sm:p-3 transition-all flex flex-row items-center justify-between gap-2.5 sm:gap-3.5 ${borderAccentClass}`}
+              onClick={() => setSelectedCourseForDetail(course)}
+              className={`neu-card rounded-2xl p-2.5 sm:p-3 transition-all flex flex-row items-center justify-between gap-2.5 sm:gap-3.5 cursor-pointer hover:shadow-md hover:scale-[1.005] active:scale-[0.99] group ${borderAccentClass}`}
             >
               {/* Left Badge Box */}
               <div
@@ -380,7 +493,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
               {/* Middle & Right Content */}
               <div className="flex-1 flex flex-col justify-between gap-1.5 min-w-0">
                 <div>
-                  <h3 className="text-xs sm:text-base font-black text-[#0B132B] dark:text-white leading-tight truncate">
+                  <h3 className="text-xs sm:text-base font-black text-[#0B132B] dark:text-white leading-tight truncate group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
                     {course.title}
                   </h3>
 
@@ -432,7 +545,10 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                       </div>
 
                       <button
-                        onClick={() => setSelectedCourseForDetail(course)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCourseForDetail(course);
+                        }}
                         className="px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl bg-[#046A38] hover:bg-[#03522b] text-white text-[10px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                       >
                         <Play className="w-2.5 h-2.5 fill-current" />
@@ -445,12 +561,28 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
                         {formatCoursePrice(course.price)}
                       </div>
 
-                      <button
-                        onClick={() => setSelectedCourseForDetail(course)}
-                        className="px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-xl bg-[#0D1930] hover:bg-[#16274a] text-white text-[10px] sm:text-xs font-bold cursor-pointer shadow-xs active:scale-95 transition-all"
-                      >
-                        বিস্তারিত
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEnrollment(course);
+                          }}
+                          className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl bg-[#046A38] hover:bg-[#03522b] text-white text-[10px] sm:text-xs font-bold cursor-pointer shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                        >
+                          <CreditCard className="w-3 h-3 text-amber-300" />
+                          <span>ভর্তি হন</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCourseForDetail(course);
+                          }}
+                          className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl bg-[#0D1930] hover:bg-[#16274a] text-white text-[10px] sm:text-xs font-bold cursor-pointer shadow-xs active:scale-95 transition-all"
+                        >
+                          বিস্তারিত
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>
@@ -460,6 +592,26 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
         })
         )}
       </div>
+
+      {/* Course Enrollment Modal */}
+      {enrollmentModalCourse && (
+        <CourseEnrollmentModal
+          course={enrollmentModalCourse}
+          onClose={() => setEnrollmentModalCourse(null)}
+          onSuccess={handleEnrollmentSuccess}
+        />
+      )}
+
+      {/* Special Premium Package Modal */}
+      {showPremiumPackageModal && (
+        <PremiumEnrollmentModal
+          onClose={() => setShowPremiumPackageModal(false)}
+          onSuccess={(record) => {
+            setShowPremiumPackageModal(false);
+            showToast('প্রিমিয়াম প্যাকেজ আবেদন সফলভাবে জমা হয়েছে!');
+          }}
+        />
+      )}
 
       {/* Course Detail Modal */}
       {activeCourseModal && (
