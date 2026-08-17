@@ -628,6 +628,19 @@ export interface FreeOverallLeaderboardItem {
 
 const LOCAL_LEADERBOARD_KEY = 'tamreen_leaderboard_entries';
 const LOCAL_EXAM_RESULTS_KEY = 'tamreen_exam_results';
+const LEADERBOARD_CLEARED_FLAG = 'tamreen_lb_cleared_v3';
+
+// One-time client purge of past/legacy leaderboard entries so the leaderboard starts completely fresh
+try {
+  if (typeof window !== 'undefined' && !localStorage.getItem(LEADERBOARD_CLEARED_FLAG)) {
+    localStorage.removeItem(LOCAL_LEADERBOARD_KEY);
+    localStorage.removeItem(LOCAL_EXAM_RESULTS_KEY);
+    localStorage.removeItem('miniquiz_leaderboard_cache');
+    localStorage.setItem(LEADERBOARD_CLEARED_FLAG, 'true');
+    // Notify server to clear in-memory stores as well
+    fetch('/api/leaderboard/clear', { method: 'POST' }).catch(() => {});
+  }
+} catch {}
 
 export function getLocalLeaderboardEntries(): LeaderboardEntry[] {
   try {
@@ -637,6 +650,28 @@ export function getLocalLeaderboardEntries(): LeaderboardEntry[] {
   } catch {
     return [];
   }
+}
+
+export function clearLocalLeaderboardEntries(): void {
+  try {
+    localStorage.removeItem(LOCAL_LEADERBOARD_KEY);
+    localStorage.removeItem(LOCAL_EXAM_RESULTS_KEY);
+    localStorage.removeItem('miniquiz_leaderboard_cache');
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('tamreen_leaderboard_channel');
+        bc.postMessage({ type: 'LEADERBOARD_CLEARED' });
+        bc.close();
+      } catch {}
+    }
+  } catch {}
+}
+
+export async function clearAllLeaderboardEntries(): Promise<void> {
+  clearLocalLeaderboardEntries();
+  try {
+    await fetch('/api/leaderboard/clear', { method: 'POST' });
+  } catch {}
 }
 
 export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {

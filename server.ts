@@ -50,30 +50,16 @@ interface ServerExamResult {
 let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 let serverExamResultsStore: ServerExamResult[] = [];
 
+// Remove any existing leaderboard files on disk to ensure clean start
 try {
   if (fs.existsSync(LEADERBOARD_FILE_PATH)) {
-    const raw = fs.readFileSync(LEADERBOARD_FILE_PATH, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      serverLeaderboardStore = parsed.filter((e) => e && e.id && !String(e.id).startsWith('seed_lb_'));
-    }
+    fs.unlinkSync(LEADERBOARD_FILE_PATH);
   }
-} catch (err) {
-  console.warn('Could not read leaderboard_store.json:', err);
-  serverLeaderboardStore = [];
-}
-
-try {
   if (fs.existsSync(EXAM_RESULTS_FILE_PATH)) {
-    const raw = fs.readFileSync(EXAM_RESULTS_FILE_PATH, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      serverExamResultsStore = parsed;
-    }
+    fs.unlinkSync(EXAM_RESULTS_FILE_PATH);
   }
 } catch (err) {
-  console.warn('Could not read exam_results_store.json:', err);
-  serverExamResultsStore = [];
+  console.warn('Resetting leaderboard stores on disk:', err);
 }
 
 function saveLeaderboardStoreToDisk() {
@@ -439,6 +425,21 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     return res.json({ success: true, updatedCount });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Server error updating profile' });
+  }
+});
+
+// API endpoint to clear all leaderboard entries and exam results
+app.post('/api/leaderboard/clear', (req, res) => {
+  try {
+    serverLeaderboardStore = [];
+    serverExamResultsStore = [];
+    try {
+      if (fs.existsSync(LEADERBOARD_FILE_PATH)) fs.unlinkSync(LEADERBOARD_FILE_PATH);
+      if (fs.existsSync(EXAM_RESULTS_FILE_PATH)) fs.unlinkSync(EXAM_RESULTS_FILE_PATH);
+    } catch {}
+    return res.json({ success: true, message: 'Leaderboard cleared successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error clearing leaderboard' });
   }
 });
 
