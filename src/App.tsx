@@ -17,8 +17,9 @@ import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, LeaderboardEnt
 import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId } from './lib/utils';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabRoute>('exam');
+  const [activeTab, setActiveTab] = useState<TabRoute>('home');
   const [currentPage, setCurrentPage] = useState<PageRoute>('home');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
       const raw = localStorage.getItem('miniquiz_questions_cache');
@@ -267,7 +268,7 @@ export default function App() {
   };
 
   const handleNavigateHome = () => {
-    navigateWithHistory('home', 'exam');
+    navigateWithHistory('home', 'home');
   };
 
   const handleRetry = () => {
@@ -303,12 +304,13 @@ export default function App() {
     <div className={`min-h-screen flex flex-col selection:bg-[#0B132B] selection:text-white pb-20 transition-colors duration-300 ${
       isDarkMode ? 'bg-[#0B132B] text-slate-100 dark' : 'bg-slate-100 text-slate-900'
     } ${getFontFamilyClass()} ${getFontSizeClass()}`}>
-      {/* Top Navigation Header */}
+      {/* Top Navigation Header with Search Bar and Sub-tabs */}
       <Header
         currentPage={currentPage}
         activeTab={activeTab}
         selectedSubject={selectedSubject}
         onNavigateHome={handleNavigateHome}
+        onTabChange={handleTabChange}
         onGoBack={handleGoBack}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
@@ -320,6 +322,8 @@ export default function App() {
         onChangeShowHarakat={setShowHarakat}
         onOpenProfile={() => setCurrentPage('profile')}
         onOpenLeaderboard={handleOpenLeaderboard}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Main Content Router */}
@@ -330,7 +334,7 @@ export default function App() {
             onOpenLeaderboard={handleOpenLeaderboard}
             onOpenCourses={() => {
               setCurrentPage('home');
-              setActiveTab('subjects');
+              setActiveTab('courses');
             }}
           />
         )}
@@ -371,6 +375,23 @@ export default function App() {
 
         {currentPage === 'home' && (
           <>
+            {activeTab === 'home' && (
+              <HomePage
+                questions={questions}
+                isLoading={isLoading}
+                isFromSupabase={isFromSupabase}
+                fetchError={fetchError}
+                studentStats={studentStats}
+                selectedSubject={selectedSubject}
+                onSelectSubject={(subj) => handleStartPractice(subj)}
+                onStartPractice={(subj) => handleStartPractice(subj || 'সকল বিষয়')}
+                onRefreshQuestions={loadQuestions}
+                onOpenSupabaseModal={() => {}}
+                onTabNavigate={handleTabChange}
+                searchQuery={searchQuery}
+              />
+            )}
+
             {activeTab === 'exam' && (
               <ExamPage
                 questions={questions}

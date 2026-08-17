@@ -1,16 +1,36 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Sun, Moon, Type, Check, X, Sparkles, Languages, ArrowLeft, User, Trophy, Settings, ChevronDown, BarChart3, GraduationCap } from 'lucide-react';
-import { PageRoute } from '../types';
+import { 
+  Sun, 
+  Moon, 
+  Type, 
+  Check, 
+  X, 
+  Sparkles, 
+  Languages, 
+  ArrowLeft, 
+  User, 
+  Trophy, 
+  Settings, 
+  BarChart3, 
+  GraduationCap,
+  Search,
+  Home,
+  FileText,
+  BookOpen,
+  Briefcase,
+  Layers
+} from 'lucide-react';
+import { PageRoute, TabRoute } from '../types';
 import { getUserProfile } from '../lib/utils';
-import { AtTamreenLogo } from './AtTamreenLogo';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
 interface HeaderProps {
   currentPage: PageRoute;
-  activeTab?: string;
+  activeTab?: TabRoute;
   selectedSubject?: string;
   onNavigateHome: () => void;
+  onTabChange?: (tab: TabRoute) => void;
   onGoBack?: () => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
@@ -22,13 +42,16 @@ interface HeaderProps {
   onChangeShowHarakat: (show: boolean) => void;
   onOpenProfile?: () => void;
   onOpenLeaderboard?: () => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentPage,
-  activeTab,
+  activeTab = 'home',
   selectedSubject,
   onNavigateHome,
+  onTabChange,
   onGoBack,
   isDarkMode,
   onToggleDarkMode,
@@ -40,11 +63,15 @@ export const Header: React.FC<HeaderProps> = ({
   onChangeShowHarakat,
   onOpenProfile,
   onOpenLeaderboard,
+  searchQuery = '',
+  onSearchChange,
 }) => {
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const userProfile = getUserProfile();
+
+  const isAtHomeRoot = currentPage === 'home' && activeTab === 'home';
 
   const bengaliFonts: { id: FontFamilyType; name: string; sample: string }[] = [
     { id: 'hind', name: 'হিন্দ শিলিগুড়ি', sample: 'Bengali Standard' },
@@ -65,42 +92,44 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'large', label: 'বড়', desc: '১১৬%' },
   ];
 
+  const handleSubTabClick = (tab: TabRoute) => {
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
+
   return (
-    <header className={`sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 border-b ${
-      isDarkMode ? 'bg-[#0B132B]/90 border-slate-800 text-white' : 'bg-[#F0F4F8]/95 border-slate-200/80 text-slate-900 shadow-xs'
+    <header className={`sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 border-b shadow-xs ${
+      isDarkMode ? 'bg-[#0B132B]/95 border-slate-800 text-white' : 'bg-[#F0F4F8]/95 border-slate-200/80 text-slate-900'
     }`}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 sm:h-18 flex items-center justify-between gap-2">
-        {/* Top Left Area (Back Button + Brand Logo) */}
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          {/* Top-Left Back Button when inside sub-page or non-home tab */}
-          {(currentPage !== 'home' || (activeTab && activeTab !== 'exam')) && (
+      {/* 1. TOP BRANDING ROW */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-3 pb-2 flex items-center justify-between gap-2">
+        {/* Left: Back Button OR Logo + Brand Title */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          {!isAtHomeRoot ? (
+            /* Circular Neumorphic Back Button (Shown when navigated into any sub-page or tab) */
             <button
               onClick={onGoBack || onNavigateHome}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all border shrink-0 active:scale-95 shadow-xs ${
-                isDarkMode
-                  ? 'bg-slate-800 text-amber-400 border-slate-700 hover:bg-slate-700'
-                  : 'bg-white text-[#0B132B] border-slate-300 hover:bg-slate-100'
-              }`}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.05)] flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform hover:bg-slate-200 dark:hover:bg-slate-700"
               title="পিছনে ফিরে যান"
             >
-              <ArrowLeft className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="font-extrabold hidden xs:inline">পিছনে</span>
+              <ArrowLeft className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={2.6} />
             </button>
-          )}
-
-          {/* Exact Brand Logo + Title + Subtitle */}
-          <button
-            onClick={onNavigateHome}
-            className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-hidden cursor-pointer min-w-0"
-            title="হোম পেজে যান"
-          >
-            {/* Green Squircle Logo Box with Golden Graduation Cap */}
+          ) : (
+            /* Green Squircle Logo Box with Golden Graduation Cap (Shown on Home root) */
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] sm:rounded-[20px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
               <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-[#EAB308]" strokeWidth={2.3} />
             </div>
+          )}
 
+          {/* Exact Brand Logo Title + Subtitle */}
+          <button
+            onClick={onNavigateHome}
+            className="flex items-center text-left group focus:outline-hidden cursor-pointer min-w-0"
+            title="হোম পেজে যান"
+          >
             <div className="min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className={`font-hind font-extrabold text-2xl sm:text-[28px] md:text-[30px] tracking-tight whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
                   আত-তামরীন
                 </span>
@@ -115,10 +144,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Action Controls Header Right */}
+        {/* Right Controls: Font ('T') + DarkMode ('Moon/Sun') + User Avatar */}
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Active Subject Indicator Pill */}
-          {selectedSubject && selectedSubject !== 'all' && (
+          {/* Active Subject Pill on wide screens */}
+          {selectedSubject && selectedSubject !== 'all' && selectedSubject !== 'সকল বিষয়' && (
             <div className={`hidden lg:flex items-center gap-2 px-3 py-1 border rounded-full text-xs font-bold ${
               isDarkMode ? 'bg-slate-800/80 border-slate-700 text-amber-300' : 'bg-slate-100 border-slate-300 text-[#0B132B]'
             }`}>
@@ -148,7 +177,6 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Font Options Popover Dropdown */}
             {showFontMenu && (
               <>
-                {/* Backdrop for mobile to tap outside */}
                 <div
                   className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 sm:hidden"
                   onClick={() => setShowFontMenu(false)}
@@ -195,14 +223,12 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  {/* 2. Arabic Harakat Option (হরকত সহ / ছাড়া) */}
+                  {/* 2. Arabic Harakat Option */}
                   <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>আরবি হরকত (Tashkeel) সেটিং:</span>
-                      </label>
-                    </div>
+                    <label className="text-[11px] font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>আরবি হরকত (Tashkeel) সেটিং:</span>
+                    </label>
 
                     <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                       <button
@@ -290,7 +316,6 @@ export const Header: React.FC<HeaderProps> = ({
                       ))}
                     </div>
                   </div>
-
                 </div>
               </>
             )}
@@ -444,8 +469,113 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 2. SEARCH BAR ROW (Exact match to screenshot) */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-1 pb-2">
+        <div className="relative flex items-center">
+          <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+            placeholder="কোর্স, বিষয় বা প্রশ্ন খুঁজুন..."
+            className="w-full pl-10 pr-9 py-2 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-full text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#046A38]/30 dark:focus:ring-emerald-500/30 transition-all shadow-xs"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange && onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. HORIZONTAL SUB-TABS ROW (Exact match to screenshots) */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 pb-2.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-max">
+          {/* 1. হোম */}
+          <button
+            onClick={() => handleSubTabClick('home')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'home' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Home className="w-3.5 h-3.5" />
+            <span>হোম</span>
+          </button>
+
+          {/* 2. পরীক্ষা দিন */}
+          <button
+            onClick={() => handleSubTabClick('exam')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'exam' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>পরীক্ষা দিন</span>
+          </button>
+
+          {/* 3. কোর্স */}
+          <button
+            onClick={() => handleSubTabClick('courses')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'courses' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>কোর্স</span>
+            <span className="text-[9px] font-black px-1.5 py-0.2 bg-rose-500 text-white rounded-full">নতুন</span>
+          </button>
+
+          {/* 4. তামরীন এআই */}
+          <button
+            onClick={() => handleSubTabClick('ustad_ai')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'ustad_ai' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>তামরীন এআই</span>
+          </button>
+
+          {/* 5. সার্কুলার */}
+          <button
+            onClick={() => handleSubTabClick('circulars')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'circulars' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>সার্কুলার</span>
+            <span className="text-[9px] font-black px-1.5 py-0.2 bg-rose-500 text-white rounded-full">ভর্তি</span>
+          </button>
+
+          {/* 6. বিষয়ভিত্তিক */}
+          <button
+            onClick={() => handleSubTabClick('subjects')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'subjects' && currentPage === 'home'
+                ? 'bg-[#046A38] text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>বিষয়ভিত্তিক</span>
+          </button>
+        </div>
+      </div>
     </header>
   );
 };
-
-
