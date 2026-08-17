@@ -420,6 +420,30 @@ export function getUserStreakDays(): number {
 }
 
 /**
+ * Premium Membership Status Helper
+ */
+const PREMIUM_STORAGE_KEY = 'tamreen_is_premium';
+
+export function isUserPremium(): boolean {
+  try {
+    const data = localStorage.getItem(PREMIUM_STORAGE_KEY);
+    if (data === null) return true; // Default to active premium as seen in screenshot
+    return data === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export function setUserPremium(isPremium: boolean): void {
+  try {
+    localStorage.setItem(PREMIUM_STORAGE_KEY, isPremium ? 'true' : 'false');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_premium_updated', { detail: isPremium }));
+    }
+  } catch {}
+}
+
+/**
  * Determines if text is FULLY Arabic (has Arabic letters and NO Bengali or English letters).
  * If a question/option starts with 1 or 2 Arabic words but is followed by Bengali or English text, returns false.
  */

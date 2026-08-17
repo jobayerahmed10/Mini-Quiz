@@ -18,7 +18,8 @@ import {
   FileText,
   Calendar,
   Bookmark,
-  Bell
+  Bell,
+  Award
 } from 'lucide-react';
 import { Question, TabRoute } from '../types';
 import { toBengaliNumeral, StudentStats } from '../lib/utils';
@@ -111,7 +112,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="pt-2 flex items-center justify-between gap-4">
             <button
               onClick={() => onTabNavigate && onTabNavigate('courses')}
-              className="bg-[#EAB308] hover:bg-amber-400 text-[#064E3B] font-black px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all text-xs sm:text-sm"
+              className="bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-[#064E3B] font-black px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl flex items-center gap-1.5 shadow-[0_4px_14px_rgba(234,179,8,0.4)] cursor-pointer active:scale-95 transition-all text-xs sm:text-sm"
             >
               <span>কোর্সগুলো দেখুন</span>
               <ChevronRight className="w-4 h-4" />
@@ -127,95 +128,95 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </div>
 
-      {/* 2. NOTICE BAR STRIP (Exact match to Screenshot 1) */}
+      {/* 2. NOTICE BAR STRIP (Pure Neumorphic exact match to Screenshot) */}
       <div 
         onClick={() => onTabNavigate && onTabNavigate('circulars')}
-        className="rounded-2xl p-3 sm:p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex items-center justify-between gap-3 cursor-pointer hover:border-amber-400 transition-all group"
+        className="neu-card !rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:scale-[1.01] transition-transform group"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="bg-amber-500 text-[#0B132B] font-black text-[11px] px-2.5 py-0.5 rounded-full shrink-0 flex items-center gap-1">
-            <Bell className="w-3 h-3 text-[#0B132B]" />
+          <span className="bg-[#F59E0B] text-[#0B132B] font-black text-xs px-3 py-1 rounded-full shrink-0 flex items-center gap-1.5 shadow-xs">
+            <Bell className="w-3.5 h-3.5 text-[#0B132B]" />
             বিজ্ঞপ্তি
           </span>
           <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
             ১৯তম শিক্ষক নিবন্ধন (NTRCA) সার্কুলার ও আবেদন আপডেট...
           </p>
         </div>
-        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-500 group-hover:translate-x-1 transition-all shrink-0" />
+        <ChevronRight className="w-4 h-4 text-amber-500 group-hover:translate-x-1 transition-transform shrink-0" />
       </div>
 
       {/* 3. SIX NEUMORPHIC ACTION CARDS GRID (Exact match to Screenshot 1) */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
         {/* 1. লাইভ ক্লাস */}
         <button
           onClick={() => onTabNavigate && onTabNavigate('courses')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <Video className="w-5 h-5" />
+          <div className="neu-icon-box w-12 h-12 rounded-2xl flex items-center justify-center mb-2 text-[#EF4444] group-hover:scale-110 transition-transform">
+            <Video className="w-6 h-6" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">লাইভ ক্লাস</span>
-          <span className="text-[10px] font-bold text-rose-500 mt-0.5">চলমান</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">লাইভ ক্লাস</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-[#EF4444] mt-0.5">চলমান</span>
         </button>
 
         {/* 2. মডেল টেস্ট */}
         <button
           onClick={() => onTabNavigate && onTabNavigate('exam')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <FileCheck2 className="w-5 h-5" />
+          <div className="neu-icon-box w-12 h-12 rounded-2xl flex items-center justify-center mb-2 text-[#F59E0B] group-hover:scale-110 transition-transform">
+            <FileCheck2 className="w-6 h-6" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">মডেল টেস্ট</span>
-          <span className="text-[10px] font-bold text-amber-500 mt-0.5">৫০+ সেট</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">মডেল টেস্ট</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">৫০+ সেট</span>
         </button>
 
         {/* 3. তামরীন AI */}
         <button
           onClick={() => onTabNavigate && onTabNavigate('ustad_ai')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <Sparkles className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-[0_4px_12px_rgba(245,158,11,0.35)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+            <Sparkles className="w-6 h-6 text-white" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">তামরীন AI</span>
-          <span className="text-[10px] font-bold text-emerald-500 mt-0.5">ডাউট সলভ</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">তামরীন AI</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-[#D97706] dark:text-amber-400 mt-0.5">ডাউট সলভ</span>
         </button>
 
-        {/* 4. রুটিন */}
+        {/* 4. ক্লাস রুটিন */}
         <button
           onClick={() => onTabNavigate && onTabNavigate('courses')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <Calendar className="w-5 h-5" />
+          <div className="neu-icon-box w-12 h-12 rounded-2xl flex items-center justify-center mb-2 text-[#3B82F6] group-hover:scale-110 transition-transform">
+            <Calendar className="w-6 h-6" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">রুটিন</span>
-          <span className="text-[10px] font-bold text-blue-500 mt-0.5">শিডিউল</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">ক্লাস রুটিন</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">সাপ্তাহিক</span>
         </button>
 
-        {/* 5. লেকচার শিট */}
+        {/* 5. বিগত প্রশ্ন */}
         <button
           onClick={() => onTabNavigate && onTabNavigate('courses')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <BookOpen className="w-5 h-5" />
+          <div className="neu-icon-box w-12 h-12 rounded-2xl flex items-center justify-center mb-2 text-[#8B5CF6] group-hover:scale-110 transition-transform">
+            <BookOpen className="w-6 h-6" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">লেকচার শিট</span>
-          <span className="text-[10px] font-bold text-purple-500 mt-0.5">পিডিএফ</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">বিগত প্রশ্ন</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">ব্যাখ্যাসহ</span>
         </button>
 
-        {/* 6. বিষয়ভিত্তিক */}
+        {/* 6. সব কোর্স */}
         <button
-          onClick={() => onTabNavigate && onTabNavigate('subjects')}
-          className="p-3 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all group"
+          onClick={() => onTabNavigate && onTabNavigate('courses')}
+          className="neu-card !rounded-3xl p-3.5 sm:p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-[1.03] active:scale-95 transition-all group"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-            <Layers className="w-5 h-5" />
+          <div className="neu-icon-box w-12 h-12 rounded-2xl flex items-center justify-center mb-2 text-[#10B981] group-hover:scale-110 transition-transform">
+            <Award className="w-6 h-6" strokeWidth={2.2} />
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">বিষয়ভিত্তিক</span>
-          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">১৫টি বিষয়</span>
+          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight font-hind">সব কোর্স</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-[#059669] dark:text-emerald-400 mt-0.5">স্পেশাল ছাড়</span>
         </button>
       </div>
 

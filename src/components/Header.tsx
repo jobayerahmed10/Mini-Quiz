@@ -100,24 +100,24 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 border-b shadow-xs ${
-      isDarkMode ? 'bg-[#0B132B]/95 border-slate-800 text-white' : 'bg-[#F0F4F8]/95 border-slate-200/80 text-slate-900'
+      isDarkMode ? 'bg-[#0B132B]/95 border-slate-800 text-white' : 'bg-[#EEF2F6]/95 border-slate-200/60 text-slate-900'
     }`}>
       {/* 1. TOP BRANDING ROW */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-3 pb-2 flex items-center justify-between gap-2">
         {/* Left: Back Button OR Logo + Brand Title */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {!isAtHomeRoot ? (
-            /* Circular Neumorphic Back Button (Shown when navigated into any sub-page or tab) */
+            /* Circular Neumorphic Back Button */
             <button
               onClick={onGoBack || onNavigateHome}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.05)] flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform hover:bg-slate-200 dark:hover:bg-slate-700"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full neu-pill flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform"
               title="পিছনে ফিরে যান"
             >
               <ArrowLeft className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={2.6} />
             </button>
           ) : (
-            /* Green Squircle Logo Box with Golden Graduation Cap (Shown on Home root) */
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] sm:rounded-[20px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
+            /* Green Squircle Logo Box with Golden Graduation Cap (Exact match to Screenshot) */
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] sm:rounded-[20px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-[2px_3px_8px_rgba(4,106,56,0.35)] border border-emerald-500/40">
               <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-[#EAB308]" strokeWidth={2.3} />
             </div>
           )}
@@ -133,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className={`font-hind font-extrabold text-2xl sm:text-[28px] md:text-[30px] tracking-tight whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
                   আত-তামরীন
                 </span>
-                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-tight shrink-0">
+                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-tight shrink-0 shadow-xs">
                   একাডেমি
                 </span>
               </div>
@@ -145,11 +145,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Controls: Font ('T') + DarkMode ('Moon/Sun') + User Avatar */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Active Subject Pill on wide screens */}
           {selectedSubject && selectedSubject !== 'all' && selectedSubject !== 'সকল বিষয়' && (
             <div className={`hidden lg:flex items-center gap-2 px-3 py-1 border rounded-full text-xs font-bold ${
-              isDarkMode ? 'bg-slate-800/80 border-slate-700 text-amber-300' : 'bg-slate-100 border-slate-300 text-[#0B132B]'
+              isDarkMode ? 'bg-slate-800/80 border-slate-700 text-amber-300' : 'bg-[#EEF2F6] border-slate-300 text-[#0B132B]'
             }`}>
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
               <span className="truncate max-w-[130px]">{selectedSubject}</span>
@@ -160,12 +160,10 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowFontMenu(!showFontMenu)}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all border shadow-xs active:scale-95 ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
                 showFontMenu
-                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/30'
-                  : isDarkMode
-                  ? 'bg-slate-800/90 hover:bg-slate-700 border-slate-700'
-                  : 'bg-white hover:bg-slate-50 border-slate-200/90'
+                  ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-400 ring-2 ring-amber-400/30'
+                  : 'neu-pill'
               }`}
               title="ফন্ট স্টাইল, আরবি ফন্ট ও হরকত সেটিং"
             >
@@ -212,7 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
                           onClick={() => onChangeFontSize(opt.id)}
                           className={`py-1.5 px-1 rounded-lg text-xs font-black cursor-pointer transition-all border ${
                             fontSize === opt.id
-                              ? 'bg-[#0B132B] text-amber-400 border-[#0B132B] shadow-xs'
+                              ? 'bg-[#046A38] text-white border-[#046A38] shadow-xs'
                               : 'neu-btn text-slate-700 dark:text-slate-200'
                           }`}
                         >
@@ -235,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                         onClick={() => onChangeShowHarakat(true)}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                           showHarakat
-                            ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                            ? 'bg-[#046A38] text-amber-300 border-[#046A38] shadow-xs'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                         }`}
                       >
@@ -247,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
                         onClick={() => onChangeShowHarakat(false)}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                           !showHarakat
-                            ? 'bg-[#0B132B] text-amber-400 border-amber-500 shadow-xs'
+                            ? 'bg-[#046A38] text-amber-300 border-[#046A38] shadow-xs'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                         }`}
                       >
@@ -269,7 +267,7 @@ export const Header: React.FC<HeaderProps> = ({
                           onClick={() => onChangeFontFamily(f.id)}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
                             fontFamily === f.id
-                              ? 'bg-[#0B132B] text-white font-bold shadow-xs'
+                              ? 'bg-[#046A38] text-white font-bold shadow-xs'
                               : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
                           }`}
                         >
@@ -298,7 +296,7 @@ export const Header: React.FC<HeaderProps> = ({
                           onClick={() => onChangeFontFamily(f.id)}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
                             fontFamily === f.id
-                              ? 'bg-[#0B132B] text-white font-bold shadow-xs'
+                              ? 'bg-[#046A38] text-white font-bold shadow-xs'
                               : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
                           }`}
                         >
@@ -324,7 +322,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Dark Mode Toggle Button (Moon / Sun) */}
           <button
             onClick={onToggleDarkMode}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all border shadow-xs active:scale-95 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200/90 dark:border-slate-700"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl neu-pill flex items-center justify-center cursor-pointer transition-all active:scale-95"
             title={isDarkMode ? "লাইট মোডে পরিবর্তন করুন" : "ডার্ক মোডে পরিবর্তন করুন"}
           >
             {isDarkMode ? (
@@ -345,7 +343,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }
                 setShowFontMenu(false);
               }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-amber-100 dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
               title="ব্যবহারকারীর প্রোফাইল ও মেনু"
             >
               {userProfile?.avatar ? (
@@ -470,7 +468,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2. SEARCH BAR ROW (Exact match to screenshot) */}
+      {/* 2. SEARCH BAR ROW (Exact Inset Neumorphic match to screenshot) */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-1 pb-2">
         <div className="relative flex items-center">
           <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -479,7 +477,7 @@ export const Header: React.FC<HeaderProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
             placeholder="কোর্স, বিষয় বা প্রশ্ন খুঁজুন..."
-            className="w-full pl-10 pr-9 py-2 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-full text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#046A38]/30 dark:focus:ring-emerald-500/30 transition-all shadow-xs"
+            className="w-full pl-10 pr-9 py-2.5 neu-inset rounded-full text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#046A38]/30 dark:focus:ring-emerald-500/30 transition-all"
           />
           {searchQuery && (
             <button
@@ -492,86 +490,86 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 3. HORIZONTAL SUB-TABS ROW (Exact match to screenshots) */}
+      {/* 3. HORIZONTAL SUB-TABS ROW (Neumorphic Pills - Exact match to screenshots) */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 pb-2.5 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-max">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-max">
           {/* 1. হোম */}
           <button
             onClick={() => handleSubTabClick('home')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'home' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <Home className="w-3.5 h-3.5" />
+            <Home className={`w-3.5 h-3.5 ${activeTab === 'home' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
             <span>হোম</span>
           </button>
 
           {/* 2. পরীক্ষা দিন */}
           <button
             onClick={() => handleSubTabClick('exam')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'exam' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
+            <FileText className={`w-3.5 h-3.5 ${activeTab === 'exam' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
             <span>পরীক্ষা দিন</span>
           </button>
 
           {/* 3. কোর্স */}
           <button
             onClick={() => handleSubTabClick('courses')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'courses' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className={`w-3.5 h-3.5 ${activeTab === 'courses' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
             <span>কোর্স</span>
-            <span className="text-[9px] font-black px-1.5 py-0.2 bg-rose-500 text-white rounded-full">নতুন</span>
+            <span className="text-[9px] font-black px-1.5 py-0.2 bg-[#EF4444] text-white rounded-full">নতুন</span>
           </button>
 
           {/* 4. তামরীন এআই */}
           <button
             onClick={() => handleSubTabClick('ustad_ai')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'ustad_ai' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>তামরীন এআই</span>
           </button>
 
           {/* 5. সার্কুলার */}
           <button
             onClick={() => handleSubTabClick('circulars')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'circulars' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <Briefcase className="w-3.5 h-3.5" />
+            <Briefcase className={`w-3.5 h-3.5 ${activeTab === 'circulars' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
             <span>সার্কুলার</span>
-            <span className="text-[9px] font-black px-1.5 py-0.2 bg-rose-500 text-white rounded-full">ভর্তি</span>
+            <span className="text-[9px] font-black px-1.5 py-0.2 bg-[#EF4444] text-white rounded-full">ভর্তি</span>
           </button>
 
           {/* 6. বিষয়ভিত্তিক */}
           <button
             onClick={() => handleSubTabClick('subjects')}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'subjects' && currentPage === 'home'
-                ? 'bg-[#046A38] text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
+                : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className={`w-3.5 h-3.5 ${activeTab === 'subjects' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
             <span>বিষয়ভিত্তিক</span>
           </button>
         </div>

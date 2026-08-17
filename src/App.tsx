@@ -423,6 +423,7 @@ export default function App() {
             {activeTab === 'subjects' && (
               <SubjectsPage
                 onSelectSubject={(subj) => handleStartPractice(subj)}
+                onOpenCourses={() => handleTabChange('courses')}
               />
             )}
           </>

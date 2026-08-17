@@ -11,7 +11,7 @@
 
 body {
   font-family: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #F1F5F9;
+  background-color: #EEF2F6;
   color: #0F172A;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -133,40 +133,52 @@ body.dark input, body.dark select, body.dark textarea {
 
 /* --- LIGHT MODE NEUMORPHIC STYLES --- */
 .neu-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  box-shadow: 6px 6px 14px #e2e8f0, -6px -6px 14px #ffffff;
-  border-radius: 1.25rem;
+  background: #EEF2F6;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 6px 6px 16px rgba(166, 180, 200, 0.55), -6px -6px 16px #FFFFFF;
+  border-radius: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.neu-pill {
+  background: #EEF2F6;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 4px 4px 10px rgba(166, 180, 200, 0.5), -4px -4px 10px #FFFFFF;
+  border-radius: 9999px;
   transition: all 0.2s ease;
 }
 
 .neu-btn {
-  background: #FFFFFF;
-  border: 1px solid #CBD5E1;
+  background: #EEF2F6;
+  border: 1px solid rgba(255, 255, 255, 0.7);
   color: #0F172A;
-  box-shadow: 4px 4px 10px #e2e8f0, -4px -4px 10px #ffffff;
+  box-shadow: 4px 4px 10px rgba(166, 180, 200, 0.5), -4px -4px 10px #FFFFFF;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .neu-btn:hover {
-  border-color: #0B132B;
-  color: #0B132B;
-  box-shadow: 6px 6px 14px #cbd5e1, -6px -6px 14px #ffffff;
+  box-shadow: 6px 6px 14px rgba(166, 180, 200, 0.65), -6px -6px 14px #FFFFFF;
   transform: translateY(-1px);
 }
 
-/* Clicked / Active Neumorphic Button in Light Mode -> Turns Navy Blue (#0B132B) */
+.neu-icon-box {
+  background: #EEF2F6;
+  box-shadow: 3px 3px 7px rgba(166, 180, 200, 0.5), -3px -3px 7px #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Clicked / Active Neumorphic Button in Light Mode -> Turns Emerald Green (#046A38) */
 .neu-btn:active, .neu-btn-active, .neu-active {
-  background: #0B132B !important;
-  border-color: #0B132B !important;
+  background: #046A38 !important;
+  border-color: #046A38 !important;
   color: #FFFFFF !important;
-  box-shadow: inset 3px 3px 6px #040711, inset -3px -3px 6px #121f45 !important;
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.35), inset -3px -3px 6px rgba(255, 255, 255, 0.1) !important;
 }
 
 .neu-inset {
-  background: #F1F5F9;
-  box-shadow: inset 3px 3px 6px #cbd5e1, inset -3px -3px 6px #ffffff;
-  border: 1px solid #E2E8F0;
+  background: #EEF2F6;
+  box-shadow: inset 3px 3px 6px rgba(166, 180, 200, 0.55), inset -3px -3px 6px #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 /* --- DARK MODE NEUMORPHIC STYLES --- */
@@ -175,6 +187,12 @@ body.dark input, body.dark select, body.dark textarea {
   border: 1px solid #233760 !important;
   box-shadow: 6px 6px 16px #060a17, -6px -6px 16px #1a2c50 !important;
   color: #F8FAFC !important;
+}
+
+.dark .neu-pill, body.dark .neu-pill {
+  background: #162444 !important;
+  border: 1px solid #233760 !important;
+  box-shadow: 4px 4px 10px #070c1b, -4px -4px 10px #213662 !important;
 }
 
 .dark .neu-btn, body.dark .neu-btn {
@@ -191,13 +209,19 @@ body.dark input, body.dark select, body.dark textarea {
   transform: translateY(-1px);
 }
 
-/* Clicked / Active Neumorphic Button in Dark Mode -> High Contrast Navy Blue + Gold/Cyan Highlight */
+.dark .neu-icon-box, body.dark .neu-icon-box {
+  background: #162444 !important;
+  box-shadow: 3px 3px 7px #070c1b, -3px -3px 7px #213662 !important;
+  border: 1px solid #233760 !important;
+}
+
+/* Clicked / Active Neumorphic Button in Dark Mode */
 .dark .neu-btn:active, .dark .neu-btn-active, .dark .neu-active,
 body.dark .neu-btn:active, body.dark .neu-btn-active, body.dark .neu-active {
-  background: #0B132B !important;
-  border-color: #F59E0B !important;
-  color: #F59E0B !important;
-  box-shadow: inset 3px 3px 6px #040711, inset -3px -3px 6px #121f45 !important;
+  background: #046A38 !important;
+  border-color: #046A38 !important;
+  color: #FFFFFF !important;
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.4), inset -3px -3px 6px rgba(255, 255, 255, 0.1) !important;
 }
 
 .dark .neu-inset, body.dark .neu-inset {
