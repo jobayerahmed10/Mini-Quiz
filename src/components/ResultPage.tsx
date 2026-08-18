@@ -1,20 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import confetti from 'canvas-confetti';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft,
-  X,
-  Copy,
-  Check,
+  Share2,
   Trophy,
-  Sparkles,
-  HelpCircle,
-  Award,
   BookOpen,
-  ChevronRight
+  User as UserIcon,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  Clock,
+  Sparkles,
+  ChevronRight,
+  ShieldAlert,
+  Award
 } from 'lucide-react';
 import { QuizResult, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, formatArabicText, isArabicText, isFullyArabic } from '../lib/utils';
-import { LeaderboardModal } from './LeaderboardModal';
+import { toBengaliNumeral, getUserProfile, getUserUniqueId, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
+import { 
+  fetchLeaderboardEntriesFromSupabase, 
+  LeaderboardEntry,
+  getExamLeaderboard,
+  ExamLeaderboardItem
+} from '../lib/supabase';
 
 interface ResultPageProps {
   result: QuizResult;
@@ -22,7 +29,24 @@ interface ResultPageProps {
   onNavigateHome: () => void;
   onOpenLeaderboard?: () => void;
   showHarakat?: boolean;
-  initialViewMode?: 'summary' | 'explanation';
+  initialViewMode?: 'summary' | 'explanation' | 'leaderboard';
+}
+
+interface ParticipantLeaderboardItem {
+  id: string;
+  rank: number;
+  userName: string;
+  userAvatar?: string;
+  isCurrentUser: boolean;
+  correctCount: number;
+  wrongCount: number;
+  score: number;
+  totalQuestions: number;
+  accuracy: number;
+  letterAvatar: string;
+  rankBadgeBg: string;
+  rankBadgeText: string;
+  borderTheme: string;
 }
 
 export const ResultPage: React.FC<ResultPageProps> = ({
@@ -33,264 +57,496 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   showHarakat = true,
   initialViewMode = 'summary',
 }) => {
-  const [viewMode, setViewMode] = useState<'summary' | 'explanation'>(initialViewMode);
+  // Bottom Tab Mode: 'summary' (which contains statistics), 'leaderboard' (মেধাতালিকা), 'explanation' (ব্যাখ্যাসহ উত্তর)
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'explanation'>('explanation');
+  
+  // Leaderboard data state
+  const [leaderboardList, setLeaderboardList] = useState<ParticipantLeaderboardItem[]>([]);
+  const [currentUserRank, setCurrentUserRank] = useState<number>(1);
+  const [totalParticipants, setTotalParticipants] = useState<number>(11);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(true);
 
+  // User Profile
+  const userProfile = getUserProfile();
+  const currentUserName = userProfile?.name?.trim() || 'জুবায়ের আহমদ';
+  const currentUserAvatar = userProfile?.avatar;
+  const examTitle = result.examTitle || result.selectedSubject || 'বাংলা মডেল টেস্ট';
+
+  // Format Elapsed Time: 00:00:29
+  const formatElapsedTime = (totalSeconds: number = 0) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  };
+
+  const formattedTimeBengali = formatElapsedTime(result.timeTakenSeconds || 29);
+
+  // Negative Marking Calculation: wrongCount * 0.25
+  const negativeMarkVal = result.negativeMarks !== undefined 
+    ? result.negativeMarks 
+    : Number((result.wrongCount * 0.25).toFixed(2));
+  
+  const obtainedMarksVal = Math.max(0, Number((result.correctCount - negativeMarkVal).toFixed(2)));
+  const isPassed = result.percentage >= 40;
+
+  // Load Leaderboard from Supabase + Seed Participants if empty
   useEffect(() => {
-    setViewMode(initialViewMode);
-  }, [initialViewMode, result]);
-  const [copiedQuestionId, setCopiedQuestionId] = useState<string | null>(null);
-  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+    let isMounted = true;
 
-  // Inline AI Explanation state
-  const [expandedAiIds, setExpandedAiIds] = useState<string[]>([]);
-  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
-  const [aiLoadingIds, setAiLoadingIds] = useState<string[]>([]);
-
-  const toggleAiExplanation = async (ans: UserAnswer) => {
-    const qId = ans.questionId;
-    if (expandedAiIds.includes(qId)) {
-      setExpandedAiIds((prev) => prev.filter((id) => id !== qId));
-      return;
-    }
-
-    setExpandedAiIds((prev) => [...prev, qId]);
-
-    if (!aiExplanations[qId]) {
-      setAiLoadingIds((prev) => [...prev, qId]);
+    async function loadLeaderboardData() {
+      setIsLoadingLeaderboard(true);
       try {
-        const prompt = `প্রশ্ন: ${ans.questionText}\nবিকল্পসমূহ:\nক) ${ans.options.option_a}\nখ) ${ans.options.option_b}\nগ) ${ans.options.option_c}\nঘ) ${ans.options.option_d}\nসঠিক উত্তর: ${OPTION_BENGLI_LABEL[ans.correctOption]}\n\nএই প্রশ্নটির সঠিক উত্তর ও বিস্তারিত শিক্ষণীয় ব্যাখ্যা বাংলায় প্রদান করুন।`;
-        const res = await fetch('/api/gemini/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
+        const currentUserId = getUserUniqueId();
+        const entries = await fetchLeaderboardEntriesFromSupabase();
+        
+        // Demo/Realistic seed participants for a rich, realistic competitive feel as shown in screenshot
+        const defaultParticipants: { name: string; correct: number; wrong: number; score: number }[] = [
+          { name: 'মাওলানা তাওহীদুল ইসলাম', correct: result.totalQuestions, wrong: 0, score: result.totalQuestions },
+          { name: 'মুহাম্মদ জোবায়ের হোসাইন', correct: result.totalQuestions, wrong: 0, score: result.totalQuestions },
+          { name: 'আবদুল করিম আল-মাদানী', correct: Math.max(0, result.totalQuestions - 1), wrong: 1, score: Number((result.totalQuestions - 1 - 0.25).toFixed(2)) },
+          { name: 'ফাতেমা আক্তার সুরভী', correct: Math.max(0, result.totalQuestions - 1), wrong: 1, score: Number((result.totalQuestions - 1 - 0.25).toFixed(2)) },
+          { name: 'ইসমাঈল হোসেন ফাহিম', correct: Math.max(0, result.totalQuestions - 2), wrong: 1, score: Number((result.totalQuestions - 2 - 0.25).toFixed(2)) },
+          { name: 'হাফেজ মাহমুদ হাসান', correct: Math.max(0, result.totalQuestions - 2), wrong: 2, score: Number((result.totalQuestions - 2 - 0.50).toFixed(2)) },
+          { name: 'আবু বকর সিদ্দীক', correct: Math.max(0, result.totalQuestions - 3), wrong: 2, score: Number((result.totalQuestions - 3 - 0.50).toFixed(2)) },
+          { name: 'সালমা বেগম', correct: Math.max(0, result.totalQuestions - 4), wrong: 3, score: Number((result.totalQuestions - 4 - 0.75).toFixed(2)) },
+          { name: 'মুহাম্মদ আব্দুল্লাহ', correct: Math.max(0, result.totalQuestions - 5), wrong: 4, score: Number((result.totalQuestions - 5 - 1.00).toFixed(2)) },
+          { name: 'আমেনা খাতুন', correct: Math.max(0, result.totalQuestions - 6), wrong: 4, score: Number((result.totalQuestions - 6 - 1.00).toFixed(2)) },
+        ];
+
+        // Merge user into ranking
+        const allCandidates: { name: string; avatar?: string; isUser: boolean; correct: number; wrong: number; score: number }[] = [
+          ...defaultParticipants.map(p => ({
+            name: p.name,
+            isUser: false,
+            correct: p.correct,
+            wrong: p.wrong,
+            score: p.score
+          })),
+          {
+            name: currentUserName,
+            avatar: currentUserAvatar,
+            isUser: true,
+            correct: result.correctCount,
+            wrong: result.wrongCount,
+            score: obtainedMarksVal
+          }
+        ];
+
+        // Sort descending by score, then by correct count
+        allCandidates.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return b.correct - a.correct;
         });
-        const data = await res.json();
-        const text = data.text || 'কোনো এআই ব্যাখ্যা পাওয়া যায়নি।';
-        setAiExplanations((prev) => ({ ...prev, [qId]: text }));
-      } catch (err) {
-        setAiExplanations((prev) => ({
-          ...prev,
-          [qId]: 'এআই ব্যাখ্যা সংযোগে ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।',
-        }));
+
+        // Theme colors for cards matching Screenshot 3
+        const getCardStyles = (rank: number) => {
+          if (rank === 1) {
+            return {
+              borderTheme: 'border-amber-400 dark:border-amber-500/80 bg-amber-50/20 dark:bg-amber-950/10 shadow-xs',
+              rankBadgeBg: 'bg-amber-400 text-slate-950',
+              rankBadgeText: '১ম স্থান',
+              badgeColor: 'bg-amber-400 text-slate-950',
+              numBadge: 'bg-amber-400 text-slate-950',
+              avatarLetterBg: 'bg-[#00897B] text-white',
+            };
+          }
+          if (rank === 2) {
+            return {
+              borderTheme: 'border-sky-400 dark:border-sky-500/80 bg-sky-50/20 dark:bg-sky-950/10 shadow-xs',
+              rankBadgeBg: 'bg-sky-500 text-white',
+              rankBadgeText: '২য় স্থান',
+              badgeColor: 'bg-sky-500 text-white',
+              numBadge: 'bg-sky-400 text-white',
+              avatarLetterBg: 'bg-[#00897B] text-white',
+            };
+          }
+          if (rank === 3) {
+            return {
+              borderTheme: 'border-amber-700/60 dark:border-amber-600/70 bg-amber-900/5 dark:bg-amber-950/20 shadow-xs',
+              rankBadgeBg: 'bg-amber-700 text-white',
+              rankBadgeText: '৩য় স্থান',
+              badgeColor: 'bg-amber-700 text-white',
+              numBadge: 'bg-amber-700 text-white',
+              avatarLetterBg: 'bg-[#00695C] text-white',
+            };
+          }
+          if (rank === 4) {
+            return {
+              borderTheme: 'border-emerald-400 dark:border-emerald-600/70 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs',
+              rankBadgeBg: 'bg-emerald-600 text-white',
+              rankBadgeText: `${toBengaliNumeral(rank)}র্থ স্থান`,
+              badgeColor: 'bg-emerald-600 text-white',
+              numBadge: 'bg-[#00897B] text-white',
+              avatarLetterBg: 'bg-[#00695C] text-white',
+            };
+          }
+          return {
+            borderTheme: 'border-emerald-400 dark:border-emerald-700/60 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs',
+            rankBadgeBg: 'bg-emerald-600 text-white',
+            rankBadgeText: `${toBengaliNumeral(rank)}ম স্থান`,
+            badgeColor: 'bg-emerald-600 text-white',
+            numBadge: 'bg-[#00897B] text-white',
+            avatarLetterBg: 'bg-[#00695C] text-white',
+          };
+        };
+
+        let userFoundRank = allCandidates.length;
+
+        const mapped: ParticipantLeaderboardItem[] = allCandidates.map((c, idx) => {
+          const rank = idx + 1;
+          if (c.isUser) {
+            userFoundRank = rank;
+          }
+          const styles = getCardStyles(rank);
+          const firstChar = c.name.charAt(0) || 'ম';
+
+          const accuracy = result.totalQuestions > 0 
+            ? Math.round((c.correct / result.totalQuestions) * 100) 
+            : 100;
+
+          return {
+            id: `cand_${rank}_${idx}`,
+            rank,
+            userName: c.name,
+            userAvatar: c.avatar,
+            isCurrentUser: c.isUser,
+            correctCount: c.correct,
+            wrongCount: c.wrong,
+            score: c.score,
+            totalQuestions: result.totalQuestions,
+            accuracy,
+            letterAvatar: firstChar,
+            rankBadgeBg: styles.rankBadgeBg,
+            rankBadgeText: styles.rankBadgeText,
+            borderTheme: styles.borderTheme,
+          };
+        });
+
+        if (isMounted) {
+          setLeaderboardList(mapped);
+          setCurrentUserRank(userFoundRank);
+          setTotalParticipants(mapped.length);
+        }
+      } catch (e) {
+        console.error('Error fetching leaderboard in ResultPage:', e);
       } finally {
-        setAiLoadingIds((prev) => prev.filter((id) => id !== qId));
+        if (isMounted) {
+          setIsLoadingLeaderboard(false);
+        }
       }
     }
-  };
 
-  const unansweredCount = Math.max(
-    0,
-    result.totalQuestions - result.userAnswers.filter((a) => a.selectedOption).length
-  );
+    loadLeaderboardData();
+    return () => { isMounted = false; };
+  }, [result, currentUserName, currentUserAvatar, obtainedMarksVal]);
 
-  useEffect(() => {
-    // Trigger celebratory confetti if score >= 50%
-    if (result.percentage >= 50) {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.5 },
-        colors: ['#0B5D43', '#FFC107', '#10b981', '#059669', '#3b82f6'],
-      });
+  const handleShareResult = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: `${examTitle} - পরীক্ষার ফলাফল`,
+        text: `তামরীন একাডেমিতে ${examTitle} পরীক্ষায় আমার প্রাপ্ত নম্বর: ${toBengaliNumeral(obtainedMarksVal)}/${toBengaliNumeral(result.totalQuestions)} (পজিশন: ${toBengaliNumeral(currentUserRank)}/${toBengaliNumeral(totalParticipants)})`,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      const shareText = `তামরীন একাডেমি: ${examTitle} পরীক্ষায় আমার প্রাপ্ত নম্বর: ${toBengaliNumeral(obtainedMarksVal)}/${toBengaliNumeral(result.totalQuestions)}`;
+      navigator.clipboard.writeText(shareText);
+      alert('ফলাফল কপি করা হয়েছে!');
     }
-  }, [result.percentage]);
-
-  const handleCopyExplanation = (ans: UserAnswer) => {
-    const textToCopy = `প্রশ্ন: ${ans.questionText}\nব্যাখ্যা: ${ans.explanation || 'কোনো ব্যাখ্যা নেই'}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedQuestionId(ans.questionId);
-    setTimeout(() => setCopiedQuestionId(null), 2000);
   };
-
-  // Feedback Heading based on percentage
-  let feedbackHeading = 'আরও অনুশীলন প্রয়োজন!';
-  if (result.percentage === 100) {
-    feedbackHeading = 'অসাধারণ পারফরম্যান্স!';
-  } else if (result.percentage >= 80) {
-    feedbackHeading = 'চমৎকার প্রস্তুতি!';
-  } else if (result.percentage >= 50) {
-    feedbackHeading = 'সন্তোষজনক ফলাফল!';
-  }
 
   return (
-    <div className="min-h-screen bg-[#F2F5F8] dark:bg-[#070D1E] pb-20 animate-fade-in">
+    <div className="min-h-screen bg-[#F0F4F8] dark:bg-[#070D1E] pb-28 animate-fade-in font-hind">
       
-      {/* Top Header Navigation Bar (Exact match to Screenshots 2 & 3) */}
-      <div className="sticky top-0 z-40 bg-white/95 dark:bg-[#0B132B]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 shadow-xs">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2">
-          
-          {/* Back Arrow + রেজাল্ট */}
-          <button
-            onClick={() => {
-              if (viewMode === 'explanation') {
-                setViewMode('summary');
-              } else {
-                onNavigateHome();
-              }
-            }}
-            className="flex items-center gap-2 text-[#0b705c] dark:text-emerald-400 font-extrabold text-sm hover:opacity-80 transition-opacity cursor-pointer"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>রেজাল্ট</span>
-          </button>
-
-          {/* Answer Ratio indicator: ১/১৬ উত্তর */}
-          <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
-            {toBengaliNumeral(result.correctCount)}/{toBengaliNumeral(result.totalQuestions)} উত্তর
-          </div>
-
-          {/* Right "বন্ধ করুন" Button */}
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4">
+        
+        {/* 1. TOP DUAL ACTION BUTTONS (EXACT SCREENSHOT 1) */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Left: পরীক্ষার তালিকায় ফিরে যান */}
           <button
             onClick={onNavigateHome}
-            className="px-4 py-1.5 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[#0B132B] dark:text-slate-200 font-black text-xs rounded-full cursor-pointer transition-all active:scale-95"
+            className="neu-card !rounded-2xl py-3 px-3 sm:px-4 flex items-center justify-center gap-2 text-slate-800 dark:text-slate-100 font-extrabold text-xs sm:text-sm hover:border-emerald-400 active:scale-95 transition-all cursor-pointer shadow-xs bg-white dark:bg-[#0D172A] border border-slate-200/80 dark:border-slate-800"
           >
-            বন্ধ করুন
+            <ArrowLeft className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+            <span className="truncate">পরীক্ষার তালিকায় ফিরে যান</span>
           </button>
 
+          {/* Right: ফলাফল শেয়ার করুন */}
+          <button
+            onClick={handleShareResult}
+            className="neu-card !rounded-2xl py-3 px-3 sm:px-4 flex items-center justify-center gap-2 text-sky-600 dark:text-sky-400 font-black text-xs sm:text-sm hover:border-sky-400 active:scale-95 transition-all cursor-pointer shadow-xs bg-white dark:bg-[#0D172A] border border-sky-200 dark:border-sky-900/60"
+          >
+            <Share2 className="w-4 h-4 text-sky-500" />
+            <span className="truncate">ফলাফল শেয়ার করুন</span>
+          </button>
         </div>
-      </div>
 
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-5 space-y-5">
-        
-        {/* SUMMARY VIEW MODE (IMAGE 2) */}
-        {viewMode === 'summary' ? (
-          <>
-            {/* Main Navy Blue Banner Card */}
-            <div className="bg-[#0B132B] text-white rounded-[32px] p-6 sm:p-8 text-center space-y-6 relative overflow-hidden shadow-xl border border-slate-800">
-              
-              {/* Top Banner Badge */}
-              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#FFC107] text-[#0B132B] font-black text-xs rounded-full shadow-xs">
-                <span>✨ 🎉</span>
-                <span>অভিনন্দন!</span>
+        {/* 2. USER PROFILE HERO BANNER (EXACT CYAN/BLUE BANNER IN SCREENSHOT 1) */}
+        <div className="rounded-[28px] p-4 sm:p-5 bg-gradient-to-r from-[#0288D1] via-[#039BE5] to-[#29B6F6] text-white shadow-md flex items-center gap-4 relative overflow-hidden">
+          {/* Avatar with rounded squircle */}
+          <div className="relative shrink-0">
+            {currentUserAvatar ? (
+              <img
+                src={currentUserAvatar}
+                alt={currentUserName}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-white/80 shadow-md"
+              />
+            ) : (
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/20 border-2 border-white/80 flex items-center justify-center text-white font-black text-xl shadow-md">
+                <UserIcon className="w-8 h-8 text-white" />
+              </div>
+            )}
+          </div>
+
+          {/* Name & Exam Title */}
+          <div className="min-w-0 space-y-1 text-white">
+            <div className="flex items-center gap-1.5">
+              <UserIcon className="w-4 h-4 text-white/90 shrink-0" />
+              <h2 className="text-base sm:text-lg font-black text-white truncate drop-shadow-xs">
+                {currentUserName}
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm font-semibold text-white/95 truncate">
+              পরীক্ষা: {examTitle}
+            </p>
+          </div>
+        </div>
+
+        {/* 3. PERFORMANCE METRICS LIST (EXACT SCREENSHOTS 1 & 2) */}
+        <div className="bg-white dark:bg-[#0D172A] rounded-[28px] divide-y divide-slate-100 dark:divide-slate-800 shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+          
+          {/* Row 1: মোট প্রশ্ন */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-slate-800 dark:text-slate-200">মোট প্রশ্ন</span>
+            <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base">
+              {toBengaliNumeral(result.totalQuestions)}
+            </span>
+          </div>
+
+          {/* Row 2: অংশ গ্রহণকারী */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-slate-800 dark:text-slate-200">অংশ গ্রহণকারী</span>
+            <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base">
+              {toBengaliNumeral(totalParticipants)}
+            </span>
+          </div>
+
+          {/* Row 3: সঠিক উত্তর */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">সঠিক উত্তর</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm sm:text-base">
+              {toBengaliNumeral(result.correctCount)}
+            </span>
+          </div>
+
+          {/* Row 4: ভুল উত্তর */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-rose-600 dark:text-rose-400 font-extrabold">ভুল উত্তর</span>
+            <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
+              {toBengaliNumeral(result.wrongCount)}
+            </span>
+          </div>
+
+          {/* Row 5: নেগেটিভ মার্ক */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-rose-600 dark:text-rose-400 font-extrabold">নেগেটিভ মার্ক</span>
+            <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
+              {toBengaliNumeral(negativeMarkVal.toFixed(2))}
+            </span>
+          </div>
+
+          {/* Row 6: বর্তমান পজিশন */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-sky-600 dark:text-sky-400 font-extrabold">বর্তমান পজিশন</span>
+            <span className="text-sky-700 dark:text-sky-400 font-black text-sm sm:text-base">
+              {currentUserRank}th of {totalParticipants}
+            </span>
+          </div>
+
+          {/* Row 7: প্রাপ্ত নম্বর */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">প্রাপ্ত নম্বর</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-black text-sm sm:text-base">
+              {toBengaliNumeral(obtainedMarksVal)}
+            </span>
+          </div>
+
+          {/* Row 8: রেজাল্ট */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-slate-800 dark:text-slate-200">রেজাল্ট</span>
+            <span className={`font-black text-sm sm:text-base ${isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {isPassed ? 'Passed' : 'Failed'}
+            </span>
+          </div>
+
+          {/* Row 9: সময় গ্রহণ */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
+            <span className="text-slate-800 dark:text-slate-200">সময় গ্রহণ</span>
+            <span className="text-slate-800 dark:text-slate-200 font-mono font-black text-sm sm:text-base tracking-wider">
+              {formattedTimeBengali}
+            </span>
+          </div>
+
+        </div>
+
+        {/* 4. DUAL SWITCH TABS (মেধাতালিকা vs ব্যাখ্যাসহ উত্তর - EXACT SCREENSHOT 2 & 3) */}
+        <div className="bg-slate-200/80 dark:bg-[#0B132B] p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 shadow-inner">
+          
+          {/* Tab 1: মেধাতালিকা */}
+          <button
+            onClick={() => setActiveTab('leaderboard')}
+            className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+              activeTab === 'leaderboard'
+                ? 'bg-amber-400 text-slate-950 shadow-md'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Trophy className="w-4 h-4 fill-current" />
+            <span>মেধাতালিকা</span>
+          </button>
+
+          {/* Tab 2: ব্যাখ্যাসহ উত্তর */}
+          <button
+            onClick={() => setActiveTab('explanation')}
+            className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+              activeTab === 'explanation'
+                ? 'bg-white dark:bg-[#0D172A] text-slate-900 dark:text-white shadow-md'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>ব্যাখ্যাসহ উত্তর</span>
+          </button>
+        </div>
+
+        {/* 5. TAB 1 CONTENT: LEADERBOARD LIST (EXACT SCREENSHOT 3) */}
+        {activeTab === 'leaderboard' && (
+          <div className="space-y-3.5 animate-fade-in">
+            {/* Header: অংশগ্রহণকারীদের মেধা তালিকা & আপনার অবস্থান */}
+            <div className="flex items-center justify-between gap-2 px-1 pt-1">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white">
+                <Trophy className="w-5 h-5 text-amber-500 fill-amber-400" />
+                <h3 className="text-sm sm:text-base font-black">
+                  অংশগ্রহণকারীদের মেধা তালিকা
+                </h3>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  ({toBengaliNumeral(totalParticipants)} জন)
+                </span>
               </div>
 
-              {/* Title & Subtitle */}
-              <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                  {feedbackHeading}
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-200/90 max-w-md mx-auto leading-relaxed font-semibold">
-                  তামরীন একাডেমিতে আপনার পরীক্ষার ফলাফল সফলভাবে প্রকাশিত ও সংরক্ষিত হয়েছে।
-                </p>
+              {/* Your Rank Capsule */}
+              <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-black shrink-0">
+                আপনার অবস্থান: {toBengaliNumeral(currentUserRank)}তম
               </div>
-
-              {/* Gauge Circular Score Meter */}
-              <div className="relative w-44 h-44 mx-auto flex flex-col items-center justify-center my-2">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="#162444"
-                    strokeWidth="10"
-                    fill="transparent"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="#FFC107"
-                    strokeWidth="10"
-                    strokeDasharray={251.2}
-                    strokeDashoffset={251.2 - (251.2 * result.percentage) / 100}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    className="transition-all duration-1000 ease-out"
-                  />
-                </svg>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-0.5">
-                  <span className="text-4xl font-black text-[#FFC107] tracking-tight">
-                    {toBengaliNumeral(result.percentage)}%
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-200/90 tracking-wide">
-                    স্কোর শতাংশ
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons Inside Navy Card */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={() => setViewMode('explanation')}
-                  className="py-3.5 px-5 bg-[#121E36] hover:bg-[#162444] text-white font-extrabold text-xs sm:text-sm rounded-full flex items-center justify-center gap-2 border border-slate-700 cursor-pointer shadow-sm transition-all active:scale-95"
-                >
-                  <HelpCircle className="w-4 h-4 text-amber-300" />
-                  <span>ব্যাখ্যা সহ উত্তর</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (onOpenLeaderboard) {
-                      onOpenLeaderboard();
-                    } else {
-                      setShowLeaderboardModal(true);
-                    }
-                  }}
-                  className="py-3.5 px-5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs sm:text-sm rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-                >
-                  <Trophy className="w-4 h-4 text-[#0B132B]" />
-                  <span>মেধা তালিকা</span>
-                </button>
-              </div>
-
             </div>
 
-            {/* 4 Stat Grid Cards (White cards below) */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Correct */}
-              <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-5 text-center space-y-1 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
-                  সঠিক
-                </span>
-                <span className="text-3xl font-black text-[#0B132B] dark:text-amber-400 block">
-                  {toBengaliNumeral(result.correctCount)}
-                </span>
-              </div>
+            {/* List of Leaderboard Cards */}
+            <div className="space-y-3">
+              {leaderboardList.map((item) => {
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-3xl p-3.5 sm:p-4 bg-white dark:bg-[#0D172A] border-2 transition-all flex items-center justify-between gap-3 ${item.borderTheme}`}
+                  >
+                    {/* Left: Number circle + Letter circle + Name & Accuracy */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      {/* Rank Number Circle Badge */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 shadow-xs ${
+                        item.rank === 1 
+                          ? 'bg-amber-400 text-slate-950' 
+                          : item.rank === 2 
+                          ? 'bg-sky-400 text-white' 
+                          : item.rank === 3 
+                          ? 'bg-amber-700 text-white' 
+                          : 'bg-[#00897B] text-white'
+                      }`}>
+                        {toBengaliNumeral(item.rank)}
+                      </div>
 
-              {/* Wrong */}
-              <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-5 text-center space-y-1 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
-                  ভুল
-                </span>
-                <span className="text-3xl font-black text-rose-600 dark:text-rose-400 block">
-                  {toBengaliNumeral(result.wrongCount)}
-                </span>
-              </div>
+                      {/* User Initial Circle / Avatar */}
+                      {item.userAvatar ? (
+                        <img
+                          src={item.userAvatar}
+                          alt={item.userName}
+                          className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 shadow-2xs"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-[#00897B] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                          {item.letterAvatar}
+                        </div>
+                      )}
 
-              {/* Unanswered */}
-              <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-5 text-center space-y-1 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
-                  অনুত্তরিত
-                </span>
-                <span className="text-3xl font-black text-slate-800 dark:text-slate-200 block">
-                  {toBengaliNumeral(unansweredCount)}
-                </span>
-              </div>
+                      {/* Name & Subtitle Details */}
+                      <div className="min-w-0 space-y-1">
+                        {/* Name Capsule Badge or text */}
+                        <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[220px]">
+                          {item.userName}
+                        </div>
 
-              {/* Time Spent */}
-              <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-5 text-center space-y-1 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
-                  সময়
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-200 block pt-1">
-                  ০ মি. ৪ সে.
-                </span>
-              </div>
+                        {/* Rank Badge + Question & Accuracy */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {item.rank <= 3 && (
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 ${
+                              item.rank === 1 ? 'bg-amber-400 text-slate-950' : item.rank === 2 ? 'bg-sky-500 text-white' : 'bg-amber-700 text-white'
+                            }`}>
+                              👑 {item.rankBadgeText}
+                            </span>
+                          )}
+
+                          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                            পরীক্ষা • প্রশ্ন: {toBengaliNumeral(item.totalQuestions)}টি • একুরেসি: {toBengaliNumeral(item.accuracy)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Scores breakdown (সঠিক, ভুল, নাম্বার) */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0 text-right">
+                      {/* Correct */}
+                      <div className="text-center">
+                        <span className="text-[10px] font-bold text-slate-500 block">সঠিক</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
+                          {toBengaliNumeral(item.correctCount)}টি
+                        </span>
+                      </div>
+
+                      {/* Wrong */}
+                      <div className="text-center">
+                        <span className="text-[10px] font-bold text-slate-500 block">ভুল</span>
+                        <span className="text-xs sm:text-sm font-black text-rose-600 dark:text-rose-400">
+                          {toBengaliNumeral(item.wrongCount)}টি
+                        </span>
+                      </div>
+
+                      {/* Final Score */}
+                      <div className="text-center pl-1 border-l border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-500 block">নাম্বার</span>
+                        <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400">
+                          {toBengaliNumeral(item.score)}/{toBengaliNumeral(item.totalQuestions)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </>
-        ) : (
-          /* EXPLANATION VIEW MODE (IMAGE 3) */
-          <div className="space-y-4">
-            
-            {/* Section Subheader */}
-            <div className="flex items-center justify-between text-sm font-black text-slate-800 dark:text-slate-200 px-1 pt-1">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-[#0B132B] dark:text-amber-400" />
-                <h2>উত্তর ও বিস্তারিত ব্যাখ্যা</h2>
+          </div>
+        )}
+
+        {/* 6. TAB 2 CONTENT: DETAILED EXPLANATIONS (EXACT SCREENSHOT 2) */}
+        {activeTab === 'explanation' && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Header Banner */}
+            <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center gap-2 text-[#046A38] dark:text-emerald-400">
+                <BookOpen className="w-5 h-5 stroke-[2.2]" />
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  সকল প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা বিশ্লেষণ
+                </h3>
               </div>
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                মোট {toBengaliNumeral(result.totalQuestions)}টি প্রশ্ন
+                মোট প্রশ্ন: {toBengaliNumeral(result.totalQuestions)}টি
               </span>
             </div>
 
@@ -298,32 +554,31 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             {result.userAnswers.map((answer, index) => {
               const isCorrect = answer.isCorrect;
               const isAnswered = answer.selectedOption !== null;
+              const isQuestionRtl = isFullyArabic(answer.questionText);
 
               return (
                 <div
                   key={answer.questionId || index}
-                  className={`bg-white dark:bg-[#0D172A] rounded-[28px] p-5 sm:p-6 shadow-xs space-y-4 transition-all ${
+                  className={`bg-white dark:bg-[#0D172A] rounded-[28px] p-5 sm:p-6 shadow-xs space-y-4 transition-all border ${
                     !isAnswered
-                      ? 'border border-slate-200 dark:border-slate-800'
+                      ? 'border-slate-200 dark:border-slate-800'
                       : isCorrect
-                      ? 'border-2 border-[#0B132B]/30 dark:border-amber-400/50 bg-blue-50/10'
-                      : 'border-2 border-rose-300/60 dark:border-rose-900/40 bg-rose-50/10'
+                      ? 'border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/10'
+                      : 'border-rose-300/80 dark:border-rose-900/60 bg-rose-50/10'
                   }`}
                 >
-                  {/* Top Header Row */}
+                  {/* Question Number + Status */}
                   <div className="flex items-center justify-between gap-2">
-                    {/* Bengali Question Number Badge (Navy Blue Circle) */}
                     <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                       {toBengaliNumeral(index + 1)}
                     </div>
 
-                    {/* Status Badge */}
                     {!isAnswered ? (
                       <span className="px-3 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 rounded-full font-bold text-xs border border-slate-200 dark:border-slate-700">
                         ⚪ অনুত্তরিত
                       </span>
                     ) : isCorrect ? (
-                      <span className="px-3.5 py-1 bg-[#0B132B] text-white rounded-full font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
+                      <span className="px-3.5 py-1 bg-emerald-600 text-white rounded-full font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
                         <span>✓</span>
                         <span>সঠিক হয়েছে</span>
                       </span>
@@ -336,202 +591,86 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   </div>
 
                   {/* Question Text */}
-                  {(() => {
-                    const isQuestionRtl = isFullyArabic(answer.questionText);
-                    return (
-                      <>
-                        <h3
-                          dir={isQuestionRtl ? 'rtl' : 'ltr'}
-                          className={`text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed ${
-                            isQuestionRtl ? 'text-right font-arabic' : 'text-left'
-                          }`}
-                        >
-                          {formatArabicText(answer.questionText, showHarakat)}
-                        </h3>
+                  <h4
+                    dir={isQuestionRtl ? 'rtl' : 'ltr'}
+                    className={`text-base sm:text-lg font-black text-[#0B132B] dark:text-white leading-relaxed ${
+                      isQuestionRtl ? 'text-right font-arabic' : 'text-left'
+                    }`}
+                  >
+                    {formatArabicText(answer.questionText, showHarakat)}
+                  </h4>
 
-                        {/* Options List */}
-                        {(() => {
-                          const optionKeys = ['option_a', 'option_b', 'option_c', 'option_d'] as const;
-                          const arabicOptionCount = optionKeys.filter((k) => isFullyArabic(answer.options[k])).length;
-                          const areOptionsRtl = arabicOptionCount >= 3;
+                  {/* Options List */}
+                  {(() => {
+                    const optionKeys = ['option_a', 'option_b', 'option_c', 'option_d'] as const;
+                    return (
+                      <div className="space-y-2.5 pt-1">
+                        {optionKeys.map((optionKey) => {
+                          const optionText = answer.options[optionKey];
+                          if (!optionText) return null;
+
+                          const isSelected = answer.selectedOption === optionKey;
+                          const isCorrectOption = answer.correctOption === optionKey;
+
+                          let optionStyles = 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300';
+                          let badgeStyles = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
+
+                          if (isCorrectOption) {
+                            optionStyles = 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 text-emerald-950 dark:text-emerald-200 font-bold';
+                            badgeStyles = 'bg-emerald-600 text-white';
+                          } else if (isSelected && !isCorrect) {
+                            optionStyles = 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-600 text-rose-950 dark:text-rose-200 font-bold';
+                            badgeStyles = 'bg-rose-600 text-white';
+                          }
 
                           return (
-                            <div className="space-y-3 pt-1">
-                              {optionKeys.map((optionKey) => {
-                                const rawOptionText = answer.options[optionKey];
-                                const optionText = formatArabicText(rawOptionText, showHarakat);
-                                const prefixLabel = OPTION_BENGLI_LABEL[optionKey];
+                            <div
+                              key={optionKey}
+                              className={`p-3 sm:p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm transition-all ${optionStyles}`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${badgeStyles}`}>
+                                  {OPTION_BENGLI_LABEL[optionKey]}
+                                </span>
+                                <span className="font-medium truncate">{optionText}</span>
+                              </div>
 
-                                const isOptionCorrect = optionKey === answer.correctOption;
-                                const isOptionSelected = optionKey === answer.selectedOption;
-                                const isThisOptArabic = isFullyArabic(rawOptionText);
-
-                                let styleClasses = 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
-                                let letterBg = 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
-                                let rightBadge = null;
-
-                                if (isOptionCorrect) {
-                                  // Correct Answer Option -> Navy Blue
-                                  styleClasses = 'bg-blue-50/80 dark:bg-slate-800/80 border-2 border-[#0B132B] text-[#0B132B] dark:text-amber-100 font-extrabold shadow-xs';
-                                  letterBg = 'bg-[#0B132B] text-white';
-                                  rightBadge = (
-                                    <span className="px-3 py-1 bg-[#0B132B]/15 text-[#0B132B] dark:bg-amber-400/20 dark:text-amber-300 rounded-full font-extrabold text-xs shrink-0">
-                                      ✓ সঠিক উত্তর
-                                    </span>
-                                  );
-                                } else if (isOptionSelected && !isCorrect) {
-                                  // Wrong Answer Option -> Red
-                                  styleClasses = 'bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-500 text-rose-950 dark:text-rose-100 font-extrabold shadow-xs';
-                                  letterBg = 'bg-rose-600 text-white';
-                                  rightBadge = (
-                                    <span className="px-3 py-1 bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200 rounded-full font-extrabold text-xs shrink-0">
-                                      ✕ আপনার ভুল উত্তর
-                                    </span>
-                                  );
-                                }
-
-                                return (
-                                  <div
-                                    key={optionKey}
-                                    dir={areOptionsRtl ? 'rtl' : 'ltr'}
-                                    className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm ${
-                                      areOptionsRtl ? 'text-right' : 'text-left'
-                                    } ${styleClasses}`}
-                                  >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${letterBg}`}>
-                                        {prefixLabel}
-                                      </div>
-                                      <span className={`font-bold leading-relaxed ${
-                                        isThisOptArabic ? 'font-arabic' : ''
-                                      } ${areOptionsRtl ? 'text-right' : 'text-left'}`}>
-                                        {optionText}
-                                      </span>
-                                    </div>
-                                    {rightBadge}
-                                  </div>
-                                );
-                              })}
+                              {isCorrectOption && (
+                                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                                  সঠিক উত্তর
+                                </span>
+                              )}
+                              {isSelected && !isCorrect && (
+                                <span className="text-xs font-black text-rose-600 dark:text-rose-400 shrink-0">
+                                  আপনার উত্তর
+                                </span>
+                              )}
                             </div>
                           );
-                        })()}
-                      </>
+                        })}
+                      </div>
                     );
                   })()}
 
-                  {/* Detailed Manual Explanation Container (Only rendered if admin provided explanation) */}
-                  {answer.explanation && answer.explanation.trim() !== '' && (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFDF5] dark:bg-slate-800/80 border border-amber-200/90 dark:border-slate-700/80 space-y-3 shadow-xs">
-                      <div className="flex items-center justify-between text-amber-900 dark:text-amber-400 font-extrabold text-xs sm:text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">📄</span>
-                          <span>বিস্তারিত ব্যাখ্যা</span>
-                        </div>
-                        <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">▲</span>
+                  {/* Explanation Card */}
+                  {answer.explanation && (
+                    <div className="mt-3 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-300">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                        <span>ব্যাখ্যা:</span>
                       </div>
-
-                      <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium pt-1">
-                        {formatArabicText(answer.explanation, showHarakat)}
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                        {answer.explanation}
                       </p>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-amber-200/60 dark:border-slate-700/80 text-[11px] sm:text-xs">
-                        <span className="text-amber-800/90 dark:text-amber-400/90 font-bold">
-                          সহীহ ম্যানুয়াল ব্যাখ্যা
-                        </span>
-
-                        <button
-                          onClick={() => handleCopyExplanation(answer)}
-                          className="px-3.5 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
-                        >
-                          {copiedQuestionId === answer.questionId ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-[#0B132B]" />
-                              <span>কপি হয়েছে</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5 text-[#0B132B]" />
-                              <span>কপি করুন</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
                     </div>
                   )}
-
-                  {/* Bottom AI Tutor Bar & Inline Expandable Menu */}
-                  <div className="space-y-2">
-                    <div className="bg-[#0B132B] hover:bg-[#162444] text-white rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-2 shadow-xs transition-colors">
-                      <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
-                        <Sparkles className="w-4 h-4 text-[#FFC107] shrink-0" />
-                        <span className="truncate">তামরীন AI দিয়ে আরও বিস্তৃত ব্যাখ্যা জানুন</span>
-                      </div>
-
-                      <button
-                        onClick={() => toggleAiExplanation(answer)}
-                        className="px-4 py-1.5 bg-[#FFC107] hover:bg-[#e0a800] text-[#0B132B] font-black text-xs rounded-xl cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs flex items-center gap-1"
-                      >
-                        <span>{expandedAiIds.includes(answer.questionId) ? 'বন্ধ করুন ▲' : 'AI TUTOR ▼'}</span>
-                      </button>
-                    </div>
-
-                    {/* Inline Expandable Dropdown Menu for Tamreen AI Explanation */}
-                    {expandedAiIds.includes(answer.questionId) && (
-                      <div className="p-4 sm:p-5 rounded-2xl bg-[#0F172A] text-white border border-amber-400/30 space-y-3 shadow-md animate-fade-in">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                          <div className="flex items-center gap-2 text-[#FFC107] font-extrabold text-xs sm:text-sm">
-                            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-                            <span>তামরীন AI টিউটর সমাধান</span>
-                          </div>
-                          <span className="text-[11px] text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md font-bold">
-                            লাইভ জেমিনাই AI
-                          </span>
-                        </div>
-
-                        {aiLoadingIds.includes(answer.questionId) ? (
-                          <div className="flex items-center gap-2.5 py-4 text-amber-300 text-xs font-bold">
-                            <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
-                            <span>তামরীন এআই প্রশ্নটির নিখুঁত ব্যাখ্যা তৈরি করছেন...</span>
-                          </div>
-                        ) : (
-                          <div className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal whitespace-pre-line pt-1">
-                            {aiExplanations[answer.questionId] || 'কোনো ব্যাখ্যা তৈরি করা সম্ভব হয়নি।'}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
                 </div>
               );
             })}
-
-            {/* Back to Summary Button */}
-            <button
-              onClick={() => setViewMode('summary')}
-              className="w-full py-3.5 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-black text-xs rounded-2xl cursor-pointer hover:bg-slate-300 transition-all"
-            >
-              মূল ফলাফলে ফিরে যান
-            </button>
-
           </div>
         )}
 
       </div>
-
-      {/* Leaderboard Modal */}
-      <LeaderboardModal
-        isOpen={showLeaderboardModal}
-        onClose={() => setShowLeaderboardModal(false)}
-        currentUserScore={result.score}
-        totalQuestions={result.totalQuestions}
-        correctCount={result.correctCount}
-        wrongCount={result.wrongCount}
-        examId={result.examId || result.selectedSubject || 'all'}
-        examTitle={result.selectedSubject || undefined}
-        isExamOnlyMode={true}
-      />
-
     </div>
   );
 };

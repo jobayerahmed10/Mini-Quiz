@@ -150,23 +150,31 @@ export default function App() {
   };
 
   // Handle quiz completion
-  const handleFinishQuiz = async (userAnswers: UserAnswer[]) => {
+  const handleFinishQuiz = async (userAnswers: UserAnswer[], timeTakenSeconds: number = 0) => {
     const totalQuestions = userAnswers.length;
     const correctCount = userAnswers.filter((a) => a.isCorrect).length;
     const wrongCount = totalQuestions - correctCount;
-    const score = correctCount;
+    // 0.25 negative marking for wrong answers if desired, or standard score
+    const negativeMarks = Number((wrongCount * 0.25).toFixed(2));
+    const score = Math.max(0, Number((correctCount - negativeMarks).toFixed(2)));
     const percentage = Math.round((correctCount / (totalQuestions || 1)) * 100);
+
+    const examId = activeExamId || selectedSubject || 'general';
+    const examTitle = activeExamTitle || (typeof activeExamId === 'string' && activeExamId !== selectedSubject ? activeExamId : selectedSubject) || 'বাংলা মডেল টেস্ট';
 
     const result: QuizResult = {
       totalQuestions,
       correctCount,
       wrongCount,
-      score,
+      score: correctCount,
       percentage,
       userAnswers,
       completedAt: new Date().toISOString(),
       selectedSubject: selectedSubject,
-      examId: activeExamId || selectedSubject,
+      examId: examId,
+      examTitle: examTitle,
+      timeTakenSeconds: timeTakenSeconds,
+      negativeMarks: negativeMarks,
     };
 
     setQuizResult(result);
@@ -174,11 +182,8 @@ export default function App() {
 
     // Create & save Leaderboard Entry & Exam Result
     const userProfile = getUserProfile();
-    const userName = userProfile?.name?.trim() || 'পরীক্ষার্থী';
+    const userName = userProfile?.name?.trim() || 'জুবায়ের আহমদ';
     const userAvatar = userProfile?.avatar;
-
-    const examId = activeExamId || selectedSubject || 'general';
-    const examTitle = activeExamTitle || (typeof activeExamId === 'string' && activeExamId !== selectedSubject ? activeExamId : selectedSubject) || 'মডেল টেস্ট';
     const userId = getUserUniqueId();
 
     const entry: LeaderboardEntry = {
@@ -210,7 +215,7 @@ export default function App() {
       total_marks: totalQuestions,
       correct_answers: correctCount,
       wrong_answers: wrongCount,
-      time_taken_seconds: 0,
+      time_taken_seconds: timeTakenSeconds,
       submitted_at: entry.created_at,
     });
 

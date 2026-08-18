@@ -54,6 +54,9 @@ export interface QuizResult {
   completedAt: string;
   selectedSubject?: string | null;
   examId?: string | null;
+  examTitle?: string | null;
+  timeTakenSeconds?: number;
+  negativeMarks?: number;
 }
 
 export type TabRoute = 'home' | 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';

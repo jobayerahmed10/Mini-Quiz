@@ -15,7 +15,7 @@ interface PracticePageProps {
   initialSubject?: string;
   targetQuestionCount?: number;
   timeMinutes?: number;
-  onFinishQuiz: (userAnswers: UserAnswer[]) => void;
+  onFinishQuiz: (userAnswers: UserAnswer[], timeTakenSeconds?: number) => void;
   onNavigateHome: () => void;
   showHarakat?: boolean;
 }
@@ -31,7 +31,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 }) => {
   const [activeSubject] = useState<string>(initialSubject);
   const [userSelections, setUserSelections] = useState<Record<string, 'option_a' | 'option_b' | 'option_c' | 'option_d'>>({});
-  const [timeLeft, setTimeLeft] = useState<number>(timeMinutes * 60);
+  const initialTotalSeconds = useMemo(() => timeMinutes * 60, [timeMinutes]);
+  const [timeLeft, setTimeLeft] = useState<number>(initialTotalSeconds);
 
   // Sync timer when timeMinutes changes
   useEffect(() => {
@@ -152,7 +153,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       };
     });
 
-    onFinishQuiz(finalAnswers);
+    const timeSpent = Math.max(1, initialTotalSeconds - timeLeft);
+    onFinishQuiz(finalAnswers, timeSpent);
   };
 
   if (totalQuestions === 0) {
