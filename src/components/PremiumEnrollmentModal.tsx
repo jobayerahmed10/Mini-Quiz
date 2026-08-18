@@ -11,28 +11,99 @@ import {
   User,
   Mail,
   FileCheck2,
-  ShieldCheck,
-  BookOpen,
   Crown,
-  Zap,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  Layers
 } from 'lucide-react';
 import { CourseEnrollmentRecord } from '../types';
 import { submitEnrollmentToSupabase } from '../lib/supabase';
-import { getUserProfile, setUserPremium, toBengaliNumeral } from '../lib/utils';
+import { getUserProfile, toBengaliNumeral } from '../lib/utils';
+
+export interface PremiumPackagePlan {
+  id: 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
+  title: string;
+  shortName: string;
+  durationName: string;
+  durationMonths: number;
+  price: string;
+  regularPrice: string;
+  tag: string;
+  tagColor: string;
+  popular?: boolean;
+  description: string;
+}
+
+export const PREMIUM_PLANS: PremiumPackagePlan[] = [
+  {
+    id: 'monthly',
+    title: 'মাসিক প্রিমিয়াম প্যাকেজ',
+    shortName: 'মাসিক',
+    durationName: '১ মাস',
+    durationMonths: 1,
+    price: '৯৯',
+    regularPrice: '১৯৯',
+    tag: 'ট্রায়াল প্যাক',
+    tagColor: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300',
+    description: '৩০ দিনের জন্য ১৫টি বিষয়ের প্রশ্নব্যাংক ও স্পেশাল প্রস্তুতি'
+  },
+  {
+    id: 'quarterly',
+    title: 'ত্রৈমাসিক প্রিমিয়াম প্যাকেজ',
+    shortName: 'ত্রৈমাসিক',
+    durationName: '৩ মাস',
+    durationMonths: 3,
+    price: '১৮০',
+    regularPrice: '৩৫০',
+    tag: 'বাজেট সেভার',
+    tagColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300',
+    description: '৯০ দিনের পূর্ণাঙ্গ অনুশীলন ও বিষয়ভিত্তিক মডেল টেস্ট'
+  },
+  {
+    id: 'half_yearly',
+    title: 'ষান্মাসিক প্রিমিয়াম প্যাকেজ',
+    shortName: 'ষান্মাসিক',
+    durationName: '৬ মাস',
+    durationMonths: 6,
+    price: '২৭০',
+    regularPrice: '৫৫০',
+    tag: 'জনপ্রিয় পছন্দ',
+    tagColor: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-300',
+    description: '১৮০ দিনের নিবিড় প্রস্তুতি ও পূর্ণাঙ্গ সিলেবাস রিভিশন'
+  },
+  {
+    id: 'yearly',
+    title: 'বাৎসরিক প্রিমিয়াম প্যাকেজ',
+    shortName: 'বাৎসরিক',
+    durationName: '১ বছর (১২ মাস)',
+    durationMonths: 12,
+    price: '৩৫০',
+    regularPrice: '৭৫০',
+    tag: 'সেরা অফার',
+    popular: true,
+    tagColor: 'bg-amber-400 text-slate-950 border-amber-500 font-black',
+    description: '৩৬৫ দিনের আনলিমিটেড অ্যাক্সেস ও শিক্ষক নিবন্ধন শতভাগ প্রস্তুতি'
+  }
+];
 
 interface PremiumEnrollmentModalProps {
   onClose: () => void;
   onSuccess: (record: CourseEnrollmentRecord) => void;
+  initialPlanId?: 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
 }
 
 export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
   onClose,
-  onSuccess
+  onSuccess,
+  initialPlanId = 'yearly'
 }) => {
   const currentProfile = getUserProfile();
 
-  // Steps: 1 (Overview), 2 (User Info), 3 (Payment Method), 4 (Payment TrxID), 5 (Success/Pending)
+  // Selected Plan
+  const [selectedPlanId, setSelectedPlanId] = useState<'monthly' | 'quarterly' | 'half_yearly' | 'yearly'>(initialPlanId);
+  const selectedPlan = PREMIUM_PLANS.find((p) => p.id === selectedPlanId) || PREMIUM_PLANS[3];
+
+  // Steps: 1 (Package Selection), 2 (User Info), 3 (Payment Method), 4 (Payment TrxID), 5 (Success/Pending)
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Form State
@@ -92,13 +163,13 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
     setIsSubmitting(true);
 
     const enrollmentRecord: CourseEnrollmentRecord = {
-      course_id: 'tamreen_premium_package',
-      course_title: '১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি ও প্রশ্নব্যাংক',
+      course_id: `tamreen_premium_${selectedPlan.id}`,
+      course_title: `১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি (${selectedPlan.title})`,
       student_name: studentName.trim(),
       phone_number: phoneNumber.trim(),
       email: email.trim() || undefined,
       payment_method: paymentMethod,
-      amount: '৩৫০',
+      amount: selectedPlan.price,
       transaction_id: transactionId.trim().toUpperCase(),
       status: 'pending',
       created_at: new Date().toISOString()
@@ -118,6 +189,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
     // 3. Mark locally as pending
     try {
       localStorage.setItem('tamreen_premium_status', 'pending');
+      localStorage.setItem('tamreen_premium_plan', selectedPlan.id);
       localStorage.setItem('tamreen_premium_trx', enrollmentRecord.transaction_id);
       window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: 'pending' }));
     } catch {}
@@ -128,7 +200,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-[#0D172A] rounded-3xl max-w-md w-full p-4 sm:p-6 relative border border-emerald-300/80 dark:border-emerald-700/60 shadow-2xl my-auto space-y-4 animate-scale-up">
+      <div className="bg-white dark:bg-[#0D172A] rounded-3xl max-w-lg w-full p-4 sm:p-6 relative border border-emerald-300/80 dark:border-emerald-700/60 shadow-2xl my-auto space-y-4 animate-scale-up">
         
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -145,7 +217,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
             <h2 className="text-sm sm:text-base font-black text-[#0B132B] dark:text-white flex items-center gap-1.5 font-hind">
               <Crown className="w-5 h-5 text-amber-500 fill-amber-400" />
               <span>
-                {currentStep === 1 && 'প্রিমিয়াম প্যাকেজ বিবরণ'}
+                {currentStep === 1 && 'প্রিমিয়াম প্যাকেজ নির্বাচন করুন'}
                 {currentStep === 2 && 'আবেদনকারীর তথ্য পূরণ'}
                 {currentStep === 3 && 'পেমেন্ট পদ্ধতি নির্বাচন'}
                 {currentStep === 4 && `${paymentMethod === 'bkash' ? 'বিকাশে' : paymentMethod === 'nagad' ? 'নগদে' : 'রকেটে'} পেমেন্ট সম্পন্ন করুন`}
@@ -211,59 +283,91 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 1: প্যাকেজ বিবরণ ও সুবিধাসমূহ */}
+        {/* STEP 1: প্যাকেজ নির্বাচন (মাসিক, ত্রৈমাসিক, ষান্মাসিক, বাৎসরিক) */}
         {/* ========================================================= */}
         {currentStep === 1 && (
-          <div className="space-y-4">
-            {/* Top Premium Card */}
-            <div className="bg-gradient-to-br from-[#063b22] via-[#046A38] to-[#022b17] rounded-2xl p-4 text-white shadow-lg space-y-3 relative overflow-hidden border border-emerald-400/30">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1">
-                  <Crown className="w-3 h-3 fill-slate-950" />
-                  বাৎসরিক প্রিমিয়াম মেম্বারশিপ
-                </span>
-                <span className="text-xs font-bold text-emerald-200 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  সকল বিষয় আনলক
-                </span>
-              </div>
-
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-white leading-tight">
-                  ১৫টি বিষয়ভিত্তিক সম্পূর্ণ প্রশ্নব্যাংক ও স্পেশাল প্রস্তুতি
-                </h3>
-                <p className="text-xs text-emerald-100 font-medium mt-0.5">
-                  স্কুল, কলেজ, মাদ্রাসা ও শিক্ষক নিবন্ধন বিশেষ প্যাকেজ
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-white/15 flex items-baseline justify-between">
-                <span className="text-xs text-slate-200">সাবস্ক্রিপশন ফি:</span>
-                <div className="text-right">
-                  <span className="text-xs text-slate-300 line-through mr-1.5">৳ ৭৫০</span>
-                  <span className="text-2xl font-black text-amber-300 font-hind">৳ ৩৫০</span>
-                  <span className="text-[10px] text-emerald-200 block font-semibold">(এককালীন / বাৎসরিক)</span>
-                </div>
-              </div>
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-[#046A38] dark:text-emerald-400" />
+                আপনার পছন্দের মেম্বারশিপ প্যাকেজ বেছে নিন:
+              </span>
             </div>
 
-            {/* Included Features */}
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-700 space-y-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
+            {/* 4 Packages Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {PREMIUM_PLANS.map((plan) => {
+                const isSelected = selectedPlanId === plan.id;
+                return (
+                  <div
+                    key={plan.id}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2 relative ${
+                      isSelected
+                        ? 'border-[#046A38] bg-emerald-50/70 dark:bg-emerald-950/40 shadow-md ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-emerald-300'
+                    }`}
+                  >
+                    {/* Top Tag & Duration */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border shadow-2xs ${plan.tagColor}`}>
+                        {plan.tag}
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                        <Calendar className="w-3 h-3 text-[#046A38] dark:text-emerald-400" />
+                        <span>{plan.durationName}</span>
+                      </div>
+                    </div>
+
+                    {/* Title & Short Description */}
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black text-[#0B132B] dark:text-white leading-tight font-hind">
+                        {plan.title}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium line-clamp-1 mt-0.5">
+                        {plan.description}
+                      </p>
+                    </div>
+
+                    {/* Price & Selection Indicator */}
+                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                      <div>
+                        <span className="text-[10px] text-slate-400 line-through mr-1">
+                          ৳ {plan.regularPrice}
+                        </span>
+                        <span className="text-base sm:text-lg font-black text-[#046A38] dark:text-amber-400 font-hind">
+                          ৳ {plan.price}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'border-[#046A38] bg-[#046A38] text-white'
+                            : 'border-slate-300 dark:border-slate-600'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Included Features Box */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3 border border-slate-200 dark:border-slate-700 space-y-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
               <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
-                <Check className="w-4 h-4 text-[#046A38] dark:text-emerald-400 shrink-0" />
+                <Check className="w-3.5 h-3.5 text-[#046A38] dark:text-emerald-400 shrink-0" />
                 <span>১৫টি বিষয়ের ৫,০০০+ অধ্যায়ভিত্তিক প্রশ্ন ও নির্ভুল ব্যাখ্যা</span>
               </div>
               <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
-                <Check className="w-4 h-4 text-[#046A38] dark:text-emerald-400 shrink-0" />
+                <Check className="w-3.5 h-3.5 text-[#046A38] dark:text-emerald-400 shrink-0" />
                 <span>১০, ২৫, ৫০ ও ১০০ প্রশ্নের আনলিমিটেড কাস্টম মডেল টেস্ট</span>
               </div>
               <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
-                <Check className="w-4 h-4 text-[#046A38] dark:text-emerald-400 shrink-0" />
+                <Check className="w-3.5 h-3.5 text-[#046A38] dark:text-emerald-400 shrink-0" />
                 <span>তামরীন AI ইনস্ট্যান্ট আরবি ও বাংলা ব্যাকরণ ডাউট সলভ</span>
-              </div>
-              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
-                <Check className="w-4 h-4 text-[#046A38] dark:text-emerald-400 shrink-0" />
-                <span>লাইভ লিডারবোর্ড ও বিস্তারিত পারফরম্যান্স অ্যানালিটিক্স</span>
               </div>
             </div>
 
@@ -272,7 +376,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
               onClick={() => setCurrentStep(2)}
               className="w-full py-3.5 bg-gradient-to-r from-[#046A38] to-[#064E3B] hover:from-[#057A42] hover:to-[#046A38] text-white rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all"
             >
-              <span>প্যাকেজ গ্রহণ করতে এগিয়ে যান</span>
+              <span>{selectedPlan.title} নিয়ে এগিয়ে যান (৳ {selectedPlan.price})</span>
               <ArrowRight className="w-4 h-4 text-emerald-200" />
             </button>
           </div>
@@ -283,19 +387,22 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
         {/* ========================================================= */}
         {currentStep === 2 && (
           <div className="space-y-4">
-            {/* Header info badge */}
+            {/* Header info badge with Selected Plan */}
             <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h4 className="text-xs font-black text-[#0B132B] dark:text-white truncate">
-                  ১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি
+                  {selectedPlan.title}
                 </h4>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                  মেয়াদ: বাৎসরিক আনলিমিটেড অ্যাক্সেস
+                  মেয়াদ: {selectedPlan.durationName} আনলিমিটেড অ্যাক্সেস
                 </p>
               </div>
-              <span className="text-sm font-black text-[#046A38] dark:text-emerald-300 shrink-0">
-                ৳ ৩৫০
-              </span>
+              <div className="text-right shrink-0">
+                <span className="text-xs text-slate-400 line-through mr-1">৳ {selectedPlan.regularPrice}</span>
+                <span className="text-sm font-black text-[#046A38] dark:text-emerald-300 font-hind">
+                  ৳ {selectedPlan.price}
+                </span>
+              </div>
             </div>
 
             {/* Form Fields */}
@@ -475,9 +582,12 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
 
             {/* Fee Box */}
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">প্রিমিয়াম ফি:</span>
+              <div>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 block">{selectedPlan.title}:</span>
+                <span className="text-[10px] text-slate-400">মেয়াদ: {selectedPlan.durationName}</span>
+              </div>
               <span className="text-base font-black text-[#046A38] dark:text-emerald-400 font-hind">
-                ৳ ৩৫০
+                ৳ {selectedPlan.price}
               </span>
             </div>
 
@@ -511,7 +621,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
                 {paymentMethod === 'bkash' ? 'বিকাশ' : paymentMethod === 'nagad' ? 'নগদ' : 'রকেট'}
               </div>
               <span className="text-xs font-black text-[#0B132B] dark:text-white">
-                পেমেন্ট সম্পন্ন করার উপায়
+                পেমেন্ট সম্পন্ন করার উপায় ({selectedPlan.title})
               </span>
             </div>
 
@@ -525,7 +635,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
               </div>
               <p>১. আপনার <strong>{paymentMethod === 'bkash' ? 'বিকাশ' : paymentMethod === 'nagad' ? 'নগদ' : 'রকেট'}</strong> অ্যাপে প্রবেশ করুন</p>
               <p>২. অপশন থেকে <strong className="text-emerald-700 dark:text-emerald-400 font-black">Send Money (সেন্ড মানি)</strong> বেছে নিন</p>
-              <p>৩. নিচের নম্বরে <strong className="text-rose-600 dark:text-rose-400 font-bold">৳৩৫০</strong> সেন্ড মানি করুন</p>
+              <p>৩. নিচের নম্বরে <strong className="text-rose-600 dark:text-rose-400 font-bold">৳{selectedPlan.price}</strong> সেন্ড মানি করুন</p>
               <p>৪. সেন্ড মানি সফল হলে প্রাপ্ত <strong>Transaction ID (TrxID)</strong> কপি করে নিচের বক্সে লিখুন</p>
             </div>
 
@@ -575,7 +685,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
                 onChange={(e) => setIsConfirmedCheckbox(e.target.checked)}
                 className="mt-0.5 rounded text-[#046A38] focus:ring-[#046A38] w-4 h-4 cursor-pointer"
               />
-              <span>আমি ০১৭৭৯৮৩৪৯৯৯ নম্বরে ৩৫০ টাকা সেন্ড মানি করেছি</span>
+              <span>আমি ০১৭৭৯৮৩৪৯৯৯ নম্বরে {selectedPlan.price} টাকা সেন্ড মানি করেছি ({selectedPlan.title})</span>
             </label>
 
             {/* Submit Button */}
@@ -605,7 +715,7 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
                 প্রিমিয়াম আবেদন সফলভাবে জমা হয়েছে!
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                আপনার ট্রানজেকশন আইডি ({transactionId}) ডাটাবেসে গ্রহণ করা হয়েছে।
+                আপনার ট্রানজেকশন আইডি ({transactionId}) ও {selectedPlan.title} ডাটাবেসে গ্রহণ করা হয়েছে।
               </p>
             </div>
 
@@ -621,18 +731,18 @@ export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold max-w-xs mx-auto leading-relaxed">
-              এডমিন প্যানেল থেকে আপনার TrxID ও পেমেন্ট তথ্য যাচাই করে অনুমোদন (Approve) করলেই ১৫টি বিষয়ের সম্পূর্ণ প্রশ্নব্যাংক স্বয়ংক্রিয়ভাবে সক্রিয় হয়ে যাবে।
+              এডমিন প্যানেল থেকে আপনার TrxID ও পেমেন্ট তথ্য যাচাই করে অনুমোদন (Approve) করলেই {selectedPlan.title} ও ১৫টি বিষয়ের সম্পূর্ণ প্রশ্নব্যাংক স্বয়ংক্রিয়ভাবে সক্রিয় হয়ে যাবে।
             </p>
 
             <button
               onClick={() => {
                 onSuccess({
-                  course_id: 'tamreen_premium_package',
-                  course_title: '১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি ও প্রশ্নব্যাংক',
+                  course_id: `tamreen_premium_${selectedPlan.id}`,
+                  course_title: `১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি (${selectedPlan.title})`,
                   student_name: studentName,
                   phone_number: phoneNumber,
                   payment_method: paymentMethod,
-                  amount: '৩৫০',
+                  amount: selectedPlan.price,
                   transaction_id: transactionId,
                   status: 'pending'
                 });

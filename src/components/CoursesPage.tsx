@@ -26,7 +26,6 @@ import {
 import { CourseModule, CourseEnrollmentRecord, Question } from '../types';
 import { CourseDetailView } from './CourseDetailView';
 import { CourseEnrollmentModal } from './CourseEnrollmentModal';
-import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 import { formatCoursePrice } from '../lib/utils';
 import {
   fetchCoursesFromSupabase,
@@ -134,7 +133,6 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   const [activeCourseModal, setActiveCourseModal] = useState<CourseModule | null>(null);
   const [selectedCourseForDetail, setSelectedCourseForDetail] = useState<CourseModule | null>(null);
   const [enrollmentModalCourse, setEnrollmentModalCourse] = useState<CourseModule | null>(null);
-  const [showPremiumPackageModal, setShowPremiumPackageModal] = useState<boolean>(false);
   const [pendingCourseIds, setPendingCourseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -319,55 +317,12 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
             <span>তামরীন একাডেমি</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-white">
-            আমাদের কোর্স ও প্যাকেজ সমূহ
+            আমাদের কোর্স সমূহ
           </h1>
         </div>
 
         <div className="w-11 h-11 sm:w-12 sm:h-12 bg-white/10 backdrop-blur-xs text-white rounded-2xl flex items-center justify-center border border-white/20 shrink-0 shadow-inner">
           <GraduationCap className="w-6 h-6 text-emerald-100" />
-        </div>
-      </div>
-
-      {/* Special Premium Package Banner Card */}
-      <div 
-        onClick={() => setShowPremiumPackageModal(true)}
-        className="rounded-3xl bg-gradient-to-r from-[#063b22] via-[#046A38] to-[#022b17] p-4 sm:p-5 text-white shadow-lg relative overflow-hidden border border-emerald-400/40 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1">
-                <Crown className="w-3 h-3 fill-slate-950" />
-                বিশেষ মেম্বারশিপ প্যাকেজ
-              </span>
-              <span className="text-[11px] font-bold text-emerald-200">
-                ১৫টি বিষয়ের পূর্ণাঙ্গ প্রশ্নব্যাংক
-              </span>
-            </div>
-            <h3 className="text-base sm:text-lg font-black text-white font-hind leading-tight group-hover:text-amber-200 transition-colors">
-              ১৫টি বিষয়ভিত্তিক প্রিমিয়াম প্রস্তুতি ও আনলিমিটেড মডেল টেস্ট
-            </h3>
-            <p className="text-xs text-emerald-100/90 font-medium">
-              বাৎসরিক আনলিমিটেড অ্যাক্সেস • ৫,০০০+ ব্যাখ্যাসহ প্রশ্ন • তামরীন এআই ডাউট সলভ
-            </p>
-          </div>
-
-          <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/15">
-            <div className="text-left sm:text-right">
-              <span className="text-[10px] text-emerald-200 block">এককালীন অফার</span>
-              <span className="text-xl sm:text-2xl font-black text-amber-300 font-hind">৳ ৩৫০</span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPremiumPackageModal(true);
-              }}
-              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all"
-            >
-              <Crown className="w-3.5 h-3.5 fill-slate-950" />
-              <span>প্যাকেজ বিবরণ</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -599,17 +554,6 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
           course={enrollmentModalCourse}
           onClose={() => setEnrollmentModalCourse(null)}
           onSuccess={handleEnrollmentSuccess}
-        />
-      )}
-
-      {/* Special Premium Package Modal */}
-      {showPremiumPackageModal && (
-        <PremiumEnrollmentModal
-          onClose={() => setShowPremiumPackageModal(false)}
-          onSuccess={(record) => {
-            setShowPremiumPackageModal(false);
-            showToast('প্রিমিয়াম প্যাকেজ আবেদন সফলভাবে জমা হয়েছে!');
-          }}
         />
       )}
 

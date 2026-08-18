@@ -106,9 +106,10 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
 
       // Find premium application
       const premiumApp = allEnrollments.find(e => 
+        e.course_id.startsWith('tamreen_premium') || 
         e.course_id === 'tamreen_premium_package' || 
         e.course_title.includes('১৫টি বিষয়ভিত্তিক') ||
-        (userPhone && e.phone_number === userPhone && e.course_id === 'tamreen_premium_package')
+        (userPhone && e.phone_number === userPhone && e.course_id.startsWith('tamreen_premium'))
       );
 
       if (premiumApp) {
@@ -267,11 +268,11 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         {/* Description Text */}
         <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-1.5 leading-relaxed">
           {isPremium ? (
-            'আপনার প্রিমিয়াম প্যাকেজের আওতায় সকল বিষয়ের ৫,০০০+ প্রশ্নব্যাংক সম্পূর্ণ আনলক রয়েছে। নিচের যেকোনো বিষয়ে ক্লিক করে কাস্টম প্রশ্ন সংখ্যা ও মোড অনুযায়ী অনুশীলন শুরু করুন।'
+            'আপনার প্রিমিয়াম মেম্বারশিপের আওতায় সকল বিষয়ের ৫,০০০+ প্রশ্নব্যাংক সম্পূর্ণ আনলক রয়েছে। নিচের যেকোনো বিষয়ে ক্লিক করে কাস্টম প্রশ্ন সংখ্যা ও মোড অনুযায়ী অনুশীলন শুরু করুন।'
           ) : isPending ? (
             `আপনার বিকাশ/নগদ TrxID (${pendingTrxId || 'যাচাইাধীন'}) ডাটাবেসে সফলভাবে জমা হয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই ১৫টি বিষয়ের সম্পূর্ণ প্রশ্নব্যাংক সক্রিয় হয়ে যাবে।`
           ) : (
-            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। বিকাশ বা নগদ নম্বরে ৩৫০ টাকা পাঠিয়ে TrxID প্রদান করুন। এডমিন অনুমোদন করলেই সকল বিষয়ের প্রশ্নব্যাংক আনলক হয়ে যাবে।'
+            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। মাসিক, ত্রৈমাসিক, ষান্মাসিক বা বাৎসরিক প্রিমিয়াম প্যাকেজ বেছে নিয়ে বিকাশ/নগদে ফি পাঠিয়ে TrxID প্রদান করুন। এডমিন অনুমোদন করলেই সকল বিষয়ের প্রশ্নব্যাংক আনলক হয়ে যাবে।'
           )}
         </p>
 
@@ -284,7 +285,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                   <Check className="w-3 h-3 stroke-[3]" />
                 </div>
                 <span>১৫টি বিষয়ের সকল প্রশ্ন ও ব্যাখ্যা সম্পূর্ণ আনলকড</span>
-                <span className="text-slate-500 dark:text-slate-400 font-medium">(মেয়াদ: বাৎসরিক আনলিমিটেড)</span>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">(প্রিমিয়াম মেম্বারশিপ সক্রিয়)</span>
               </>
             ) : isPending ? (
               <>
@@ -316,7 +317,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                   ? 'প্যাকেজ বিবরণ'
                   : isPending
                   ? 'পেমেন্ট তথ্য দেখুন'
-                  : 'বিকাশে টাকা পাঠিয়ে আনলক করুন'}
+                  : 'প্যাকেজসমূহ দেখুন ও আনলক করুন'}
               </span>
             </button>
           </div>
