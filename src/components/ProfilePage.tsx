@@ -3,15 +3,22 @@ import {
   User, Phone, Camera, Check, X, Sparkles, Trophy, Crown, Flame, 
   ChevronRight, BookOpen, Bookmark, AlertTriangle, RotateCcw, 
   LayoutGrid, Settings, Upload, ArrowLeft, BarChart3, HelpCircle, 
-  CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck
+  CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck,
+  LogIn, LogOut
 } from 'lucide-react';
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
   getBookmarkedIds 
 } from '../lib/utils';
-import { fetchCourseApplicationsFromSupabase } from '../lib/supabase';
+import { 
+  fetchCourseApplicationsFromSupabase, 
+  supabaseGetSession, 
+  supabaseSignOut, 
+  supabaseOnAuthStateChange 
+} from '../lib/supabase';
 import { CourseEnrollmentRecord } from '../types';
+import { AuthModal } from './AuthModal';
 
 interface ProfilePageProps {
   onNavigateHome: () => void;
@@ -44,6 +51,38 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Supabase Auth State
+  const [authSession, setAuthSession] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+
+  useEffect(() => {
+    supabaseGetSession().then((session) => {
+      setAuthSession(session);
+    });
+
+    const unsubscribe = supabaseOnAuthStateChange((_event, session) => {
+      setAuthSession(session);
+      if (session?.user) {
+        const prof = getUserProfile();
+        if (prof) {
+          setName(prof.name);
+          setPhone(prof.phone);
+          setAvatar(prof.avatar);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabaseSignOut();
+    setAuthSession(null);
+    setSuccessMsg('সফলভাবে লগআউট হয়েছে');
+    setTimeout(() => setSuccessMsg(''), 2000);
+  };
 
   // Course Applications State from Supabase
   const [applications, setApplications] = useState<CourseEnrollmentRecord[]>([]);
@@ -389,6 +428,64 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               <ChevronRight className="w-5 h-5 text-slate-400" />
             </button>
+
+            {/* 10. Login / Create Account OR Sign Out */}
+            {authSession?.user ? (
+              <button
+                onClick={handleSignOut}
+                className="w-full p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-rose-200/70 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center shrink-0">
+                    <LogOut className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-base font-black block">লগআউট করুন</span>
+                    <span className="text-xs font-semibold text-rose-500/80">
+                      {authSession.user.email || 'বর্তমানে সক্রিয় অ্যাকাউন্ট'}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-rose-400" />
+              </button>
+            ) : (
+              <div className="p-4 bg-gradient-to-r from-[#07532B]/10 to-[#EAB308]/15 border border-[#07532B]/30 rounded-2xl space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#07532B] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <LogIn className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                      আত-তামরীন অ্যাকাউন্টে যুক্ত হোন
+                    </h4>
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                      পরীক্ষার রেকর্ড ও কোর্স অ্যাক্সেস পেতে লগইন করুন
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setAuthInitialMode('login');
+                      setShowAuthModal(true);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-[#07532B] hover:bg-[#064423] text-white font-black text-xs transition-colors text-center shadow-xs cursor-pointer"
+                  >
+                    লগইন করুন
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthInitialMode('register');
+                      setShowAuthModal(true);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[#07532B] dark:text-emerald-400 hover:bg-slate-50 font-black text-xs transition-colors text-center shadow-xs cursor-pointer"
+                  >
+                    নতুন অ্যাকাউন্ট
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         )}
@@ -787,6 +884,19 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         )}
 
       </div>
+
+      {/* Auth Modal (Login / Create Account) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authInitialMode}
+        onAuthSuccess={(profile) => {
+          setName(profile.name);
+          setPhone(profile.phone);
+          if (profile.avatar) setAvatar(profile.avatar);
+          setShowAuthModal(false);
+        }}
+      />
 
     </div>
   );

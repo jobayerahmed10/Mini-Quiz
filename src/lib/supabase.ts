@@ -2157,6 +2157,273 @@ export function subscribeToCourseDetails(onChange: () => void): () => void {
   }
 }
 
+// ============================================================================
+// SUPABASE AUTH & USER PROFILE INTEGRATION
+// ============================================================================
+
+export interface AuthResult {
+  success: boolean;
+  user?: any;
+  session?: any;
+  error?: string | null;
+  needsEmailConfirmation?: boolean;
+}
+
+export function formatAuthErrorMessage(error: any): string {
+  if (!error) return 'একটি অজানা ত্রুটি ঘটেছে। আবার চেষ্টা করুন।';
+  const msg = typeof error === 'string' ? error : (error.message || '');
+  const lower = msg.toLowerCase();
+  
+  if (lower.includes('invalid login credentials') || lower.includes('invalid_grant')) {
+    return 'ভুল ইমেইল বা পাসওয়ার্ড প্রদান করা হয়েছে। অনুগ্রহ করে পুনরায় পরীক্ষা করুন।';
+  }
+  if (lower.includes('user already registered') || lower.includes('email already in use') || lower.includes('user already exists')) {
+    return 'এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে। অনুগ্রহ করে লগইন করুন।';
+  }
+  if (lower.includes('password should be at least') || lower.includes('password is too short')) {
+    return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'আপনার ইমেইলটি এখনও নিশ্চিত করা হয়নি। অনুগ্রহ করে আপনার ইনবক্স চেক করে ভেরিফিকেশন সম্পন্ন করুন।';
+  }
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return 'অতিরিক্ত অনুরোধ পাঠানো হয়েছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।';
+  }
+  if (lower.includes('failed to fetch') || lower.includes('network error')) {
+    return 'ইন্টারনেট সংযোগে ত্রুটি দেখা দিয়েছে। দয়া করে আপনার নেট সংযোগ যাচাই করুন।';
+  }
+  return msg || 'অনাকাঙ্ক্ষিত ত্রুটি ঘটেছে। পুনরায় চেষ্টা করুন।';
+}
+
+/**
+ * Sign up a new user using Supabase Auth
+ * Automatically creates/syncs profile in public.profiles with role = 'student'
+ */
+export async function supabaseSignUp(
+  fullName: string,
+  email: string,
+  phone: string,
+  password: string,
+  avatarUrl?: string
+): Promise<AuthResult> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase কনফিগারেশন পাওয়া যায়নি।'
+    };
+  }
+
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = fullName.trim();
+    const cleanPhone = phone.trim();
+
+    const { data, error } = await supabaseInstance.auth.signUp({
+      email: cleanEmail,
+      password: password,
+      options: {
+        data: {
+          full_name: cleanName,
+          phone: cleanPhone,
+          avatar_url: avatarUrl || null,
+          role: 'student',
+        },
+      },
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: formatAuthErrorMessage(error),
+      };
+    }
+
+    if (data.user) {
+      // Upsert profile in public.profiles table (without overriding admin role if any)
+      try {
+        await supabaseInstance
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            full_name: cleanName,
+            avatar_url: avatarUrl || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+      } catch (profErr) {
+        console.warn('Profiles upsert on signup:', profErr);
+      }
+
+      const needsConfirmation = !data.session && !data.user.confirmed_at;
+
+      return {
+        success: true,
+        user: data.user,
+        session: data.session,
+        needsEmailConfirmation: needsConfirmation,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'অ্যাকাউন্ট তৈরি সম্ভব হয়নি। তথ্য যাচাই করে পুনরায় চেষ্টা করুন।',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: formatAuthErrorMessage(err),
+    };
+  }
+}
+
+/**
+ * Sign in existing user with email/identifier and password
+ */
+export async function supabaseSignIn(
+  identifier: string,
+  password: string
+): Promise<AuthResult> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase কনফিগারেশন পাওয়া যায়নি।'
+    };
+  }
+
+  try {
+    let cleanEmail = identifier.trim();
+    // If entered as phone number without @, handle gracefully
+    if (!cleanEmail.includes('@')) {
+      cleanEmail = `${cleanEmail.replace(/[^0-9]/g, '')}@attamreen.academy`;
+    } else {
+      cleanEmail = cleanEmail.toLowerCase();
+    }
+
+    const { data, error } = await supabaseInstance.auth.signInWithPassword({
+      email: cleanEmail,
+      password: password,
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: formatAuthErrorMessage(error),
+      };
+    }
+
+    if (data.user) {
+      // Fetch user profile from public.profiles table to get latest name/avatar
+      try {
+        const { data: prof } = await supabaseInstance
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (prof) {
+          (data.user as any).profile = prof;
+        }
+      } catch (profErr) {
+        console.warn('Error fetching profile on login:', profErr);
+      }
+
+      return {
+        success: true,
+        user: data.user,
+        session: data.session,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'লগইন ব্যর্থ হয়েছে। দয়া করে পুনরায় চেষ্টা করুন।',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: formatAuthErrorMessage(err),
+    };
+  }
+}
+
+/**
+ * Sends a password reset email via Supabase Auth
+ */
+export async function supabaseResetPassword(email: string): Promise<{ success: boolean; error?: string | null }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase কনফিগারেশন পাওয়া যায়নি।'
+    };
+  }
+
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const { error } = await supabaseInstance.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: formatAuthErrorMessage(error),
+      };
+    }
+
+    return {
+      success: true,
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: formatAuthErrorMessage(err),
+    };
+  }
+}
+
+/**
+ * Sign out the current authenticated user
+ */
+export async function supabaseSignOut(): Promise<void> {
+  if (!supabaseInstance) return;
+  try {
+    await supabaseInstance.auth.signOut();
+  } catch (err) {
+    console.warn('Signout error:', err);
+  }
+}
+
+/**
+ * Get current authenticated user session
+ */
+export async function supabaseGetSession(): Promise<any> {
+  if (!supabaseInstance) return null;
+  try {
+    const { data } = await supabaseInstance.auth.getSession();
+    return data?.session || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Supabase Auth state changes
+ */
+export function supabaseOnAuthStateChange(callback: (event: string, session: any) => void): () => void {
+  if (!supabaseInstance) return () => {};
+  try {
+    const { data: { subscription } } = supabaseInstance.auth.onAuthStateChange((event, session) => {
+      callback(event, session);
+    });
+    return () => {
+      subscription?.unsubscribe();
+    };
+  } catch {
+    return () => {};
+  }
+}
+
+
 
 
 
