@@ -27,7 +27,7 @@ import {
   Send
 } from 'lucide-react';
 import { Question } from '../types';
-import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase, DEFAULT_EXAM_PRESETS } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase } from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
@@ -53,12 +53,28 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   onOpenLeaderboard,
   onReviewAnswers,
 }) => {
-  const [exams, setExams] = useState<ExamItem[]>(DEFAULT_EXAM_PRESETS);
+  const [exams, setExams] = useState<ExamItem[]>(() => {
+    try {
+      const raw = localStorage.getItem('miniquiz_exams_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [filterType, setFilterType] = useState<'all' | 'daily' | 'free' | 'weekly' | 'live'>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const raw = localStorage.getItem('miniquiz_exams_cache');
+      return !raw || JSON.parse(raw).length === 0;
+    } catch {
+      return true;
+    }
+  });
   const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
@@ -95,10 +111,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       fetchLeaderboardEntriesFromSupabase('all'),
     ]);
 
-    if (res.exams && res.exams.length > 0) {
+    if (res.exams) {
       setExams(res.exams);
     } else {
-      setExams(DEFAULT_EXAM_PRESETS);
+      setExams([]);
     }
 
     // Calculate actual participant count per exam from leaderboard
@@ -343,7 +359,26 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
       {/* 4. Exam Cards List (Matches Screenshots 1, 2, 3) */}
       <div className="space-y-4">
-        {filteredExams.length === 0 ? (
+        {isLoading && exams.length === 0 ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="neu-card p-5 sm:p-6 rounded-[28px] border-2 border-slate-200 dark:border-slate-800 animate-pulse space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="h-6 w-28 bg-slate-200 dark:bg-slate-700/80 rounded-full" />
+                  <div className="h-6 w-16 bg-slate-200 dark:bg-slate-700/80 rounded-full" />
+                </div>
+                <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-700/80 rounded-xl" />
+                <div className="h-4 w-1/2 bg-slate-200 dark:bg-slate-700/80 rounded-lg" />
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700/80 rounded-xl" />
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700/80 rounded-xl" />
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700/80 rounded-xl" />
+                </div>
+                <div className="h-12 bg-slate-200 dark:bg-slate-700/80 rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        ) : filteredExams.length === 0 ? (
           <div className="neu-card p-10 text-center space-y-2">
             <FileText className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="text-sm font-bold text-slate-600 dark:text-slate-300">

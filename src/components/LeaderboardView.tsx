@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X } from 'lucide-react';
+import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X, BookOpen } from 'lucide-react';
 import { toBengaliNumeral, getUserProfile, getUserUniqueId } from '../lib/utils';
 import { 
   LeaderboardEntry, 
@@ -32,6 +32,61 @@ export interface LeaderboardDisplayItem {
   examTitle?: string;
   
   createdAt: string;
+}
+
+function getLetterAvatar(name: string) {
+  if (!name || name.trim() === '') return 'প';
+  const clean = name.replace(/^(মাওলানা|মুহাম্মদ|মুহাঃ|মোছাম্মৎ|মোছাঃ|মোঃ|ড\.|হাফেজ)\s+/i, '').trim();
+  return clean[0] || name[0] || 'প';
+}
+
+function getRankBadgeText(rank: number) {
+  if (rank === 1) return '১ম স্থান';
+  if (rank === 2) return '২য় স্থান';
+  if (rank === 3) return '৩য় স্থান';
+  return `${toBengaliNumeral(rank)}তম স্থান`;
+}
+
+function getRankTheme(rank: number) {
+  if (rank === 1) {
+    return {
+      border: 'border-amber-400 dark:border-amber-500',
+      rankBadge: 'bg-amber-400 text-slate-950',
+      rankNumberCircle: 'bg-amber-400 text-slate-950',
+      isTop3: true,
+    };
+  }
+  if (rank === 2) {
+    return {
+      border: 'border-sky-400 dark:border-sky-500',
+      rankBadge: 'bg-sky-500 text-white',
+      rankNumberCircle: 'bg-sky-400 text-white',
+      isTop3: true,
+    };
+  }
+  if (rank === 3) {
+    return {
+      border: 'border-amber-700/70 sm:border-orange-400 dark:border-amber-600',
+      rankBadge: 'bg-amber-700 text-white',
+      rankNumberCircle: 'bg-amber-700 text-white',
+      isTop3: true,
+    };
+  }
+  return {
+    border: 'border-teal-400 dark:border-teal-700',
+    rankBadge: 'bg-[#00897B] text-white',
+    rankNumberCircle: 'bg-[#00897B] text-white',
+    isTop3: false,
+  };
+}
+
+function formatMarkDisplay(item: LeaderboardDisplayItem) {
+  const totalQ = item.totalQuestions > 0 ? item.totalQuestions : 10;
+  let scoreVal = item.score;
+  if (item.wrongCount > 0 && scoreVal === item.correctCount) {
+    scoreVal = Math.max(0, Number((item.correctCount - item.wrongCount * 0.25).toFixed(2)));
+  }
+  return `${toBengaliNumeral(scoreVal)}/${toBengaliNumeral(totalQ)}`;
 }
 
 export function computeLeaderboard(
@@ -276,6 +331,7 @@ interface LeaderboardViewProps {
   initialExamId?: string;
   isExamOnlyMode?: boolean;
   exams?: ExamItem[];
+  onReviewAnswers?: (opts: { examId?: string; subject?: string; examType?: string }) => void;
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
@@ -285,6 +341,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   initialExamId = 'all',
   isExamOnlyMode = false,
   exams: propsExams,
+  onReviewAnswers,
 }) => {
   const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId);
   
@@ -453,7 +510,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       
       {/* Top Header Controls (For Modal / Page Top) */}
       <div className="flex items-center justify-between px-1">
@@ -487,392 +544,456 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         </div>
       </div>
 
-      {/* 1. Dark Green Header Card */}
-      <div className="bg-gradient-to-b from-[#05402A] to-[#043321] text-white rounded-[32px] p-5 sm:p-7 text-center flex flex-col items-center justify-center space-y-4 shadow-xl border border-emerald-900/60 relative overflow-hidden mx-auto">
-        
-        {/* Top Badge */}
-        <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-[#074D33] text-amber-300 font-extrabold text-xs shadow-xs mx-auto text-center">
-          <Trophy className="w-4 h-4 text-amber-400" />
-          <span>{effectiveExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
-        </div>
-
-        {/* Title */}
-        <div className="space-y-1.5 max-w-xl mx-auto text-center">
-          <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
-            {effectiveExamOnlyMode
-              ? `${selectedExamTitle} - এর মেধা তালিকা`
-              : 'ফ্রি পরীক্ষায় অংশগ্রহণকারীদের লিডারবোর্ড'}
-          </h1>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-3 pt-1">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="px-5 py-2.5 rounded-full border border-emerald-600/60 bg-[#074D33]/60 hover:bg-[#074D33] text-white font-extrabold text-xs sm:text-sm transition-all cursor-pointer"
-            >
-              ফিরে যান
-            </button>
-          )}
-
-          <button
-            onClick={() => {
-              if (effectiveExamOnlyMode) {
-                setFilterType('this_exam');
-              } else {
-                setFilterType('today');
-              }
-            }}
-            className="px-5 py-2.5 rounded-full bg-[#00E676] hover:bg-[#00C853] text-[#05402A] font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-          >
-            <Trophy className="w-4 h-4 text-[#05402A]" />
-            <span>{effectiveExamOnlyMode ? 'মেধাতালিকা' : 'লিডারবোর্ড'}</span>
-          </button>
-        </div>
-
-        {/* 4 Filter Tabs (Only in General Leaderboard) */}
-        {!effectiveExamOnlyMode && (
-          <div className="pt-2">
-            <div className="bg-[#032E1E] p-1.5 rounded-full border border-emerald-900/60 flex items-center justify-between gap-1 max-w-md mx-auto">
-              <button
-                onClick={() => setFilterType('today')}
-                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  filterType === 'today'
-                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                    : 'text-emerald-100/80 hover:text-white font-extrabold'
-                }`}
-              >
-                আজকে
-              </button>
-
-              <button
-                onClick={() => setFilterType('this_week')}
-                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  filterType === 'this_week'
-                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                    : 'text-emerald-100/80 hover:text-white font-extrabold'
-                }`}
-              >
-                এই সপ্তাহে
-              </button>
-
-              <button
-                onClick={() => setFilterType('this_month')}
-                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  filterType === 'this_month'
-                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                    : 'text-emerald-100/80 hover:text-white font-extrabold'
-                }`}
-              >
-                এই মাসে
-              </button>
-
-              <button
-                onClick={() => setFilterType('all_time')}
-                className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  filterType === 'all_time'
-                    ? 'bg-[#FFC107] text-[#05402A] shadow-md'
-                    : 'text-emerald-100/80 hover:text-white font-extrabold'
-                }`}
-              >
-                সর্বকালে
-              </button>
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* Main Content Area */}
-      {isLoading ? (
-        <div className="p-12 text-center bg-white dark:bg-[#0D172A] rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm">
-          <RefreshCw className="w-8 h-8 text-[#0B705C] animate-spin mx-auto mb-3" />
-          <p className="text-xs font-bold text-slate-500">মেধা তালিকা লোড হচ্ছে...</p>
-        </div>
-      ) : rankedList.length === 0 ? (
-        /* Empty State */
-        <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-8 sm:p-12 text-center border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto border-2 border-amber-200 dark:border-amber-800/60 shadow-inner">
-            <Trophy className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-1.5 max-w-md mx-auto">
-            <h3 className="text-lg font-black text-[#0B132B] dark:text-white">
-              এখনো কোনো পরীক্ষার্থী অংশ নেয়নি
-            </h3>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
-              "{selectedExamTitle}" পরীক্ষায় এখনো কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে মেধা তালিকায় স্থান অর্জন করুন!
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
+      {/* ======================================================== */}
+      {/* CASE A: SPECIFIC EXAM LEADERBOARD (EXACT SCREENSHOT MATCH) */}
+      {/* ======================================================== */}
+      {effectiveExamOnlyMode ? (
+        <div className="space-y-4">
           
-          {/* 2. Top Champion Section */}
-          {topOneItem && (
-            <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 text-center">
-              
-              <div className="flex items-center justify-center gap-1.5 text-base font-black text-[#0B132B] dark:text-white">
-                <Sparkles className="w-5 h-5 text-amber-500" />
-                <span>শীর্ষ ৩ বিজয়ী</span>
-              </div>
+          {/* 1. TOP 2 TABS / PILL BUTTONS */}
+          <div className="bg-slate-100/90 dark:bg-slate-800/80 p-1.5 rounded-2xl flex items-center gap-2 max-w-xl mx-auto shadow-xs border border-slate-200/80 dark:border-slate-700/60">
+            {/* Active Tab: মেধাতালিকা */}
+            <button
+              className="flex-1 py-2.5 px-4 rounded-xl bg-[#FFC107] text-[#05402A] font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
+            >
+              <Trophy className="w-4 h-4 text-[#05402A] fill-[#05402A]" />
+              <span>মেধাতালিকা</span>
+            </button>
 
-              {/* Champion Card */}
-              <div className="max-w-xs mx-auto space-y-3">
-                <div className="relative inline-block pt-3">
-                  {/* Crown Icon */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
-                    👑
-                  </div>
+            {/* Inactive Tab: ব্যাখ্যাসহ উত্তর */}
+            <button
+              onClick={() => {
+                if (onReviewAnswers) {
+                  onReviewAnswers({
+                    examId: selectedExamId,
+                    subject: selectedExamTitle,
+                    examType: selectedExamTitle,
+                  });
+                }
+              }}
+              className="flex-1 py-2.5 px-4 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>ব্যাখ্যাসহ উত্তর</span>
+            </button>
+          </div>
 
-                  {/* Avatar */}
-                  {topOneItem.userAvatar ? (
-                    <img
-                      src={topOneItem.userAvatar}
-                      alt={topOneItem.userName}
-                      className="w-24 h-24 rounded-2xl object-cover ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-[#0B705C] text-white flex items-center justify-center font-black ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto">
-                      <User className="w-12 h-12 text-amber-300" />
-                    </div>
-                  )}
-
-                  {/* Medal Badge */}
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
-                    🥇
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <h3 className="font-black text-base sm:text-lg text-[#0B132B] dark:text-white">
-                    {topOneItem.userName}
-                  </h3>
-
-                  <div className="inline-block px-3.5 py-0.5 rounded-full bg-[#FFC107] text-[#05402A] text-xs font-black shadow-2xs">
-                    👑 ১ম স্থান
-                  </div>
-
-                  <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300 pt-0.5">
-                    {currentFilter === 'this_exam' ? (
-                      <>
-                        {topOneItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(topOneItem.totalQuestions)}টি • ` : ''}একুরেসি {toBengaliNumeral(topOneItem.avgAccuracy)}%
-                      </>
-                    ) : (
-                      <>
-                        {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা • গড় {toBengaliNumeral(topOneItem.avgAccuracy)}%
-                      </>
-                    )}
-                  </p>
-
-                  <p className="text-sm font-black text-amber-600 dark:text-amber-400">
-                    {currentFilter === 'this_exam' ? (
-                      <>নম্বর: {toBengaliNumeral(topOneItem.score)}{topOneItem.totalQuestions > 0 ? ` / ${toBengaliNumeral(topOneItem.totalQuestions)}` : ''}</>
-                    ) : (
-                      <>{toBengaliNumeral(topOneItem.points)} পয়েন্ট</>
-                    )}
-                  </p>
-                </div>
-
-                {/* Gold Podium Card */}
-                <div className="bg-gradient-to-b from-amber-100 to-amber-200/80 border border-amber-300 rounded-2xl p-4 text-center shadow-xs space-y-0.5">
-                  <div className="text-3xl font-black text-amber-800">
-                    ১
-                  </div>
-                  <div className="text-xs font-black text-amber-900 tracking-wide">
-                    চ্যাম্পিয়ন
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* 3. Current User Mint Card Banner */}
-          {currentUserRankItem && (
-            <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border-2 border-[#10B981] rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base font-black text-[#0B132B] dark:text-white shrink-0">
-                  {toBengaliNumeral(currentUserRankItem.rank)}.
-                </span>
-
-                <div className="relative shrink-0">
-                  {currentUserRankItem.userAvatar ? (
-                    <img
-                      src={currentUserRankItem.userAvatar}
-                      alt={currentUserRankItem.userName}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-500"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black ring-2 ring-emerald-500">
-                      <User className="w-6 h-6 text-amber-300" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h4 className="font-black text-sm text-[#0B132B] dark:text-white truncate">
-                      {currentUserRankItem.userName}
-                    </h4>
-                    <span className="px-2 py-0.5 bg-[#0B705C] text-white text-[10px] font-black rounded-full">
-                      আপনি
-                    </span>
-                  </div>
-
-                  {currentFilter === 'this_exam' ? (
-                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px] sm:max-w-xs">
-                      {currentUserRankItem.examTitle ? `${currentUserRankItem.examTitle} • ` : ''}
-                      {currentUserRankItem.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(currentUserRankItem.totalQuestions)}টি • ` : ''}
-                      একুরেসি {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300 text-[11px] font-extrabold rounded-full">
-                        টেস্ট: {toBengaliNumeral(currentUserRankItem.testCount)}
-                      </span>
-                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] font-extrabold rounded-full">
-                        গড়: {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Side Stats */}
-              {currentFilter === 'this_exam' ? (
-                <div className="flex items-center gap-3 shrink-0 text-right text-xs font-bold">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">সঠিক</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">
-                      {toBengaliNumeral(currentUserRankItem.correctCount)}টি
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">ভুল</span>
-                    <span className="text-rose-600 dark:text-rose-400 font-black text-sm">
-                      {toBengaliNumeral(currentUserRankItem.wrongCount)}টি
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">নাম্বার</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-black text-sm">
-                      {toBengaliNumeral(currentUserRankItem.score)}
-                      {currentUserRankItem.totalQuestions > 0 ? ` / ${toBengaliNumeral(currentUserRankItem.totalQuestions)}` : ''}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] text-slate-500 font-bold block">পয়েন্ট</span>
-                  <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                    {toBengaliNumeral(currentUserRankItem.points)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 4. Other Participants Rankings List */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs font-black text-[#0B132B] dark:text-white px-1">
-              <span>অন্যান্য পরীক্ষার্থীদের র‍্যাঙ্কিং</span>
-              <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-bold">
-                মোট পরীক্ষার্থী: {toBengaliNumeral(rankedList.length)} জন
+          {/* 2. HEADER: অংশগ্রহণকারীদের মেধা তালিকা (১১ জন) & আপনার অবস্থান */}
+          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+            <div className="flex items-center gap-2 text-slate-900 dark:text-white">
+              <Trophy className="w-5 h-5 text-amber-500 fill-amber-400" />
+              <h3 className="text-sm sm:text-base font-black">
+                অংশগ্রহণকারীদের মেধা তালিকা
+              </h3>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                ({toBengaliNumeral(rankedList.length)} জন)
               </span>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rankedList.map((item) => (
-                <div
-                  key={item.id}
-                  className={`py-3 px-2 flex items-center justify-between gap-3 ${
-                    item.isCurrentUser ? 'bg-amber-50/70 dark:bg-amber-950/20 rounded-xl' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-6 text-center font-black text-xs text-slate-500 shrink-0">
-                      {toBengaliNumeral(item.rank)}.
-                    </span>
+            {/* Your Rank Capsule */}
+            <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-black shrink-0">
+              আপনার অবস্থান: {toBengaliNumeral(currentUserRankItem?.rank || (rankedList.length > 0 ? rankedList.length : 1))}তম
+            </div>
+          </div>
 
-                    {item.userAvatar ? (
-                      <img
-                        src={item.userAvatar}
-                        alt={item.userName}
-                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black text-xs shrink-0">
-                        <User className="w-5 h-5" />
+          {/* 3. CONTENT AREA */}
+          {isLoading ? (
+            <div className="p-12 text-center bg-white dark:bg-[#0D172A] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <RefreshCw className="w-8 h-8 text-[#0B705C] animate-spin mx-auto mb-3" />
+              <p className="text-xs font-bold text-slate-500">মেধা তালিকা লোড হচ্ছে...</p>
+            </div>
+          ) : rankedList.length === 0 ? (
+            /* Empty State */
+            <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-8 sm:p-12 text-center border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+              <div className="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto border-2 border-amber-200 dark:border-amber-800/60 shadow-inner">
+                <Trophy className="w-10 h-10" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="text-lg font-black text-[#0B132B] dark:text-white">
+                  এখনো কোনো পরীক্ষার্থী অংশ নেয়নি
+                </h3>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+                  "{selectedExamTitle}" পরীক্ষায় এখনো কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে মেধা তালিকায় স্থান অর্জন করুন!
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* 4. EXACT SEQUENTIAL LIST OF PARTICIPANTS */
+            <div className="space-y-3">
+              {rankedList.map((item) => {
+                const theme = getRankTheme(item.rank);
+                const letterAvatar = getLetterAvatar(item.userName);
+                const markText = formatMarkDisplay(item);
+                const totalQ = item.totalQuestions > 0 ? item.totalQuestions : 10;
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-3xl p-3.5 sm:p-4 bg-white dark:bg-[#0D172A] border-2 transition-all flex items-center justify-between gap-3 shadow-2xs ${theme.border}`}
+                  >
+                    {/* Left: Number circle + Letter circle + Name & Accuracy */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      {/* Rank Number Circle Badge */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 shadow-xs ${theme.rankNumberCircle}`}>
+                        {toBengaliNumeral(item.rank)}
                       </div>
-                    )}
 
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate">
-                          {item.userName}
-                        </h4>
-                        {item.isCurrentUser && (
-                          <span className="px-2 py-0.2 bg-[#0B705C] text-white text-[9px] font-black rounded-full">
-                            আপনি
-                          </span>
-                        )}
-                      </div>
-
-                      {currentFilter === 'this_exam' ? (
-                        <p className="text-[10px] font-bold text-slate-500 truncate max-w-[180px] sm:max-w-xs">
-                          {item.examTitle ? `${item.examTitle} • ` : ''}
-                          {item.totalQuestions ? `প্রশ্ন: ${toBengaliNumeral(item.totalQuestions)}টি • ` : ''}
-                          একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
-                        </p>
+                      {/* User Initial Circle / Avatar */}
+                      {item.userAvatar ? (
+                        <img
+                          src={item.userAvatar}
+                          alt={item.userName}
+                          className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 shadow-2xs"
+                        />
                       ) : (
-                        <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.2 bg-blue-100 text-blue-900 text-[10px] font-bold rounded-full">
-                            টেস্ট: {toBengaliNumeral(item.testCount)}
-                          </span>
-                          <span className="px-2 py-0.2 bg-emerald-100 text-emerald-900 text-[10px] font-bold rounded-full">
-                            গড়: {toBengaliNumeral(item.avgAccuracy)}%
-                          </span>
+                        <div className="w-9 h-9 rounded-full bg-[#00897B] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                          {letterAvatar}
                         </div>
                       )}
-                    </div>
-                  </div>
 
-                  {currentFilter === 'this_exam' ? (
-                    <div className="flex items-center gap-2.5 text-right text-xs shrink-0">
-                      <div>
-                        <span className="text-[9px] text-slate-400 block">সঠিক</span>
-                        <span className="text-emerald-600 font-black">
+                      {/* Name & Subtitle Details */}
+                      <div className="min-w-0 space-y-1">
+                        {/* Name Capsule Badge */}
+                        <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[220px]">
+                          {item.userName}
+                        </div>
+
+                        {/* Rank Badge + Question & Accuracy */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {theme.isTop3 && (
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 shrink-0 ${theme.rankBadge}`}>
+                              👑 {getRankBadgeText(item.rank)}
+                            </span>
+                          )}
+
+                          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                            পরীক্ষা • প্রশ্ন: {toBengaliNumeral(totalQ)}টি • একুরেসি: {toBengaliNumeral(item.avgAccuracy)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Scores breakdown (সঠিক, ভুল, নাম্বার) */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0 text-right">
+                      {/* Correct */}
+                      <div className="text-center">
+                        <span className="text-[10px] font-bold text-slate-500 block">সঠিক</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
                           {toBengaliNumeral(item.correctCount)}টি
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[9px] text-slate-400 block">ভুল</span>
-                        <span className="text-rose-600 font-black">
+
+                      {/* Wrong */}
+                      <div className="text-center">
+                        <span className="text-[10px] font-bold text-slate-500 block">ভুল</span>
+                        <span className="text-xs sm:text-sm font-black text-rose-600 dark:text-rose-400">
                           {toBengaliNumeral(item.wrongCount)}টি
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[9px] text-slate-400 block">নাম্বার</span>
-                        <span className="text-amber-600 font-black text-sm">
-                          {toBengaliNumeral(item.score)}
-                          {item.totalQuestions > 0 ? ` / ${toBengaliNumeral(item.totalQuestions)}` : ''}
+
+                      {/* Final Score */}
+                      <div className="text-center pl-1 border-l border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-500 block">নাম্বার</span>
+                        <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400">
+                          {markText}
                         </span>
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-right shrink-0">
-                      <span className="text-[9px] text-slate-400 font-bold block">পয়েন্ট</span>
-                      <span className="text-base font-black text-amber-600">
-                        {toBengaliNumeral(item.points)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </div>
+      ) : (
+        /* ======================================================== */
+        /* CASE B: GENERAL OVERALL LEADERBOARD (TODAY, WEEK, MONTH) */
+        /* ======================================================== */
+        <div className="space-y-6">
+          {/* Dark Green Header Card */}
+          <div className="bg-gradient-to-b from-[#05402A] to-[#043321] text-white rounded-[32px] p-5 sm:p-7 text-center flex flex-col items-center justify-center space-y-4 shadow-xl border border-emerald-900/60 relative overflow-hidden mx-auto">
+            
+            {/* Top Badge */}
+            <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full border border-amber-400/40 bg-[#074D33] text-amber-300 font-extrabold text-xs shadow-xs mx-auto text-center">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>লিডারবোর্ড</span>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-1.5 max-w-xl mx-auto text-center">
+              <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
+                ফ্রি পরীক্ষায় অংশগ্রহণকারীদের লিডারবোর্ড
+              </h1>
+            </div>
+
+            {/* 4 Filter Tabs */}
+            <div className="pt-2 w-full">
+              <div className="bg-[#032E1E] p-1.5 rounded-full border border-emerald-900/60 flex items-center justify-between gap-1 max-w-md mx-auto">
+                <button
+                  onClick={() => setFilterType('today')}
+                  className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    filterType === 'today'
+                      ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                      : 'text-emerald-100/80 hover:text-white font-extrabold'
+                  }`}
+                >
+                  আজকে
+                </button>
+
+                <button
+                  onClick={() => setFilterType('this_week')}
+                  className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    filterType === 'this_week'
+                      ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                      : 'text-emerald-100/80 hover:text-white font-extrabold'
+                  }`}
+                >
+                  এই সপ্তাহে
+                </button>
+
+                <button
+                  onClick={() => setFilterType('this_month')}
+                  className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    filterType === 'this_month'
+                      ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                      : 'text-emerald-100/80 hover:text-white font-extrabold'
+                  }`}
+                >
+                  এই মাসে
+                </button>
+
+                <button
+                  onClick={() => setFilterType('all_time')}
+                  className={`flex-1 py-2 px-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    filterType === 'all_time'
+                      ? 'bg-[#FFC107] text-[#05402A] shadow-md'
+                      : 'text-emerald-100/80 hover:text-white font-extrabold'
+                  }`}
+                >
+                  সর্বকালে
+                </button>
+              </div>
+            </div>
+
           </div>
+
+          {/* Main Content Area */}
+          {isLoading ? (
+            <div className="p-12 text-center bg-white dark:bg-[#0D172A] rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm">
+              <RefreshCw className="w-8 h-8 text-[#0B705C] animate-spin mx-auto mb-3" />
+              <p className="text-xs font-bold text-slate-500">মেধা তালিকা লোড হচ্ছে...</p>
+            </div>
+          ) : rankedList.length === 0 ? (
+            /* Empty State */
+            <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-8 sm:p-12 text-center border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto border-2 border-amber-200 dark:border-amber-800/60 shadow-inner">
+                <Trophy className="w-10 h-10" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="text-lg font-black text-[#0B132B] dark:text-white">
+                  এখনো কোনো পরীক্ষার্থী অংশ নেয়নি
+                </h3>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+                  এই সময়ের মধ্যে কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে মেধা তালিকায় স্থান অর্জন করুন!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              
+              {/* Champion Podium Section for General Leaderboard */}
+              {topOneItem && (
+                <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 text-center">
+                  
+                  <div className="flex items-center justify-center gap-1.5 text-base font-black text-[#0B132B] dark:text-white">
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                    <span>শীর্ষ ৩ বিজয়ী</span>
+                  </div>
+
+                  {/* Champion Card */}
+                  <div className="max-w-xs mx-auto space-y-3">
+                    <div className="relative inline-block pt-3">
+                      {/* Crown Icon */}
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
+                        👑
+                      </div>
+
+                      {/* Avatar */}
+                      {topOneItem.userAvatar ? (
+                        <img
+                          src={topOneItem.userAvatar}
+                          alt={topOneItem.userName}
+                          className="w-24 h-24 rounded-2xl object-cover ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 rounded-2xl bg-[#0B705C] text-white flex items-center justify-center font-black ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto">
+                          <User className="w-12 h-12 text-amber-300" />
+                        </div>
+                      )}
+
+                      {/* Medal Badge */}
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
+                        🥇
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="font-black text-base sm:text-lg text-[#0B132B] dark:text-white">
+                        {topOneItem.userName}
+                      </h3>
+
+                      <div className="inline-block px-3.5 py-0.5 rounded-full bg-[#FFC107] text-[#05402A] text-xs font-black shadow-2xs">
+                        👑 ১ম স্থান
+                      </div>
+
+                      <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300 pt-0.5">
+                        {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা • গড় {toBengaliNumeral(topOneItem.avgAccuracy)}%
+                      </p>
+
+                      <p className="text-sm font-black text-amber-600 dark:text-amber-400">
+                        {toBengaliNumeral(topOneItem.points)} পয়েন্ট
+                      </p>
+                    </div>
+
+                    {/* Gold Podium Card */}
+                    <div className="bg-gradient-to-b from-amber-100 to-amber-200/80 border border-amber-300 rounded-2xl p-4 text-center shadow-xs space-y-0.5">
+                      <div className="text-3xl font-black text-amber-800">
+                        ১
+                      </div>
+                      <div className="text-xs font-black text-amber-900 tracking-wide">
+                        চ্যাম্পিয়ন
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* Current User Mint Card Banner */}
+              {currentUserRankItem && (
+                <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border-2 border-[#10B981] rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-base font-black text-[#0B132B] dark:text-white shrink-0">
+                      {toBengaliNumeral(currentUserRankItem.rank)}.
+                    </span>
+
+                    <div className="relative shrink-0">
+                      {currentUserRankItem.userAvatar ? (
+                        <img
+                          src={currentUserRankItem.userAvatar}
+                          alt={currentUserRankItem.userName}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-500"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black ring-2 ring-emerald-500">
+                          <User className="w-6 h-6 text-amber-300" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-black text-sm text-[#0B132B] dark:text-white truncate">
+                          {currentUserRankItem.userName}
+                        </h4>
+                        <span className="px-2 py-0.5 bg-[#0B705C] text-white text-[10px] font-black rounded-full">
+                          আপনি
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300 text-[11px] font-extrabold rounded-full">
+                          টেস্ট: {toBengaliNumeral(currentUserRankItem.testCount)}
+                        </span>
+                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] font-extrabold rounded-full">
+                          গড়: {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side Stats */}
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] text-slate-500 font-bold block">পয়েন্ট</span>
+                    <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                      {toBengaliNumeral(currentUserRankItem.points)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Other Participants Rankings List */}
+              <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs font-black text-[#0B132B] dark:text-white px-1">
+                  <span>অন্যান্য পরীক্ষার্থীদের র‍্যাঙ্কিং</span>
+                  <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-bold">
+                    মোট পরীক্ষার্থী: {toBengaliNumeral(rankedList.length)} জন
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {rankedList.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`py-3 px-2 flex items-center justify-between gap-3 ${
+                        item.isCurrentUser ? 'bg-amber-50/70 dark:bg-amber-950/20 rounded-xl' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 text-center font-black text-xs text-slate-500 shrink-0">
+                          {toBengaliNumeral(item.rank)}.
+                        </span>
+
+                        {item.userAvatar ? (
+                          <img
+                            src={item.userAvatar}
+                            alt={item.userName}
+                            className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black text-xs shrink-0">
+                            <User className="w-5 h-5" />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate">
+                              {item.userName}
+                            </h4>
+                            {item.isCurrentUser && (
+                              <span className="px-2 py-0.2 bg-[#0B705C] text-white text-[9px] font-black rounded-full">
+                                আপনি
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.2 bg-blue-100 text-blue-900 text-[10px] font-bold rounded-full">
+                              টেস্ট: {toBengaliNumeral(item.testCount)}
+                            </span>
+                            <span className="px-2 py-0.2 bg-emerald-100 text-emerald-900 text-[10px] font-bold rounded-full">
+                              গড়: {toBengaliNumeral(item.avgAccuracy)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[9px] text-slate-400 font-bold block">পয়েন্ট</span>
+                        <span className="text-base font-black text-amber-600">
+                          {toBengaliNumeral(item.points)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          )}
 
         </div>
       )}

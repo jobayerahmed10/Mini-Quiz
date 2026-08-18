@@ -9,6 +9,7 @@ import {
   CourseSyllabusItem
 } from '../types';
 import { detectQuestionSubject } from './subjects';
+import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
 
 /**
  * Safely retrieve Supabase configuration.
@@ -128,7 +129,12 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   let cachedQuestions: Question[] = [];
   try {
     const raw = localStorage.getItem('miniquiz_questions_cache');
-    if (raw) cachedQuestions = JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedQuestions = parsed;
+      }
+    }
   } catch {}
 
   if (!supabaseInstance) {
@@ -234,78 +240,13 @@ export interface FetchExamsResult {
 /**
  * Default fallback list of exams when Supabase is empty or not configured
  */
-export const DEFAULT_EXAM_PRESETS: ExamItem[] = [
-  {
-    id: 'free-daily-1',
-    title: 'আজকের স্পেশাল ডেইলি মডেল টেস্ট (২৯তম দিন)',
-    badge: 'দৈনিক মডেল টেস্ট',
-    badge_type: 'daily',
-    subject: 'আরবি ব্যাকরণ (নাহু ও সরফ)',
-    question_count: 25,
-    time_minutes: 25,
-    negative_marks: 0.50,
-    total_marks: 25,
-    description: '১৮তম ও ১৯তম শিক্ষক নিবন্ধন পরীক্ষার্থীদের জন্য স্পেশাল ডেইলি প্রাকটিস টেস্ট।',
-    examinee_count: '২,৮৫০+',
-    examinee_tag: 'আজকের টেস্ট',
-    is_premium: false,
-    status: 'active',
-  },
-  {
-    id: 'free-topic-1',
-    title: 'সহকারী মৌলভী বিষয়ভিত্তিক ফ্রি প্র্যাকটিস টেস্ট',
-    badge: 'ফ্রি এক্সাম',
-    badge_type: 'free',
-    subject: 'ফিকহ ও উসূলে ফিকহ',
-    question_count: 30,
-    time_minutes: 30,
-    negative_marks: 0.50,
-    total_marks: 30,
-    description: 'ফিকহ ও উসূলে ফিকহ বিষয়ের ১০০% গুরুত্বপূর্ণ বাছাইকৃত প্রশ্নাবলী।',
-    examinee_count: '৩,২০০+',
-    examinee_tag: 'চলতি সপ্তাহ',
-    is_premium: false,
-    status: 'active',
-  },
-  {
-    id: 'vip-mega-1',
-    title: 'ভিআইপি প্রভাষক (আরবি ক্যাডার) প্রিমিয়াম মেগা মডেল টেস্ট',
-    badge: 'প্রিমিয়াম ভিআইপি',
-    badge_type: 'weekly',
-    subject: 'আল-কুরআন, হাদিস, বালাগাত ও ফিকহুস সুন্নাহ',
-    question_count: 100,
-    time_minutes: 90,
-    negative_marks: 0.50,
-    total_marks: 100,
-    description: '১০০ নম্বরের মেগা মডেল টেস্ট উইথ বিস্তারিত ব্যাখ্যা ও নেগেটিভ মার্কিং।',
-    examinee_count: '১,৯৮০+',
-    examinee_tag: 'স্পেশাল ভিআইপি',
-    is_premium: true,
-    status: 'active',
-  },
-  {
-    id: 'free-live-1',
-    title: 'আগামীকালের লাইভ সাবজেক্ট উইকলি ব্যাটল',
-    badge: 'লাইভ পরীক্ষা',
-    badge_type: 'live',
-    subject: 'নাহু-সরফ ও আরবি সাহিত্য',
-    question_count: 40,
-    time_minutes: 40,
-    negative_marks: 0.50,
-    total_marks: 40,
-    description: 'সারা দেশের হাজারো পরীক্ষার্থীর সাথে সরাসরি লাইভ লিডারবোর্ডে অংশ নিন।',
-    examinee_count: '২,১০০+',
-    examinee_tag: 'লাইভ চলছে',
-    is_premium: false,
-    status: 'active',
-  },
-];
+export const DEFAULT_EXAM_PRESETS: ExamItem[] = [];
 
 /**
  * Fetches exams/model tests from Supabase table 'public.exams'
  */
 export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
-  let cachedExams: ExamItem[] = DEFAULT_EXAM_PRESETS;
+  let cachedExams: ExamItem[] = [];
   try {
     const raw = localStorage.getItem('miniquiz_exams_cache');
     if (raw) {
@@ -334,17 +275,16 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
 
     if (error) {
       console.warn('Supabase fetch exams error:', error);
-      // Fallback to default presets or cached exams
       return {
         exams: cachedExams,
         isFromSupabase: true,
-        error: `Supabase Table 'exams' পাওয়া যায়নি। ডেমো লিস্ট দেখানো হচ্ছে। (ত্রুটি: ${error.message})`,
+        error: `Supabase Table 'exams' ত্রুটি: ${error.message}`,
       };
     }
 
     if (!data || data.length === 0) {
       return {
-        exams: cachedExams,
+        exams: [],
         isFromSupabase: true,
         error: null,
       };
@@ -361,7 +301,7 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
       negative_marks: Number(item.negative_marks || 0.5),
       total_marks: Number(item.total_marks || item.question_count || 25),
       description: item.description ? String(item.description) : undefined,
-      examinee_count: item.examinee_count ? String(item.examinee_count) : '২,৫০০+',
+      examinee_count: item.examinee_count ? String(item.examinee_count) : '০',
       examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
       is_premium: Boolean(item.is_premium),
       status: item.status || 'active',

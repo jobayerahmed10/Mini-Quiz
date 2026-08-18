@@ -23,7 +23,10 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
       const raw = localStorage.getItem('miniquiz_questions_cache');
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
     return [];
   });
@@ -121,6 +124,8 @@ export default function App() {
         if (e.state.tab) {
           setActiveTab(e.state.tab as TabRoute);
         }
+      } else if (e.state && e.state.examInProgress) {
+        setCurrentPage('practice');
       } else {
         setCurrentPage('home');
         setActiveTab('exam');
@@ -392,6 +397,7 @@ export default function App() {
             correctCount={quizResult?.correctCount || 0}
             wrongCount={quizResult?.wrongCount || 0}
             initialExamId={selectedLeaderboardExamId}
+            onReviewAnswers={(opts) => handleReviewAnswers(opts)}
           />
         )}
 

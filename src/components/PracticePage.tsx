@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowLeft, 
   HelpCircle,
@@ -31,33 +31,70 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 }) => {
   const [activeSubject] = useState<string>(initialSubject);
   const [userSelections, setUserSelections] = useState<Record<string, 'option_a' | 'option_b' | 'option_c' | 'option_d'>>({});
-  const initialTotalSeconds = useMemo(() => timeMinutes * 60, [timeMinutes]);
+  
+  const safeTimeMinutes = Math.max(1, timeMinutes || 30);
+  const initialTotalSeconds = useMemo(() => safeTimeMinutes * 60, [safeTimeMinutes]);
   const [timeLeft, setTimeLeft] = useState<number>(initialTotalSeconds);
 
   // Sync timer when timeMinutes changes
   useEffect(() => {
-    setTimeLeft(timeMinutes * 60);
-  }, [timeMinutes]);
+    setTimeLeft(safeTimeMinutes * 60);
+  }, [safeTimeMinutes]);
 
-  // Filter questions based on subject if needed
-  const subjectQuestions = useMemo(() => {
-    if (!activeSubject || activeSubject === 'all' || activeSubject === 'সকল বিষয়') return questions;
-    return questions.filter((q) => {
-      if (q.subject && (q.subject.toLowerCase().includes(activeSubject.toLowerCase()) || activeSubject.toLowerCase().includes(q.subject.toLowerCase()))) {
+  // Robust multi-tier question matching so exam never collapses to 0
+  const getResolvedQuestions = (pool: Question[], subj: string, count?: number): Question[] => {
+    const rawPool = pool || [];
+    if (!subj || subj === 'all' || subj === 'সকল বিষয়') {
+      return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
+    }
+
+    // Tier 1: Direct subject match
+    const directMatches = rawPool.filter((q) => {
+      if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
         return true;
       }
-      const subj = detectQuestionSubject(q);
-      return subj === activeSubject || activeSubject.includes(subj) || subj.includes(activeSubject);
+      const detected = detectQuestionSubject(q);
+      return detected === subj || subj.includes(detected) || detected.includes(subj);
     });
-  }, [questions, activeSubject]);
 
-  const filteredQuestions = useMemo(() => {
-    if (targetQuestionCount && targetQuestionCount > 0 && subjectQuestions.length > targetQuestionCount) {
-      return subjectQuestions.slice(0, targetQuestionCount);
+    if (directMatches.length > 0) {
+      return count && count > 0 && directMatches.length > count ? directMatches.slice(0, count) : directMatches;
     }
-    return subjectQuestions;
-  }, [subjectQuestions, targetQuestionCount]);
 
+    // Tier 2: Keyword match
+    const keywords = subj
+      .replace(/[\(\)（）\[\]\-\_\,\.\/]/g, ' ')
+      .split(/\s+/)
+      .filter((k) => k.trim().length > 1);
+
+    const keywordMatches = rawPool.filter((q) => {
+      const combined = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+      return keywords.some((k) => combined.includes(k.toLowerCase()));
+    });
+
+    if (keywordMatches.length > 0) {
+      return count && count > 0 && keywordMatches.length > count ? keywordMatches.slice(0, count) : keywordMatches;
+    }
+
+    // Tier 3: Fallback to all questions
+    return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
+  };
+
+  // Lock exam questions on session mount so background Supabase updates don't wipe active exam
+  const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
+    return getResolvedQuestions(questions, initialSubject, targetQuestionCount);
+  });
+
+  // If questions was completely empty on mount and now arrived, populate once
+  const isInitializedRef = useRef(false);
+  useEffect(() => {
+    if (!isInitializedRef.current && (!examQuestions || examQuestions.length === 0) && questions && questions.length > 0) {
+      isInitializedRef.current = true;
+      setExamQuestions(getResolvedQuestions(questions, activeSubject, targetQuestionCount));
+    }
+  }, [questions, activeSubject, targetQuestionCount, examQuestions]);
+
+  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, targetQuestionCount);
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;
   const unansweredCount = totalQuestions - answeredCount;
@@ -81,7 +118,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       setShowExitModal(true);
     };
 
-    window.history.pushState({ examInProgress: true }, '');
+    window.history.pushState({ page: 'practice', examInProgress: true }, '');
     window.addEventListener('popstate', handlePopState);
 
     return () => {
