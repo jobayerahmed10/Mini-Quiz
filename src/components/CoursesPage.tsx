@@ -151,10 +151,11 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
       const pendingIds = new Set<string>();
 
       (enrollResult.enrollments || []).forEach((e) => {
+        if (!e || !e.course_id) return;
         if (e.status === 'approved') {
-          approvedIds.add(e.course_id);
+          approvedIds.add(String(e.course_id));
         } else if (e.status === 'pending') {
-          pendingIds.add(e.course_id);
+          pendingIds.add(String(e.course_id));
         }
       });
 

@@ -116,8 +116,12 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
       } catch {}
 
       // 4. If approving a premium package or course, reflect in premium/enrollment caches
+      const appCourseId = String(app.course_id || '').toLowerCase();
+      const appCourseTitle = String(app.course_title || '');
+      const isPremiumType = appCourseId.startsWith('tamreen_premium') || appCourseId === 'tamreen_premium_package' || appCourseTitle.includes('প্রিমিয়াম') || appCourseTitle.includes('বিষয়ভিত্তিক');
+
       if (newStatus === 'approved') {
-        if (app.course_id === 'tamreen_premium_package' || app.course_title.includes('প্রিমিয়াম') || app.course_title.includes('বিষয়ভিত্তিক')) {
+        if (isPremiumType) {
           setUserPremium(true);
           localStorage.setItem('tamreen_premium_status', 'approved');
           window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: 'approved' }));
@@ -125,13 +129,13 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
         }
         showToast(`আবেদনটি অনুমোদিত হয়েছে! (${app.student_name})`);
       } else if (newStatus === 'rejected') {
-        if (app.course_id === 'tamreen_premium_package') {
+        if (isPremiumType) {
           localStorage.setItem('tamreen_premium_status', 'rejected');
           window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: 'rejected' }));
         }
         showToast(`আবেদনটি বাতিল করা হয়েছে।`);
       } else {
-        if (app.course_id === 'tamreen_premium_package') {
+        if (isPremiumType) {
           localStorage.setItem('tamreen_premium_status', 'pending');
           window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: 'pending' }));
         }

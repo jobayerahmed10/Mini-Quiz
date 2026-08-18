@@ -36,6 +36,7 @@ import { SUBJECT_CATEGORIES } from '../lib/subjects';
 import { isUserPremium, setUserPremium, toBengaliNumeral, getUserProfile } from '../lib/utils';
 import { fetchEnrollmentsFromSupabase } from '../lib/supabase';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
+import { SubscriptionPackages } from './SubscriptionPackages';
 import { CourseEnrollmentRecord } from '../types';
 
 interface SubjectsPageProps {
@@ -78,8 +79,9 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
   const isPremium = premiumStatus === 'approved';
   const isPending = premiumStatus === 'pending';
 
-  // Modals
+  // Modals and Inline View State
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [showInlinePackages, setShowInlinePackages] = useState<boolean>(false);
   const [attemptedSubject, setAttemptedSubject] = useState<string>('');
   const [pendingTrxId, setPendingTrxId] = useState<string>(() => localStorage.getItem('tamreen_premium_trx') || '');
 
@@ -104,13 +106,19 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         }
       } catch {}
 
-      // Find premium application
-      const premiumApp = allEnrollments.find(e => 
-        e.course_id.startsWith('tamreen_premium') || 
-        e.course_id === 'tamreen_premium_package' || 
-        e.course_title.includes('১৫টি বিষয়ভিত্তিক') ||
-        (userPhone && e.phone_number === userPhone && e.course_id.startsWith('tamreen_premium'))
-      );
+      // Find premium application with complete null-safety
+      const premiumApp = allEnrollments.find(e => {
+        if (!e) return false;
+        const cId = String(e.course_id || '').toLowerCase();
+        const cTitle = String(e.course_title || '');
+        const ePhone = String(e.phone_number || '').trim();
+
+        const isPremiumCourseId = cId.startsWith('tamreen_premium') || cId === 'tamreen_premium_package';
+        const isPremiumCourseTitle = cTitle.includes('১৫টি বিষয়ভিত্তিক') || cTitle.includes('প্রিমিয়াম');
+        const isUserMatch = Boolean(userPhone && ePhone && (ePhone === userPhone || ePhone.includes(userPhone) || userPhone.includes(ePhone)));
+
+        return isPremiumCourseId || isPremiumCourseTitle || (isUserMatch && isPremiumCourseId);
+      });
 
       if (premiumApp) {
         if (premiumApp.status === 'approved') {
@@ -179,14 +187,21 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
   const handleSubjectClick = (subjectName: string) => {
     if (isPending) {
       setAttemptedSubject(subjectName);
-      setShowPaymentModal(false);
-      alert('আপনার বিকাশ/নগদ TrxID পেমেন্ট আবেদনটি বর্তমানে যাচাইাধীন (Pending) রয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই এই বিষয়টি স্বয়ংক্রিয়ভাবে খুলে যাবে।');
+      setShowInlinePackages(true);
+      setTimeout(() => {
+        const el = document.getElementById('subscription-packages-container');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
       return;
     }
 
     if (!isPremium) {
       setAttemptedSubject(subjectName);
-      setShowPaymentModal(true);
+      setShowInlinePackages(true);
+      setTimeout(() => {
+        const el = document.getElementById('subscription-packages-container');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
       return;
     }
 
@@ -221,7 +236,13 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
             {/* Pill 1: Status Pill (Clickable) */}
             <button
               type="button"
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => {
+                setShowInlinePackages(prev => !prev);
+                setTimeout(() => {
+                  const el = document.getElementById('subscription-packages-container');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+              }}
               className={`text-xs font-black px-3.5 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-xs border cursor-pointer hover:scale-[1.03] active:scale-95 transition-all ${
                 isPremium
                   ? 'bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60'
@@ -251,7 +272,13 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
             {/* Pill 2: 15 Subjects Special Preparation */}
             <button
               type="button"
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => {
+                setShowInlinePackages(true);
+                setTimeout(() => {
+                  const el = document.getElementById('subscription-packages-container');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+              }}
               className="text-xs font-black px-3.5 py-1.5 bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-full inline-flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.03] active:scale-95 transition-all"
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -308,15 +335,23 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => {
+                setShowInlinePackages(prev => !prev);
+                setTimeout(() => {
+                  const el = document.getElementById('subscription-packages-container');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+              }}
               className="neu-pill !rounded-2xl px-4 py-2 text-xs font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-400 active:scale-95 transition-all shadow-xs border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90"
             >
               <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
               <span>
-                {isPremium
+                {showInlinePackages
+                  ? 'প্যাকেজ লুকান'
+                  : isPremium
                   ? 'প্যাকেজ বিবরণ'
                   : isPending
-                  ? 'পেমেন্ট তথ্য দেখুন'
+                  ? 'পেমেন্ট তথ্য ও প্যাকেজ'
                   : 'প্যাকেজসমূহ দেখুন ও আনলক করুন'}
               </span>
             </button>
@@ -324,96 +359,112 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         </div>
       </div>
 
-      {/* 2. NEUMORPHIC INSET SEARCH BAR */}
-      <div className="relative">
-        <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="বিষয় খুঁজুন (যেমন: ফিকহ, আরবি ব্যাকরণ, গণিত, কুরআন)..."
-          className="neu-inset w-full !rounded-2xl pl-12 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium focus:outline-none"
+      {/* 2. CONDITIONAL VIEW: DIRECT SUBSCRIPTION PACKAGES OR SUBJECTS LIST */}
+      {showInlinePackages ? (
+        <SubscriptionPackages
+          isPremium={isPremium}
+          isPending={isPending}
+          pendingTrxId={pendingTrxId || undefined}
+          onClose={() => setShowInlinePackages(false)}
+          onEnrollmentSuccess={(record) => {
+            setPendingTrxId(record.transaction_id);
+            setPremiumStatus('pending');
+          }}
         />
-      </div>
+      ) : (
+        <>
+          {/* 3. NEUMORPHIC INSET SEARCH BAR */}
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="বিষয় খুঁজুন (যেমন: ফিকহ, আরবি ব্যাকরণ, গণিত, কুরআন)..."
+              className="neu-inset w-full !rounded-2xl pl-12 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium focus:outline-none"
+            />
+          </div>
 
-      {/* 3. LIST OF 15 SUBJECT CARDS */}
-      <div className="space-y-3 sm:space-y-3.5">
-        {filteredSubjects.map((sub) => {
-          const IconComponent = ICON_MAP[sub.iconName] || BookOpen;
+          {/* 4. LIST OF 15 SUBJECT CARDS */}
+          <div className="space-y-3 sm:space-y-3.5">
+            {filteredSubjects.map((sub) => {
+              const IconComponent = ICON_MAP[sub.iconName] || BookOpen;
 
-          return (
-            <div
-              key={sub.id}
-              onClick={() => handleSubjectClick(sub.name)}
-              className={`neu-card !rounded-3xl p-3.5 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group border ${
-                isPremium 
-                  ? 'border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-400/60' 
-                  : isPending
-                  ? 'border-amber-300/80 dark:border-amber-800/80 hover:border-amber-400'
-                  : 'border-slate-200/70 dark:border-slate-800/70 hover:border-amber-400/60'
-              }`}
-            >
-              {/* Left: Green Squircle Icon Container */}
-              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                <div className="neu-icon-box w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 text-[#046A38] dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/60 border border-emerald-200/90 dark:border-emerald-800/60 group-hover:scale-105 transition-transform">
-                  <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+              return (
+                <div
+                  key={sub.id}
+                  onClick={() => handleSubjectClick(sub.name)}
+                  className={`neu-card !rounded-3xl p-3.5 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group border ${
+                    isPremium 
+                      ? 'border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-400/60' 
+                      : isPending
+                      ? 'border-amber-300/80 dark:border-amber-800/80 hover:border-amber-400'
+                      : 'border-slate-200/70 dark:border-slate-800/70 hover:border-amber-400/60'
+                  }`}
+                >
+                  {/* Left: Green Squircle Icon Container */}
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="neu-icon-box w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 text-[#046A38] dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/60 border border-emerald-200/90 dark:border-emerald-800/60 group-hover:scale-105 transition-transform">
+                      <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                    </div>
+
+                    {/* Middle: Title & Subtitle */}
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-black text-[#064E3B] dark:text-emerald-400 font-hind leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors truncate">
+                        {sub.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                        {sub.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Green Practice Button / Locked Button / Pending Button */}
+                  <div className="shrink-0">
+                    {isPremium ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSubjectClick(sub.name);
+                        }}
+                        className="neu-pill !rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-[#046A38] dark:text-emerald-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-emerald-300/80 dark:border-emerald-700/60 bg-white/90 dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                      >
+                        <span>অনুশীলন শুরু</span>
+                        <ChevronRight className="w-4 h-4 text-[#046A38] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    ) : isPending ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSubjectClick(sub.name);
+                        }}
+                        className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-800 dark:text-amber-300 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-400/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/50 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>যাচাইাধীন</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSubjectClick(sub.name);
+                        }}
+                        className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-700 dark:text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>লক করা</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                {/* Middle: Title & Subtitle */}
-                <div className="min-w-0">
-                  <h3 className="text-sm sm:text-base font-black text-[#064E3B] dark:text-emerald-400 font-hind leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors truncate">
-                    {sub.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
-                    {sub.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right: Green Practice Button / Locked Button / Pending Button */}
-              <div className="shrink-0">
-                {isPremium ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubjectClick(sub.name);
-                    }}
-                    className="neu-pill !rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-[#046A38] dark:text-emerald-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-emerald-300/80 dark:border-emerald-700/60 bg-white/90 dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
-                  >
-                    <span>অনুশীলন শুরু</span>
-                    <ChevronRight className="w-4 h-4 text-[#046A38] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                ) : isPending ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubjectClick(sub.name);
-                    }}
-                    className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-800 dark:text-amber-300 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-400/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/50 hover:scale-105 active:scale-95 transition-all shadow-xs"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>যাচাইাধীন</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubjectClick(sub.name);
-                    }}
-                    className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-700 dark:text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>লক করা</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* 4. QUESTION COUNT & TIME LIMIT CONFIG MODAL (Unlocked State) */}
       {selectedSubject && (
