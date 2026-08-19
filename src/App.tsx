@@ -12,9 +12,10 @@ import { SubjectsPage } from './components/SubjectsPage';
 import { ProfileModal } from './components/ProfileModal';
 import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
+import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
-import { fetchPublishedQuestions, saveLeaderboardEntryToSupabase, submitExamResultToSupabase, LeaderboardEntry } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId } from './lib/utils';
+import { fetchPublishedQuestions, fetchExamsFromSupabase, saveLeaderboardEntryToSupabase, submitExamResultToSupabase, LeaderboardEntry } from './lib/supabase';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
@@ -52,6 +53,16 @@ export default function App() {
   const [resultViewMode, setResultViewMode] = useState<'summary' | 'explanation'>('summary');
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+
+  // Direct Exam Deep-linking & Auth Modal State
+  const [showDirectRegModal, setShowDirectRegModal] = useState<boolean>(false);
+  const [pendingDirectExamOpts, setPendingDirectExamOpts] = useState<{
+    examId?: string;
+    subject: string;
+    questionCount?: number;
+    timeMinutes?: number;
+    examType?: string;
+  } | null>(null);
 
   // Dark Mode & Font Customization State
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -110,6 +121,47 @@ export default function App() {
   useEffect(() => {
     loadQuestions();
   }, [loadQuestions]);
+
+  // Deep Link support: Auto-detect ?exam=... or ?examId=... in URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const examQuery = urlParams.get('exam') || urlParams.get('examId') || urlParams.get('test');
+
+    if (examQuery) {
+      fetchExamsFromSupabase().then((res) => {
+        const examsList = res.exams || [];
+        const found = examsList.find(
+          (e) => e.id === examQuery || e.title === examQuery || e.subject === examQuery
+        );
+
+        const targetOpts = found
+          ? {
+              examId: found.id,
+              subject: found.subject,
+              questionCount: found.question_count,
+              timeMinutes: found.time_minutes,
+              examType: found.title,
+            }
+          : {
+              examId: examQuery,
+              subject: examQuery,
+              questionCount: 25,
+              timeMinutes: 20,
+              examType: examQuery,
+            };
+
+        const profile = getUserProfile();
+        if (profile && profile.name && profile.name.trim() !== '') {
+          handleStartPractice(targetOpts);
+        } else {
+          // Direct to Account Creation Form
+          setPendingDirectExamOpts(targetOpts);
+          setShowDirectRegModal(true);
+        }
+      });
+    }
+  }, []);
 
   // History state listener for mobile back button support
   useEffect(() => {
@@ -457,6 +509,24 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Direct Exam Access Registration Modal */}
+      <UserRegistrationModal
+        isOpen={showDirectRegModal}
+        onClose={() => {
+          setShowDirectRegModal(false);
+          setPendingDirectExamOpts(null);
+        }}
+        initialMode="register"
+        title="পরীক্ষা শুরু করতে অ্যাকাউন্ট তৈরি করুন"
+        onSaveSuccess={(profile: UserProfile) => {
+          setShowDirectRegModal(false);
+          if (pendingDirectExamOpts) {
+            handleStartPractice(pendingDirectExamOpts);
+            setPendingDirectExamOpts(null);
+          }
+        }}
+      />
 
       {/* Bottom Neumorphic Sticky Nav Bar */}
       {currentPage !== 'practice' && (

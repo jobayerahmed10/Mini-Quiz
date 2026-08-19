@@ -14,8 +14,8 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   isOpen,
   onClose,
   onSaveSuccess,
-  title,
-  initialMode = 'login',
+  title = 'পরীক্ষা শুরু করতে অ্যাকাউন্ট তৈরি করুন',
+  initialMode = 'register',
 }) => {
   return (
     <AuthModal
