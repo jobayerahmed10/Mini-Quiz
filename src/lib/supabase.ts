@@ -814,7 +814,17 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
   }
 
   // 3. Fallback to computing from local entries
-  const local = getLocalLeaderboardEntries().filter((e) => e.exam_id === examId || e.exam_title === examId);
+  const local = getLocalLeaderboardEntries().filter((e) => {
+    const eId = (e.exam_id || '').toLowerCase().trim();
+    const eTitle = (e.exam_title || '').toLowerCase().trim();
+    const target = examId.toLowerCase().trim();
+    return (
+      eId === target ||
+      eTitle === target ||
+      (eId && (eId.includes(target) || target.includes(eId))) ||
+      (eTitle && (eTitle.includes(target) || target.includes(eTitle)))
+    );
+  });
   const bestMap = new Map<string, LeaderboardEntry>();
   for (const e of local) {
     const key = e.user_id || e.user_name;

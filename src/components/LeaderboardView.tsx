@@ -100,19 +100,18 @@ export function computeLeaderboard(
   const currentUserId = getUserUniqueId();
   const normalizedCurrentUserName = (currentUserName || '').toLowerCase().trim();
 
-  // Filter out invalid or default placeholder entries ("পরীক্ষার্থী", "Anonymous", empty names)
+  // Filter out invalid/empty entries
   let filtered = entries.filter((e) => {
     const rawName = (e.user_name || '').trim();
     if (!rawName) return false;
     const lower = rawName.toLowerCase();
-    const isDefault = lower === 'পরীক্ষার্থী' || lower === 'anonymous' || lower === 'user' || lower === 'student';
-    if (isDefault) {
-      // Keep only if it corresponds to current active user who has a real profile name
+    const isPlaceholder = lower === 'anonymous' || lower === 'unknown' || lower === 'test_user';
+    if (isPlaceholder) {
       const isCurr = Boolean(
         (e.user_id && currentUserId && e.user_id === currentUserId) ||
-        (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && uKeyMatch(e.user_name, normalizedCurrentUserName))
+        (normalizedCurrentUserName && lower === normalizedCurrentUserName)
       );
-      return isCurr && normalizedCurrentUserName !== '' && normalizedCurrentUserName !== 'পরীক্ষার্থী';
+      return isCurr;
     }
     return true;
   });
@@ -123,26 +122,35 @@ export function computeLeaderboard(
   }
 
   // Helper set of candidate exam identifiers for flexible matching
-  const currentExamObj = examList?.find(
-    (e) => e.id === selectedExamId || e.title === selectedExamId || e.subject === selectedExamId
-  );
-
   const candidateIds = new Set<string>();
   if (selectedExamId && selectedExamId !== 'all') {
     candidateIds.add(selectedExamId.toLowerCase().trim());
   }
-  if (currentExamObj) {
-    if (currentExamObj.id) candidateIds.add(currentExamObj.id.toLowerCase().trim());
-    if (currentExamObj.title) candidateIds.add(currentExamObj.title.toLowerCase().trim());
-    if (currentExamObj.subject) candidateIds.add(currentExamObj.subject.toLowerCase().trim());
+  if (examList && examList.length > 0) {
+    for (const ex of examList) {
+      const matchFound =
+        ex.id?.toLowerCase().trim() === selectedExamId.toLowerCase().trim() ||
+        ex.title?.toLowerCase().trim() === selectedExamId.toLowerCase().trim() ||
+        ex.subject?.toLowerCase().trim() === selectedExamId.toLowerCase().trim();
+      if (matchFound) {
+        if (ex.id) candidateIds.add(ex.id.toLowerCase().trim());
+        if (ex.title) candidateIds.add(ex.title.toLowerCase().trim());
+        if (ex.subject) candidateIds.add(ex.subject.toLowerCase().trim());
+      }
+    }
   }
 
   const isExamMatch = (e: LeaderboardEntry) => {
     if (!selectedExamId || selectedExamId === 'all') return true;
     const eId = (e.exam_id || '').toLowerCase().trim();
     const eTitle = (e.exam_title || '').toLowerCase().trim();
-    if (candidateIds.size === 0) return true;
-    return candidateIds.has(eId) || candidateIds.has(eTitle);
+    const target = selectedExamId.toLowerCase().trim();
+
+    if (eId === target || eTitle === target) return true;
+    if (candidateIds.has(eId) || candidateIds.has(eTitle)) return true;
+    if (eId && target && (eId.includes(target) || target.includes(eId))) return true;
+    if (eTitle && target && (eTitle.includes(target) || target.includes(eTitle))) return true;
+    return false;
   };
 
   if (filterType === 'this_exam') {
@@ -418,13 +426,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         const examRows = await getExamLeaderboard(selectedExamId);
         if (examRows && examRows.length > 0) {
           const filteredRows = examRows.filter((r) => {
-            const name = (r.full_name || '').trim().toLowerCase();
-            if (!name || name === 'পরীক্ষার্থী' || name === 'anonymous' || name === 'user' || name === 'student') {
+            const rawName = (r.full_name || '').trim();
+            if (!rawName) return false;
+            const lower = rawName.toLowerCase();
+            const isPlaceholder = lower === 'anonymous' || lower === 'unknown' || lower === 'test_user';
+            if (isPlaceholder) {
               const isCurr = Boolean(
                 (r.user_id && currentUserId && r.user_id === currentUserId) ||
-                (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && name === normalizedCurrentUserName)
+                (normalizedCurrentUserName && lower === normalizedCurrentUserName)
               );
-              return isCurr && normalizedCurrentUserName !== '' && normalizedCurrentUserName !== 'পরীক্ষার্থী';
+              return isCurr;
             }
             return true;
           });
@@ -432,14 +443,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           const mapped: LeaderboardDisplayItem[] = filteredRows.map((row, idx) => {
             const isCurr = Boolean(
               (row.user_id && currentUserId && row.user_id === currentUserId) ||
-              (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
+              (normalizedCurrentUserName && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
             );
-            const cleanName = isCurr ? (userName || row.full_name) : row.full_name;
+            const cleanName = isCurr ? (userName || row.full_name) : (row.full_name || 'পরীক্ষার্থী');
             const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
             const totalQ = Number(row.total_marks || (row.correct_answers + row.wrong_answers) || 0);
 
             return {
-              id: `rpc_exam_${row.user_id}_${row.rank || idx + 1}`,
+              id: `rpc_exam_${row.user_id || idx}_${row.rank || idx + 1}`,
               rank: Number(row.rank || idx + 1),
               userName: cleanName,
               userAvatar: cleanAvatar,
@@ -465,13 +476,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         const freeRows = await getFreeOverallLeaderboard(currentFilter);
         if (freeRows && freeRows.length > 0) {
           const filteredFree = freeRows.filter((r) => {
-            const name = (r.full_name || '').trim().toLowerCase();
-            if (!name || name === 'পরীক্ষার্থী' || name === 'anonymous' || name === 'user' || name === 'student') {
+            const rawName = (r.full_name || '').trim();
+            if (!rawName) return false;
+            const lower = rawName.toLowerCase();
+            const isPlaceholder = lower === 'anonymous' || lower === 'unknown' || lower === 'test_user';
+            if (isPlaceholder) {
               const isCurr = Boolean(
                 (r.user_id && currentUserId && r.user_id === currentUserId) ||
-                (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && name === normalizedCurrentUserName)
+                (normalizedCurrentUserName && lower === normalizedCurrentUserName)
               );
-              return isCurr && normalizedCurrentUserName !== '' && normalizedCurrentUserName !== 'পরীক্ষার্থী';
+              return isCurr;
             }
             return true;
           });
@@ -479,9 +493,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           const mapped: LeaderboardDisplayItem[] = filteredFree.map((row, idx) => {
             const isCurr = Boolean(
               (row.user_id && currentUserId && row.user_id === currentUserId) ||
-              (normalizedCurrentUserName && normalizedCurrentUserName !== 'পরীক্ষার্থী' && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
+              (normalizedCurrentUserName && row.full_name?.toLowerCase().trim() === normalizedCurrentUserName)
             );
-            const cleanName = isCurr ? (userName || row.full_name) : row.full_name;
+            const cleanName = isCurr ? (userName || row.full_name) : (row.full_name || 'পরীক্ষার্থী');
             const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
 
             return {

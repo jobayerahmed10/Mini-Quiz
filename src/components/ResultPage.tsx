@@ -91,7 +91,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   const obtainedMarksVal = Math.max(0, Number((result.correctCount - negativeMarkVal).toFixed(2)));
   const isPassed = result.percentage >= 40;
 
-  // Load Leaderboard from Supabase + Seed Participants if empty
+  // Load Leaderboard from Supabase / Server without default mock data
   useEffect(() => {
     let isMounted = true;
 
@@ -99,40 +99,95 @@ export const ResultPage: React.FC<ResultPageProps> = ({
       setIsLoadingLeaderboard(true);
       try {
         const currentUserId = getUserUniqueId();
-        const entries = await fetchLeaderboardEntriesFromSupabase();
-        
-        // Demo/Realistic seed participants for a rich, realistic competitive feel as shown in screenshot
-        const defaultParticipants: { name: string; correct: number; wrong: number; score: number }[] = [
-          { name: 'মাওলানা তাওহীদুল ইসলাম', correct: result.totalQuestions, wrong: 0, score: result.totalQuestions },
-          { name: 'মুহাম্মদ জোবায়ের হোসাইন', correct: result.totalQuestions, wrong: 0, score: result.totalQuestions },
-          { name: 'আবদুল করিম আল-মাদানী', correct: Math.max(0, result.totalQuestions - 1), wrong: 1, score: Number((result.totalQuestions - 1 - 0.25).toFixed(2)) },
-          { name: 'ফাতেমা আক্তার সুরভী', correct: Math.max(0, result.totalQuestions - 1), wrong: 1, score: Number((result.totalQuestions - 1 - 0.25).toFixed(2)) },
-          { name: 'ইসমাঈল হোসেন ফাহিম', correct: Math.max(0, result.totalQuestions - 2), wrong: 1, score: Number((result.totalQuestions - 2 - 0.25).toFixed(2)) },
-          { name: 'হাফেজ মাহমুদ হাসান', correct: Math.max(0, result.totalQuestions - 2), wrong: 2, score: Number((result.totalQuestions - 2 - 0.50).toFixed(2)) },
-          { name: 'আবু বকর সিদ্দীক', correct: Math.max(0, result.totalQuestions - 3), wrong: 2, score: Number((result.totalQuestions - 3 - 0.50).toFixed(2)) },
-          { name: 'সালমা বেগম', correct: Math.max(0, result.totalQuestions - 4), wrong: 3, score: Number((result.totalQuestions - 4 - 0.75).toFixed(2)) },
-          { name: 'মুহাম্মদ আব্দুল্লাহ', correct: Math.max(0, result.totalQuestions - 5), wrong: 4, score: Number((result.totalQuestions - 5 - 1.00).toFixed(2)) },
-          { name: 'আমেনা খাতুন', correct: Math.max(0, result.totalQuestions - 6), wrong: 4, score: Number((result.totalQuestions - 6 - 1.00).toFixed(2)) },
-        ];
+        const examIdToFetch = result.examId || result.selectedSubject || 'general';
 
-        // Merge user into ranking
-        const allCandidates: { name: string; avatar?: string; isUser: boolean; correct: number; wrong: number; score: number }[] = [
-          ...defaultParticipants.map(p => ({
-            name: p.name,
-            isUser: false,
-            correct: p.correct,
-            wrong: p.wrong,
-            score: p.score
-          })),
-          {
+        // 1. Fetch real leaderboard entries from RPC and server
+        const [rpcEntries, generalEntries] = await Promise.all([
+          getExamLeaderboard(examIdToFetch),
+          fetchLeaderboardEntriesFromSupabase(examIdToFetch),
+        ]);
+
+        // Map real participants by unique user ID or name
+        const candidatesMap = new Map<string, {
+          name: string;
+          avatar?: string;
+          isUser: boolean;
+          correct: number;
+          wrong: number;
+          score: number;
+          userId?: string;
+        }>();
+
+        // Add from RPC
+        for (const item of rpcEntries) {
+          const rawName = (item.full_name || '').trim();
+          if (!rawName) continue;
+          const isUser = Boolean(
+            (item.user_id && currentUserId && item.user_id === currentUserId) ||
+            (rawName.toLowerCase() === currentUserName.toLowerCase())
+          );
+          const key = (item.user_id && item.user_id.trim()) ? item.user_id.trim() : rawName.toLowerCase();
+          candidatesMap.set(key, {
+            name: isUser ? currentUserName : rawName,
+            avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
+            isUser,
+            correct: Number(item.correct_answers ?? item.score ?? 0),
+            wrong: Number(item.wrong_answers ?? 0),
+            score: Number(item.score ?? 0),
+            userId: item.user_id,
+          });
+        }
+
+        // Add from general entries if matching exam
+        for (const entry of generalEntries) {
+          const eId = (entry.exam_id || '').toLowerCase().trim();
+          const eTitle = (entry.exam_title || '').toLowerCase().trim();
+          const target = examIdToFetch.toLowerCase().trim();
+          const isMatch =
+            !target || target === 'all' ||
+            eId === target || eTitle === target ||
+            (eId && (eId.includes(target) || target.includes(eId))) ||
+            (eTitle && (eTitle.includes(target) || target.includes(eTitle)));
+
+          if (isMatch) {
+            const rawName = (entry.user_name || '').trim();
+            if (!rawName) continue;
+            const isUser = Boolean(
+              (entry.user_id && currentUserId && entry.user_id === currentUserId) ||
+              (rawName.toLowerCase() === currentUserName.toLowerCase())
+            );
+            const key = (entry.user_id && entry.user_id.trim()) ? entry.user_id.trim() : rawName.toLowerCase();
+            const existing = candidatesMap.get(key);
+            if (!existing || entry.score > existing.score) {
+              candidatesMap.set(key, {
+                name: isUser ? currentUserName : rawName,
+                avatar: isUser ? (currentUserAvatar || entry.user_avatar) : entry.user_avatar,
+                isUser,
+                correct: Number(entry.correct_count ?? entry.score ?? 0),
+                wrong: Number(entry.wrong_count ?? 0),
+                score: Number(entry.score ?? 0),
+                userId: entry.user_id,
+              });
+            }
+          }
+        }
+
+        // Always ensure current user's latest result is included
+        const userKey = currentUserId || currentUserName.toLowerCase();
+        const existingUser = candidatesMap.get(userKey);
+        if (!existingUser || obtainedMarksVal >= existingUser.score) {
+          candidatesMap.set(userKey, {
             name: currentUserName,
             avatar: currentUserAvatar,
             isUser: true,
             correct: result.correctCount,
             wrong: result.wrongCount,
-            score: obtainedMarksVal
-          }
-        ];
+            score: obtainedMarksVal,
+            userId: currentUserId,
+          });
+        }
+
+        const allCandidates = Array.from(candidatesMap.values());
 
         // Sort descending by score, then by correct count
         allCandidates.sort((a, b) => {

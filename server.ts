@@ -50,16 +50,25 @@ interface ServerExamResult {
 let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 let serverExamResultsStore: ServerExamResult[] = [];
 
-// Remove any existing leaderboard files on disk to ensure clean start
+// Load existing leaderboard files from disk on startup
 try {
   if (fs.existsSync(LEADERBOARD_FILE_PATH)) {
-    fs.unlinkSync(LEADERBOARD_FILE_PATH);
-  }
-  if (fs.existsSync(EXAM_RESULTS_FILE_PATH)) {
-    fs.unlinkSync(EXAM_RESULTS_FILE_PATH);
+    const raw = fs.readFileSync(LEADERBOARD_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverLeaderboardStore = parsed;
   }
 } catch (err) {
-  console.warn('Resetting leaderboard stores on disk:', err);
+  console.warn('Could not load leaderboard_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(EXAM_RESULTS_FILE_PATH)) {
+    const raw = fs.readFileSync(EXAM_RESULTS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverExamResultsStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load exam_results_store.json:', err);
 }
 
 function saveLeaderboardStoreToDisk() {
@@ -166,20 +175,27 @@ app.post('/api/exam_results', (req, res) => {
 // RPC API: Get leaderboard for a specific exam
 app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
   try {
-    const examId = String(req.query.p_exam_id || req.query.exam_id || '').trim();
+    const examId = String(req.query.p_exam_id || req.query.exam_id || '').trim().toLowerCase();
     if (!examId || examId === 'all') {
       return res.json({ success: true, data: [] });
     }
 
     // Filter matching exam results
-    const matching = serverExamResultsStore.filter(
-      (r) => r.exam_id === examId || (r.exam_title && r.exam_title === examId)
-    );
+    const matching = serverExamResultsStore.filter((r) => {
+      const eId = (r.exam_id || '').toLowerCase().trim();
+      const eTitle = (r.exam_title || '').toLowerCase().trim();
+      return (
+        eId === examId ||
+        eTitle === examId ||
+        (eId && (eId.includes(examId) || examId.includes(eId))) ||
+        (eTitle && (eTitle.includes(examId) || examId.includes(eTitle)))
+      );
+    });
 
-    // Keep best result per distinct user_id
+    // Keep best result per distinct user_id or full_name
     const userBestMap = new Map<string, ServerExamResult>();
     for (const r of matching) {
-      const uKey = r.user_id || r.full_name;
+      const uKey = (r.user_id && r.user_id.trim()) ? r.user_id.trim() : (r.full_name || '').toLowerCase().trim();
       const existing = userBestMap.get(uKey);
       if (!existing) {
         userBestMap.set(uKey, r);
