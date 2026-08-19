@@ -1,15 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   User, Phone, Camera, Check, X, Sparkles, Trophy, Award, 
   BarChart3, Settings, Upload, Crown, Flame, Target, CheckCircle2, 
   ChevronRight, BookOpen, Bookmark, AlertTriangle, RotateCcw, 
-  LayoutGrid, Mail, Star, ExternalLink, SlidersHorizontal, ArrowLeft
+  LayoutGrid, Mail, Star, ExternalLink, SlidersHorizontal, ArrowLeft,
+  LogIn, LogOut
 } from 'lucide-react';
 import { 
   saveUserProfile, UserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
   getBookmarkedIds 
 } from '../lib/utils';
+import { 
+  supabaseGetSession, 
+  supabaseSignOut, 
+  supabaseOnAuthStateChange 
+} from '../lib/supabase';
+import { AuthModal } from './AuthModal';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -46,6 +53,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Supabase Auth State
+  const [authSession, setAuthSession] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+
+  useEffect(() => {
+    supabaseGetSession().then((session) => {
+      setAuthSession(session);
+    });
+
+    const unsubscribe = supabaseOnAuthStateChange((_event, session) => {
+      setAuthSession(session);
+      if (session?.user) {
+        const prof = getUserProfile();
+        if (prof) {
+          setName(prof.name);
+          setPhone(prof.phone);
+          setAvatar(prof.avatar);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabaseSignOut();
+    setAuthSession(null);
+    setSuccessMsg('সফলভাবে লগআউট হয়েছে');
+    setTimeout(() => setSuccessMsg(''), 2000);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentStats = getStudentStats();
@@ -345,6 +384,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-400" />
               </button>
+
+              {/* Item 10: Auth (Login / Register / Logout) */}
+              {authSession?.user ? (
+                <button
+                  onClick={handleSignOut}
+                  className="w-full p-3.5 sm:p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-rose-200/70 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center shrink-0">
+                      <LogOut className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-sm font-black block">লগআউট করুন</span>
+                      <span className="text-[10px] font-bold text-rose-500/80">
+                        {authSession.user.email || 'সক্রিয় অ্যাকাউন্ট'}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-rose-400" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAuthInitialMode('login');
+                    setShowAuthModal(true);
+                  }}
+                  className="w-full p-3.5 sm:p-4 rounded-2xl bg-[#07532B]/10 dark:bg-[#07532B]/20 hover:bg-[#07532B]/20 text-[#07532B] dark:text-emerald-300 border border-[#07532B]/30 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#07532B] text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <LogIn className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-sm font-black block">লগইন / নতুন অ্যাকাউন্ট তৈরি করুন</span>
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        আত-তামরীন অ্যাকাউন্টে প্রবেশ করুন
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-[#07532B] dark:text-emerald-400" />
+                </button>
+              )}
             </div>
           )}
 
@@ -590,6 +671,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         </div>
       </div>
+
+      {/* Auth Modal (Login / Register / Forgot Password) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authInitialMode}
+        onAuthSuccess={(profile) => {
+          setName(profile.name);
+          setPhone(profile.phone);
+          if (profile.avatar) setAvatar(profile.avatar);
+          setShowAuthModal(false);
+        }}
+      />
     </div>
   );
 };
