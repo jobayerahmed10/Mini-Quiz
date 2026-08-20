@@ -13,9 +13,12 @@ import { ProfileModal } from './components/ProfileModal';
 import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { UserRegistrationModal } from './components/UserRegistrationModal';
+import { AuthModal } from './components/AuthModal';
+import { SharedExamEntranceCard } from './components/SharedExamEntranceCard';
+import { RegistrationPromptModal } from './components/RegistrationPromptModal';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { fetchPublishedQuestions, fetchExamsFromSupabase, saveLeaderboardEntryToSupabase, submitExamResultToSupabase, LeaderboardEntry } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile } from './lib/utils';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
@@ -53,6 +56,24 @@ export default function App() {
   const [resultViewMode, setResultViewMode] = useState<'summary' | 'explanation'>('summary');
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+
+  // Authentication & Registration Gating State
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showRegPromptModal, setShowRegPromptModal] = useState<boolean>(false);
+  const [pendingTabAfterAuth, setPendingTabAfterAuth] = useState<TabRoute | null>(null);
+
+  // Big Card Landing State for Shared Exams
+  const [sharedExamData, setSharedExamData] = useState<{
+    examId?: string;
+    title: string;
+    subject?: string;
+    category?: string;
+    instructor?: string;
+    institution?: string;
+    timeMinutes?: number;
+    questionCount?: number;
+    negativeMark?: string | number;
+  } | null>(null);
 
   // Direct Exam Deep-linking & Auth Modal State
   const [showDirectRegModal, setShowDirectRegModal] = useState<boolean>(false);
@@ -122,7 +143,7 @@ export default function App() {
     loadQuestions();
   }, [loadQuestions]);
 
-  // Deep Link support: Auto-detect ?exam=... or ?examId=... in URL
+  // Deep Link support: Auto-detect ?exam=... or ?examId=... in URL and show Big Entrance Card
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -135,29 +156,30 @@ export default function App() {
           (e) => e.id === examQuery || e.title === examQuery || e.subject === examQuery
         );
 
-        const targetOpts = found
-          ? {
-              examId: found.id,
-              subject: found.subject,
-              questionCount: found.question_count,
-              timeMinutes: found.time_minutes,
-              examType: found.title,
-            }
-          : {
-              examId: examQuery,
-              subject: examQuery,
-              questionCount: 25,
-              timeMinutes: 20,
-              examType: examQuery,
-            };
-
-        const profile = getUserProfile();
-        if (profile && profile.name && profile.name.trim() !== '') {
-          handleStartPractice(targetOpts);
+        if (found) {
+          setSharedExamData({
+            examId: found.id,
+            title: found.title,
+            subject: found.subject,
+            category: found.subject.includes('বাংলা') ? 'BENGALI LESSON' : 'EXAM LESSON',
+            instructor: 'প্রভাষক আরবি',
+            institution: 'আত-তামরীন একাডেমি',
+            timeMinutes: found.time_minutes || 5,
+            questionCount: found.question_count || 20,
+            negativeMark: '-০.২৫',
+          });
         } else {
-          // Direct to Account Creation Form
-          setPendingDirectExamOpts(targetOpts);
-          setShowDirectRegModal(true);
+          setSharedExamData({
+            examId: examQuery,
+            title: examQuery,
+            subject: examQuery,
+            category: examQuery.includes('বাংলা') ? 'BENGALI LESSON' : 'EXAM LESSON',
+            instructor: 'প্রভাষক আরবি',
+            institution: 'আত-তামরীন একাডেমি',
+            timeMinutes: 5,
+            questionCount: 20,
+            negativeMark: '-০.২৫',
+          });
         }
       });
     }
@@ -360,6 +382,14 @@ export default function App() {
   };
 
   const handleTabChange = (tab: TabRoute) => {
+    // Check if user is registered for protected features / tabs
+    const registered = isUserRegistered();
+    if (!registered && tab !== 'home' && tab !== 'exam') {
+      setPendingTabAfterAuth(tab);
+      setShowRegPromptModal(true);
+      return;
+    }
+
     navigateWithHistory('home', tab);
   };
 
@@ -404,6 +434,7 @@ export default function App() {
         showHarakat={showHarakat}
         onChangeShowHarakat={setShowHarakat}
         onOpenProfile={() => setCurrentPage('profile')}
+        onOpenLogin={() => setShowAuthModal(true)}
         onOpenLeaderboard={handleOpenLeaderboard}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -479,7 +510,10 @@ export default function App() {
             {activeTab === 'exam' && (
               <ExamPage
                 questions={questions}
-                onStartExam={(opts) => handleStartPractice(opts)}
+                onStartExam={(opts) => {
+                  // If opening an entrance preview, show the card or start directly
+                  handleStartPractice(opts);
+                }}
                 onOpenLeaderboard={handleOpenLeaderboard}
                 onReviewAnswers={(opts) => handleReviewAnswers(opts)}
               />
@@ -513,6 +547,69 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Big Card Landing Modal for Shared Exam Links */}
+      {sharedExamData && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in"
+          onClick={() => setSharedExamData(null)}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl">
+            <SharedExamEntranceCard
+              examId={sharedExamData.examId}
+              title={sharedExamData.title}
+              subject={sharedExamData.subject}
+              category={sharedExamData.category}
+              instructor={sharedExamData.instructor}
+              institution={sharedExamData.institution}
+              timeMinutes={sharedExamData.timeMinutes}
+              questionCount={sharedExamData.questionCount}
+              negativeMark={sharedExamData.negativeMark}
+              onClose={() => setSharedExamData(null)}
+              onStartExam={(studentName) => {
+                const targetExam = sharedExamData;
+                setSharedExamData(null);
+                handleStartPractice({
+                  subject: targetExam.subject || 'সকল বিষয়',
+                  examId: targetExam.examId,
+                  examType: targetExam.title,
+                  timeMinutes: targetExam.timeMinutes || 5,
+                  questionCount: targetExam.questionCount || 20,
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Registration Prompt Modal for Locked / Study Tabs */}
+      <RegistrationPromptModal
+        isOpen={showRegPromptModal}
+        onClose={() => {
+          setShowRegPromptModal(false);
+          setPendingTabAfterAuth(null);
+        }}
+        onConfirm={() => {
+          setShowRegPromptModal(false);
+          setShowAuthModal(true);
+        }}
+      />
+
+      {/* Primary Authentication & Registration Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+        }}
+        initialMode="login"
+        onAuthSuccess={(profile) => {
+          setShowAuthModal(false);
+          if (pendingTabAfterAuth) {
+            navigateWithHistory('home', pendingTabAfterAuth);
+            setPendingTabAfterAuth(null);
+          }
+        }}
+      />
 
       {/* Direct Exam Access Registration Modal */}
       <UserRegistrationModal

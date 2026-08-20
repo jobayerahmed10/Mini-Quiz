@@ -9,7 +9,7 @@ import {
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
-  getBookmarkedIds 
+  getBookmarkedIds, isUserRegistered, clearUserProfile, UserProfile
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -41,12 +41,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onOpenCourses,
   onOpenFontSettings,
 }) => {
-  const currentProfile = getUserProfile();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
+  const [isRegistered, setIsRegistered] = useState<boolean>(() => isUserRegistered());
+
   const [activeTab, setActiveTab] = useState<'menu' | 'edit_profile' | 'dashboard' | 'bookmarks' | 'wrong_bank' | 'archive' | 'vip_membership' | 'applications'>('menu');
   
-  const [name, setName] = useState(currentProfile?.name || 'জোবায়ের আহমদ');
-  const [phone, setPhone] = useState(currentProfile?.phone || '01700000000');
-  const [avatar, setAvatar] = useState(currentProfile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250');
+  const [name, setName] = useState(userProfile?.name || '');
+  const [phone, setPhone] = useState(userProfile?.phone || userProfile?.email || '');
+  const [avatar, setAvatar] = useState(userProfile?.avatar || '');
   const [goalText, setGoalText] = useState(getUserGoal());
 
   const [errorMsg, setErrorMsg] = useState('');
@@ -64,24 +66,56 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
     const unsubscribe = supabaseOnAuthStateChange((_event, session) => {
       setAuthSession(session);
-      if (session?.user) {
-        const prof = getUserProfile();
-        if (prof) {
-          setName(prof.name);
-          setPhone(prof.phone);
-          setAvatar(prof.avatar);
-        }
+      const prof = getUserProfile();
+      if (prof) {
+        setUserProfile(prof);
+        setIsRegistered(true);
+        setName(prof.name);
+        setPhone(prof.phone || prof.email || '');
+        setAvatar(prof.avatar || '');
       }
     });
 
-    return () => unsubscribe();
+    const handleProfileSync = () => {
+      const p = getUserProfile();
+      setUserProfile(p);
+      const reg = isUserRegistered();
+      setIsRegistered(reg);
+      if (p) {
+        setName(p.name);
+        setPhone(p.phone || p.email || '');
+        setAvatar(p.avatar || '');
+      } else {
+        setName('');
+        setPhone('');
+        setAvatar('');
+      }
+    };
+
+    window.addEventListener('tamreen_profile_updated', handleProfileSync);
+    window.addEventListener('tamreen_auth_status_changed', handleProfileSync);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('tamreen_profile_updated', handleProfileSync);
+      window.removeEventListener('tamreen_auth_status_changed', handleProfileSync);
+    };
   }, []);
 
   const handleSignOut = async () => {
     await supabaseSignOut();
+    clearUserProfile();
     setAuthSession(null);
+    setIsRegistered(false);
+    setUserProfile(null);
+    setName('');
+    setPhone('');
+    setAvatar('');
     setSuccessMsg('সফলভাবে লগআউট হয়েছে');
-    setTimeout(() => setSuccessMsg(''), 2000);
+    setTimeout(() => {
+      setSuccessMsg('');
+      onNavigateHome();
+    }, 800);
   };
 
   // Course Applications State from Supabase
@@ -184,7 +218,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             <span className="text-xs font-black px-3 py-1.5 bg-amber-400 text-[#0B132B] rounded-full flex items-center gap-1.5 shadow-md">
               <Crown className="w-4 h-4 fill-[#0B132B]" />
-              VIP মেম্বারশিপ অ্যাক্টিভ
+              {isRegistered ? 'VIP মেম্বারশিপ অ্যাক্টিভ' : 'গেস্ট অ্যাকাউন্ট'}
             </span>
           </div>
 
@@ -194,7 +228,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               {avatar ? (
                 <img
                   src={avatar}
-                  alt={name}
+                  alt={name || 'User'}
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-4 ring-amber-400/90 shadow-2xl border-2 border-white/20"
                 />
               ) : (
@@ -202,28 +236,45 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <User className="w-10 h-10" />
                 </div>
               )}
-              <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-amber-400 text-[#0B132B] rounded-full flex items-center justify-center shadow-lg border-2 border-[#095748]">
-                <Crown className="w-4.5 h-4.5 fill-[#0B132B]" />
-              </div>
+              {isRegistered && (
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-amber-400 text-[#0B132B] rounded-full flex items-center justify-center shadow-lg border-2 border-[#095748]">
+                  <Crown className="w-4.5 h-4.5 fill-[#0B132B]" />
+                </div>
+              )}
             </div>
 
             <div className="min-w-0 flex-1 space-y-1">
               <span className="inline-block text-[10px] font-black px-2.5 py-0.5 bg-amber-400/20 border border-amber-400/30 text-amber-300 rounded-md tracking-wider uppercase font-anek">
-                শিক্ষক নিবন্ধন পরীক্ষার্থী
+                {isRegistered ? 'শিক্ষক নিবন্ধন পরীক্ষার্থী' : 'অনিবন্ধিত শিক্ষার্থী'}
               </span>
               <h1 className="text-2xl sm:text-3xl font-black font-tiro text-amber-300 tracking-wide truncate leading-tight drop-shadow-md">
-                {name || 'জোবায়ের আহমদ'}
+                {isRegistered ? (name || 'শিক্ষার্থী') : 'অতিথি শিক্ষার্থী'}
               </h1>
               <p className="text-xs sm:text-sm font-semibold text-emerald-100/90 truncate">
-                {phone ? `${phone} • tamreen.app` : 'jobayer.tamreen@gmail.com'}
+                {isRegistered 
+                  ? (phone ? `${phone} • tamreen.app` : 'নিবন্ধিত শিক্ষার্থী')
+                  : 'লগইন বা রেজিষ্ট্রেশন করা নেই'}
               </p>
-              <button
-                onClick={() => setActiveTab('edit_profile')}
-                className="mt-1.5 inline-flex items-center gap-1 text-xs font-extrabold text-amber-300 hover:text-amber-200 underline cursor-pointer"
-              >
-                <span>প্রোফাইল সংশোধন করুন</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              {isRegistered ? (
+                <button
+                  onClick={() => setActiveTab('edit_profile')}
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-extrabold text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                >
+                  <span>প্রোফাইল সংশোধন করুন</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAuthInitialMode('login');
+                    setShowAuthModal(true);
+                  }}
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-extrabold text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                >
+                  <span>এখনই লগইন করুন</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -430,7 +481,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </button>
 
             {/* 10. Login / Create Account OR Sign Out */}
-            {authSession?.user ? (
+            {isRegistered ? (
               <button
                 onClick={handleSignOut}
                 className="w-full p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"
@@ -442,7 +493,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <div className="text-left">
                     <span className="text-base font-black block">লগআউট করুন</span>
                     <span className="text-xs font-semibold text-rose-500/80">
-                      {authSession.user.email || 'বর্তমানে সক্রিয় অ্যাকাউন্ট'}
+                      {phone || userProfile?.email || authSession?.user?.email || 'অ্যাকাউন্ট থেকে প্রস্থান করুন'}
                     </span>
                   </div>
                 </div>

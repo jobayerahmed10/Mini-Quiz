@@ -177,6 +177,25 @@ export interface UserProfile {
   name: string;
   phone: string;
   avatar?: string;
+  email?: string;
+  isRegistered?: boolean;
+}
+
+export function isUserRegistered(): boolean {
+  try {
+    const data = localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!data) return false;
+    const parsed = JSON.parse(data);
+    if (!parsed || !parsed.name) return false;
+    if (parsed.isRegistered === true) return true;
+    if (parsed.phone && parsed.phone.trim().length >= 6) return true;
+    if (parsed.email && parsed.email.includes('@') && !parsed.email.endsWith('@attamreen.academy')) return true;
+    const authStatus = localStorage.getItem('tamreen_user_auth_status');
+    if (authStatus === 'registered' || authStatus === 'logged_in') return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 export function getUserUniqueId(): string {
@@ -202,6 +221,8 @@ export function getUserProfile(): UserProfile | null {
         name: parsed.name.trim(),
         phone: parsed.phone ? parsed.phone.trim() : '',
         avatar: parsed.avatar || '',
+        email: parsed.email || '',
+        isRegistered: Boolean(parsed.isRegistered || (parsed.phone && parsed.phone.length >= 6)),
       };
     }
     return null;
@@ -210,17 +231,28 @@ export function getUserProfile(): UserProfile | null {
   }
 }
 
-export function saveUserProfile(name: string, phone: string, avatar?: string): UserProfile {
+export function saveUserProfile(
+  name: string, 
+  phone: string = '', 
+  avatar?: string, 
+  isRegistered: boolean = true, 
+  email?: string
+): UserProfile {
   const previousProfile = getUserProfile();
   const oldName = previousProfile?.name?.trim()?.toLowerCase();
 
   const profile: UserProfile = {
     name: name.trim(),
-    phone: phone.trim(),
+    phone: phone ? phone.trim() : '',
     avatar: avatar || '',
+    email: email || '',
+    isRegistered: isRegistered,
   };
   try {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    if (isRegistered) {
+      localStorage.setItem('tamreen_user_auth_status', 'registered');
+    }
   } catch {
     // ignore localstorage errors
   }
@@ -276,6 +308,28 @@ export function saveUserProfile(name: string, phone: string, avatar?: string): U
   }
 
   return profile;
+}
+
+export function clearUserProfile(): void {
+  try {
+    localStorage.removeItem(PROFILE_STORAGE_KEY);
+    localStorage.removeItem('tamreen_user_auth_status');
+    localStorage.removeItem('tamreen_auth_token');
+    localStorage.removeItem('supabase_auth_session');
+  } catch {
+    // ignore
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('tamreen_profile_updated'));
+    window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+    if ('BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('tamreen_leaderboard_channel');
+        bc.postMessage({ type: 'AUTH_LOGOUT' });
+        bc.close();
+      } catch {}
+    }
+  }
 }
 
 /**

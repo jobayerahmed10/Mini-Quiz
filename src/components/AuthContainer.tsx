@@ -118,8 +118,11 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
       const name = profile.full_name || userMeta.full_name || 'শিক্ষার্থী';
       const phone = profile.phone || userMeta.phone || (cleanIdentifier.includes('@') ? '' : cleanIdentifier);
       const avatar = profile.avatar_url || userMeta.avatar_url || '';
+      const email = profile.email || userMeta.email || (cleanIdentifier.includes('@') ? cleanIdentifier : '');
 
-      const saved = saveUserProfile(name, phone, avatar);
+      const saved = saveUserProfile(name, phone, avatar, true, email);
+      window.dispatchEvent(new Event('tamreen_profile_updated'));
+      window.dispatchEvent(new Event('tamreen_auth_status_changed'));
       setSuccessMessage('স্বাগতম! আপনি সফলভাবে লগইন করেছেন।');
 
       setTimeout(() => {
@@ -194,7 +197,9 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         return;
       }
 
-      const saved = saveUserProfile(cleanName, cleanPhone || cleanEmail, '');
+      const saved = saveUserProfile(cleanName, cleanPhone, '', true, cleanEmail);
+      window.dispatchEvent(new Event('tamreen_profile_updated'));
+      window.dispatchEvent(new Event('tamreen_auth_status_changed'));
 
       if (res.needsEmailConfirmation) {
         setSuccessMessage('অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! আপনার ইমেইলে ভেরিফিকেশন লিংক পাঠানো হয়েছে।');

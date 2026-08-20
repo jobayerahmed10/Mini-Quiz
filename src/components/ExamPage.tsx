@@ -31,6 +31,7 @@ import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase }
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
+import { SharedExamEntranceCard } from './SharedExamEntranceCard';
 
 interface ExamStartOptions {
   examId?: string;
@@ -82,7 +83,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [activeShareExam, setActiveShareExam] = useState<ExamItem | null>(null);
   const [shareToast, setShareToast] = useState(false);
 
-  // Registration modal for users entering exam
+  // Shared Exam Big Entrance Card state
+  const [previewEntranceExam, setPreviewEntranceExam] = useState<ExamItem | null>(null);
   const [showRegModal, setShowRegModal] = useState(false);
   const [pendingStartOpts, setPendingStartOpts] = useState<ExamStartOptions | null>(null);
 
@@ -91,8 +93,14 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     if (profile && profile.name) {
       onStartExam(opts);
     } else {
-      setPendingStartOpts(opts);
-      setShowRegModal(true);
+      // Find matching exam item to display the rich entrance card
+      const foundExam = exams.find(e => e.id === opts.examId || e.title === opts.examType);
+      if (foundExam) {
+        setPreviewEntranceExam(foundExam);
+      } else {
+        setPendingStartOpts(opts);
+        setShowRegModal(true);
+      }
     }
   };
 
@@ -594,6 +602,40 @@ export const ExamPage: React.FC<ExamPageProps> = ({
           })
         )}
       </div>
+
+      {/* Big Card Landing Modal for Exam Entrance */}
+      {previewEntranceExam && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in"
+          onClick={() => setPreviewEntranceExam(null)}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl">
+            <SharedExamEntranceCard
+              examId={previewEntranceExam.id}
+              title={previewEntranceExam.title}
+              subject={previewEntranceExam.subject}
+              category={previewEntranceExam.subject.includes('বাংলা') ? 'BENGALI LESSON' : 'EXAM LESSON'}
+              instructor="প্রভাষক আরবি"
+              institution="আত-তামরীন একাডেমি"
+              timeMinutes={previewEntranceExam.time_minutes || 5}
+              questionCount={previewEntranceExam.question_count || 20}
+              negativeMark="-০.২৫"
+              onClose={() => setPreviewEntranceExam(null)}
+              onStartExam={(studentName) => {
+                const targetExam = previewEntranceExam;
+                setPreviewEntranceExam(null);
+                onStartExam({
+                  examId: targetExam.id,
+                  subject: targetExam.subject,
+                  questionCount: targetExam.question_count,
+                  timeMinutes: targetExam.time_minutes,
+                  examType: targetExam.title,
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* User Registration Modal before starting exam */}
       <UserRegistrationModal

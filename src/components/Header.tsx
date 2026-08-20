@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sun, 
   Moon, 
@@ -18,10 +18,15 @@ import {
   FileText,
   BookOpen,
   Briefcase,
-  Layers
+  Layers,
+  LogIn,
+  UserPlus,
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 import { PageRoute, TabRoute } from '../types';
-import { getUserProfile } from '../lib/utils';
+import { getUserProfile, isUserRegistered, clearUserProfile, UserProfile } from '../lib/utils';
+import { supabaseSignOut } from '../lib/supabase';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
@@ -41,6 +46,7 @@ interface HeaderProps {
   showHarakat: boolean;
   onChangeShowHarakat: (show: boolean) => void;
   onOpenProfile?: () => void;
+  onOpenLogin?: () => void;
   onOpenLeaderboard?: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
@@ -62,14 +68,30 @@ export const Header: React.FC<HeaderProps> = ({
   showHarakat,
   onChangeShowHarakat,
   onOpenProfile,
+  onOpenLogin,
   onOpenLeaderboard,
   searchQuery = '',
   onSearchChange,
 }) => {
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
+  const [isRegistered, setIsRegistered] = useState<boolean>(() => isUserRegistered());
 
-  const userProfile = getUserProfile();
+  // Listen for realtime auth and profile updates
+  useEffect(() => {
+    const handleProfileSync = () => {
+      setUserProfile(getUserProfile());
+      setIsRegistered(isUserRegistered());
+    };
+
+    window.addEventListener('tamreen_profile_updated', handleProfileSync);
+    window.addEventListener('tamreen_auth_status_changed', handleProfileSync);
+    return () => {
+      window.removeEventListener('tamreen_profile_updated', handleProfileSync);
+      window.removeEventListener('tamreen_auth_status_changed', handleProfileSync);
+    };
+  }, []);
 
   const isAtHomeRoot = currentPage === 'home' && activeTab === 'home';
 
@@ -332,32 +354,54 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* User Profile / Circular Avatar Button */}
+          {/* User Profile OR Login Button */}
           <div className="relative">
-            <button
-              onClick={() => {
-                if (onOpenProfile) {
-                  onOpenProfile();
-                } else {
-                  setShowUserMenu(!showUserMenu);
-                }
-                setShowFontMenu(false);
-              }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
-              title="ব্যবহারকারীর প্রোফাইল ও মেনু"
-            >
-              {userProfile?.avatar ? (
-                <img
-                  src={userProfile.avatar}
-                  alt={userProfile.name || 'User'}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
-                  <User className="w-4 h-4 text-amber-300" />
-                </div>
-              )}
-            </button>
+            {isRegistered ? (
+              /* Registered / Logged In: Show Circular Avatar with Gold Ring */
+              <button
+                onClick={() => {
+                  if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    setShowUserMenu(!showUserMenu);
+                  }
+                  setShowFontMenu(false);
+                }}
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                title="ব্যবহারকারীর প্রোফাইল ও মেনু"
+              >
+                {userProfile?.avatar ? (
+                  <img
+                    src={userProfile.avatar}
+                    alt={userProfile.name || 'User'}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
+                    <User className="w-4 h-4 text-amber-300" />
+                  </div>
+                )}
+              </button>
+            ) : (
+              /* Unregistered Guest: Show Prominent Bengali "লগইন" Button */
+              <button
+                onClick={() => {
+                  if (onOpenLogin) {
+                    onOpenLogin();
+                  } else if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    setShowUserMenu(!showUserMenu);
+                  }
+                  setShowFontMenu(false);
+                }}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#046A38] to-[#085a4a] hover:from-[#03542c] hover:to-[#064236] text-white font-hind font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(4,106,56,0.3)] hover:brightness-110 active:scale-95 transition-all border border-emerald-400/40 cursor-pointer shrink-0"
+                title="লগইন বা অ্যাকাউন্ট তৈরি করুন"
+              >
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" strokeWidth={2.4} />
+                <span className="whitespace-nowrap">লগইন</span>
+              </button>
+            )}
 
             {/* Top Right User Menu Dropdown Popover */}
             {showUserMenu && (
@@ -365,54 +409,101 @@ export const Header: React.FC<HeaderProps> = ({
                 isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
               }`}>
                 {/* User Header Profile Card */}
-                <div className="p-3.5 bg-gradient-to-r from-[#0b705c] via-[#085a4a] to-[#0B132B] text-white rounded-2xl mb-3 flex items-center gap-3 relative overflow-hidden shadow-xs border border-amber-400/30">
-                  {userProfile?.avatar ? (
-                    <img
-                      src={userProfile.avatar}
-                      alt={userProfile?.name || 'User'}
-                      className="w-12 h-12 rounded-2xl object-cover ring-2 ring-amber-400 border border-white/20 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center font-black text-lg border border-white/20 text-amber-300 shrink-0">
-                      <User className="w-6 h-6" />
+                {isRegistered ? (
+                  <div className="p-3.5 bg-gradient-to-r from-[#0b705c] via-[#085a4a] to-[#0B132B] text-white rounded-2xl mb-3 flex items-center gap-3 relative overflow-hidden shadow-xs border border-amber-400/30">
+                    {userProfile?.avatar ? (
+                      <img
+                        src={userProfile.avatar}
+                        alt={userProfile?.name || 'User'}
+                        className="w-12 h-12 rounded-2xl object-cover ring-2 ring-amber-400 border border-white/20 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center font-black text-lg border border-white/20 text-amber-300 shrink-0">
+                        <User className="w-6 h-6" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm sm:text-base font-black truncate text-amber-300 font-tiro tracking-wide drop-shadow-xs">
+                        {userProfile?.name || 'ব্যবহারকারীর নাম'}
+                      </h4>
+                      <p className="text-[11px] font-bold text-amber-200 truncate">
+                        {userProfile?.phone || userProfile?.email || 'নিবন্ধিত শিক্ষার্থী'}
+                      </p>
+                      <span className="inline-block mt-1 text-[9px] font-black px-2 py-0.5 bg-amber-400 text-[#0B132B] rounded-full">
+                        শিক্ষক নিবন্ধন পরীক্ষার্থী
+                      </span>
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm sm:text-base font-black truncate text-amber-300 font-tiro tracking-wide drop-shadow-xs">
-                      {userProfile?.name || 'ব্যবহারকারীর নাম নেই'}
-                    </h4>
-                    <p className="text-[11px] font-bold text-amber-200 truncate">
-                      {userProfile?.phone || 'ফোন নম্বর যুক্ত করুন'}
-                    </p>
-                    <span className="inline-block mt-1 text-[9px] font-black px-2 py-0.5 bg-amber-400 text-[#0B132B] rounded-full">
-                      শিক্ষক নিবন্ধন পরীক্ষার্থী
-                    </span>
+                    <button
+                      onClick={() => setShowUserMenu(false)}
+                      className="p-1 text-white/70 hover:text-white cursor-pointer absolute top-2 right-2"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowUserMenu(false)}
-                    className="p-1 text-white/70 hover:text-white cursor-pointer absolute top-2 right-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="p-4 bg-gradient-to-br from-slate-900 via-[#0B132B] to-[#064E3B] text-white rounded-2xl mb-3 relative overflow-hidden border border-emerald-500/30 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-amber-300 font-bold">
+                          <LogIn className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-white font-hind">লগইন করুন</h4>
+                          <p className="text-[11px] font-medium text-emerald-200/80">পড়াশোনা সুবিধা আনলক করুন</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowUserMenu(false)}
+                        className="p-1 text-white/70 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          if (onOpenLogin) onOpenLogin();
+                        }}
+                        className="py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>লগইন</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          if (onOpenLogin) onOpenLogin();
+                        }}
+                        className="py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-amber-300 font-black text-xs flex items-center justify-center gap-1.5 transition-all border border-white/20 cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>রেজিষ্ট্রেশন</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Menu Items List */}
                 <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      if (onOpenProfile) onOpenProfile();
-                    }}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-emerald-500/10 text-[#0b705c] dark:text-emerald-400">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="block font-black">👤 প্রোফাইল ও এডিট</span>
-                      <span className="block text-[10px] font-medium opacity-60">ছবি, নাম ও নম্বর পরিবর্তন</span>
-                    </div>
-                  </button>
+                  {isRegistered ? (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        if (onOpenProfile) onOpenProfile();
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
+                    >
+                      <div className="p-2 rounded-lg bg-emerald-500/10 text-[#0b705c] dark:text-emerald-400">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="block font-black">👤 প্রোফাইল ও এডিট</span>
+                        <span className="block text-[10px] font-medium opacity-60">ছবি, নাম ও নম্বর পরিবর্তন</span>
+                      </div>
+                    </button>
+                  ) : null}
 
                   <button
                     onClick={() => {
@@ -461,6 +552,26 @@ export const Header: React.FC<HeaderProps> = ({
                       <span className="block text-[10px] font-medium opacity-60">ফন্ট, হরকত ও ডিসপ্লে পরিবর্তন</span>
                     </div>
                   </button>
+
+                  {/* Log Out Button at the very bottom of the user menu */}
+                  {isRegistered && (
+                    <button
+                      onClick={async () => {
+                        setShowUserMenu(false);
+                        await supabaseSignOut();
+                        clearUserProfile();
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-1"
+                    >
+                      <div className="p-2 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="block font-black">🚪 লগআউট করুন</span>
+                        <span className="block text-[10px] font-medium opacity-60">অ্যাকাউন্ট থেকে প্রস্থান করুন</span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
