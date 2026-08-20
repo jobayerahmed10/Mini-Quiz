@@ -303,6 +303,9 @@ export function addCompletedExamId(examIdentifier: string): void {
     } catch {
       // ignore
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_exam_completed', { detail: { examIdentifier } }));
+    }
   }
 }
 

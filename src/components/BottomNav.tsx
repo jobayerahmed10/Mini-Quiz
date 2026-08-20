@@ -47,7 +47,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'subjects' as TabRoute,
-      label: 'বিষয়ভিত্তিক প্রস্তুতি',
+      label: 'বিষয়ভিত্তিক',
       icon: Layers,
     },
   ];

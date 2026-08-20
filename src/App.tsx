@@ -281,6 +281,10 @@ export default function App() {
       addCompletedExamId(activeExamId);
       saveExamResult(activeExamId, result);
     }
+    if (activeExamTitle) {
+      addCompletedExamId(activeExamTitle);
+      saveExamResult(activeExamTitle, result);
+    }
     if (selectedSubject) {
       saveExamResult(selectedSubject, result);
     }

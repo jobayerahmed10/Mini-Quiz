@@ -25,7 +25,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { Question, TabRoute } from '../types';
-import { toBengaliNumeral, getUserProfile, UserProfile } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
 import { ExamItem, fetchExamsFromSupabase } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 
@@ -61,6 +61,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     return [];
   });
 
+  const [completedRevision, setCompletedRevision] = useState(0);
   const [currentBannerSlide, setCurrentBannerSlide] = useState(0);
   const [showRegModal, setShowRegModal] = useState(false);
   const [pendingExamOpts, setPendingExamOpts] = useState<{
@@ -104,6 +105,23 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => clearInterval(timer);
   }, [bannerSlides.length]);
 
+  // Listen for exam completed events or storage changes to immediately remove completed exams from Home
+  useEffect(() => {
+    const handleExamCompleted = () => {
+      setCompletedRevision((r) => r + 1);
+    };
+
+    window.addEventListener('tamreen_exam_completed', handleExamCompleted);
+    window.addEventListener('storage', handleExamCompleted);
+    window.addEventListener('focus', handleExamCompleted);
+
+    return () => {
+      window.removeEventListener('tamreen_exam_completed', handleExamCompleted);
+      window.removeEventListener('storage', handleExamCompleted);
+      window.removeEventListener('focus', handleExamCompleted);
+    };
+  }, []);
+
   // Load latest exams from Supabase or cache
   useEffect(() => {
     fetchExamsFromSupabase().then((res) => {
@@ -135,8 +153,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   ];
 
-  // Combine database exams or fallback presets
-  const displayLiveExams = exams.length > 0 ? exams.slice(0, 4) : defaultLiveExams;
+  // Filter out any exam that the student has already taken; display at most 5 new exams
+  const allLiveExams = exams.length > 0 ? exams : defaultLiveExams;
+  const uncompletedLiveExams = allLiveExams.filter((exam) => !isExamCompleted(exam.id, exam.title));
+  const displayLiveExams = uncompletedLiveExams.slice(0, 5);
 
   const handleAttemptExam = (opts: {
     examId?: string;
@@ -482,71 +502,94 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
 
-        {/* Live Exam Cards List */}
-        <div className="space-y-3 sm:space-y-4">
-          {displayLiveExams.map((exam, idx) => {
-            const questionCount = exam.question_count || (exam.total_marks ? Number(exam.total_marks) : 10);
-            const timeMinutes = exam.time_minutes || 5;
-            const examineeCount = exam.examinee_count || '০+';
-            const subject = exam.subject || 'সাধারণ ও মাদ্রাসা কারিকুলাম';
+        {/* Live Exam Cards List or All Completed Notice */}
+        {displayLiveExams.length > 0 ? (
+          <div className="space-y-3 sm:space-y-4">
+            {displayLiveExams.map((exam, idx) => {
+              const questionCount = exam.question_count || (exam.total_marks ? Number(exam.total_marks) : 10);
+              const timeMinutes = exam.time_minutes || 5;
+              const examineeCount = exam.examinee_count || '০+';
+              const subject = exam.subject || 'সাধারণ ও মাদ্রাসা কারিকুলাম';
 
-            return (
-              <div 
-                key={exam.id || `live-exam-${idx}`}
-                className="neu-card !rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-3.5 hover:shadow-md transition-all"
-              >
-                {/* Top Info Row */}
-                <div className="flex items-start gap-3.5">
-                  {/* Left Squircle Document Icon */}
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center text-[#0b705c] dark:text-emerald-400 shrink-0 shadow-2xs">
-                    <FileText className="w-6 h-6" strokeWidth={2.2} />
-                  </div>
-
-                  <div className="min-w-0 flex-1 space-y-1">
-                    {/* Badge & Category Line */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 font-bold text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full">
-                        লাইভ এক্সাম
-                      </span>
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">
-                        সাধারণ ও মাদ্রাসা কারিকুলাম
-                      </span>
-                    </div>
-
-                    {/* Exam Title */}
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind leading-snug">
-                      {exam.title}
-                    </h3>
-
-                    {/* Metadata Line */}
-                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-2 sm:gap-3 flex-wrap">
-                      <span>পূর্ণমান: <strong className="font-bold text-slate-800 dark:text-slate-200">{toBengaliNumeral(questionCount)}</strong></span>
-                      <span>•</span>
-                      <span>সময়: <strong className="font-bold text-slate-800 dark:text-slate-200">{toBengaliNumeral(timeMinutes)} মিনিট</strong></span>
-                      <span>•</span>
-                      <span>অংশগ্রহণকারী: <strong className="font-bold text-slate-800 dark:text-slate-200">{examineeCount}</strong></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Full-Width Action Button */}
-                <button
-                  onClick={() => handleAttemptExam({
-                    examId: exam.id,
-                    subject: subject,
-                    questionCount: questionCount,
-                    timeMinutes: timeMinutes,
-                    examType: exam.title
-                  })}
-                  className="w-full py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all cursor-pointer"
+              return (
+                <div 
+                  key={exam.id || `live-exam-${idx}`}
+                  className="neu-card !rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-3.5 hover:shadow-md transition-all"
                 >
-                  <Zap className="w-4 h-4 fill-amber-300 text-amber-300 shrink-0" />
-                  <span>পরীক্ষায় অংশ নিন</span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  {/* Top Info Row */}
+                  <div className="flex items-start gap-3.5">
+                    {/* Left Squircle Document Icon */}
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center text-[#0b705c] dark:text-emerald-400 shrink-0 shadow-2xs">
+                      <FileText className="w-6 h-6" strokeWidth={2.2} />
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-1">
+                      {/* Badge & Category Line */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 font-bold text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full">
+                          লাইভ এক্সাম
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">
+                          সাধারণ ও মাদ্রাসা কারিকুলাম
+                        </span>
+                      </div>
+
+                      {/* Exam Title */}
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind leading-snug">
+                        {exam.title}
+                      </h3>
+
+                      {/* Metadata Line */}
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-2 sm:gap-3 flex-wrap">
+                        <span>পূর্ণমান: <strong className="font-bold text-slate-800 dark:text-slate-200">{toBengaliNumeral(questionCount)}</strong></span>
+                        <span>•</span>
+                        <span>সময়: <strong className="font-bold text-slate-800 dark:text-slate-200">{toBengaliNumeral(timeMinutes)} মিনিট</strong></span>
+                        <span>•</span>
+                        <span>অংশগ্রহণকারী: <strong className="font-bold text-slate-800 dark:text-slate-200">{examineeCount}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Full-Width Action Button */}
+                  <button
+                    onClick={() => handleAttemptExam({
+                      examId: exam.id,
+                      subject: subject,
+                      questionCount: questionCount,
+                      timeMinutes: timeMinutes,
+                      examType: exam.title
+                    })}
+                    className="w-full py-3 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 fill-amber-300 text-amber-300 shrink-0" />
+                    <span>পরীক্ষায় অংশ নিন</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="neu-card !rounded-3xl p-5 sm:p-6 text-center border border-slate-200/70 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center text-[#0b705c] dark:text-emerald-400 mx-auto shadow-2xs">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-hind">
+                চলমান সকল লাইভ মডেল টেস্ট আপনি সম্পন্ন করেছেন!
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                নতুন লাইভ মডেল টেস্ট প্রকাশিত হলে এখানে দেখতে পাবেন। আপনার পূর্ববর্তী পরীক্ষার ব্যাখ্যা সহ উত্তর ও মেধা তালিকা দেখতে 'পরীক্ষা দিন' ট্যাবে যান।
+              </p>
+            </div>
+            <button
+              onClick={() => onTabNavigate && onTabNavigate('exam')}
+              className="px-5 py-2.5 rounded-full bg-[#0b705c] hover:bg-[#085a4a] text-white font-black text-xs inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+            >
+              <span>পরীক্ষা দিন ট্যাবে যান</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ========================================================================= */}
