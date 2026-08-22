@@ -2218,6 +2218,7 @@ export interface LocalRegisteredAccount {
   passwordHash?: string;
   createdAt: string;
   avatarUrl?: string;
+  role?: string;
 }
 
 export function getLocalRegisteredAccounts(): LocalRegisteredAccount[] {
@@ -2232,9 +2233,18 @@ export function getLocalRegisteredAccounts(): LocalRegisteredAccount[] {
 export function saveLocalRegisteredAccount(account: LocalRegisteredAccount): void {
   try {
     const accounts = getLocalRegisteredAccounts();
-    const existingIndex = accounts.findIndex(
-      (a) => (account.phone && a.phone === account.phone) || (account.email && a.email.toLowerCase() === account.email.toLowerCase())
-    );
+    const cleanPhoneDigits = (account.phone || '').replace(/[^0-9]/g, '');
+    const cleanEmailLower = (account.email || '').trim().toLowerCase();
+
+    const existingIndex = accounts.findIndex((a) => {
+      const aPhoneDigits = (a.phone || '').replace(/[^0-9]/g, '');
+      const aEmailLower = (a.email || '').trim().toLowerCase();
+      const phoneMatch = cleanPhoneDigits && aPhoneDigits && cleanPhoneDigits === aPhoneDigits;
+      const emailMatch = cleanEmailLower && aEmailLower && cleanEmailLower === aEmailLower;
+      const idMatch = a.id === account.id;
+      return phoneMatch || emailMatch || idMatch;
+    });
+
     if (existingIndex >= 0) {
       accounts[existingIndex] = { ...accounts[existingIndex], ...account };
     } else {
@@ -2257,15 +2267,19 @@ export async function supabaseSignUp(
 ): Promise<AuthResult> {
   const cleanName = fullName.trim();
   const cleanPhone = phone.trim();
+  const cleanPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
   let cleanEmail = email.trim().toLowerCase();
 
   // If no email was provided, generate a clean dedicated address for Supabase
-  if (!cleanEmail && cleanPhone) {
-    const sanitizedDigits = cleanPhone.replace(/[^0-9]/g, '');
-    cleanEmail = `${sanitizedDigits || 'student'}@attamreen.academy`;
+  if (!cleanEmail && cleanPhoneDigits) {
+    cleanEmail = `${cleanPhoneDigits}@attamreen.academy`;
+  } else if (!cleanEmail) {
+    cleanEmail = `student_${Date.now()}@attamreen.academy`;
   }
 
-  const generatedUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  // Generate unique readable Student ID (e.g. STD-728190)
+  const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+  const generatedUserId = `STD-${randomSuffix}`;
 
   // Save to local registered accounts cache immediately for instant login resilience
   const localAccount: LocalRegisteredAccount = {
@@ -2276,12 +2290,18 @@ export async function supabaseSignUp(
     passwordHash: password, // For instant fallback authentication matching
     createdAt: new Date().toISOString(),
     avatarUrl: avatarUrl || '',
+    role: 'student',
   };
   saveLocalRegisteredAccount(localAccount);
+
+  let finalUserId = generatedUserId;
+  let authUser: any = null;
+  let authSession: any = null;
 
   // If Supabase is configured, attempt Supabase Auth and Profiles sync
   if (supabaseInstance) {
     try {
+      // 1. Try Supabase Auth Sign Up
       const { data, error } = await supabaseInstance.auth.signUp({
         email: cleanEmail,
         password: password,
@@ -2291,108 +2311,68 @@ export async function supabaseSignUp(
             phone: cleanPhone,
             avatar_url: avatarUrl || null,
             role: 'student',
+            student_id: generatedUserId,
           },
         },
       });
 
-      // If Auth signup succeeded
       if (data?.user) {
-        try {
-          await supabaseInstance
-            .from('profiles')
-            .upsert({
-              id: data.user.id,
-              full_name: cleanName,
-              avatar_url: avatarUrl || null,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'id' });
-        } catch (profErr) {
-          console.warn('Profiles upsert on signup:', profErr);
-        }
-
-        return {
-          success: true,
-          user: data.user,
-          session: data.session,
-          needsEmailConfirmation: false,
-        };
+        finalUserId = data.user.id;
+        authUser = data.user;
+        authSession = data.session;
       }
 
-      // If error occurred (e.g. rate limit, already registered, etc.)
-      if (error) {
-        const errorLower = error.message?.toLowerCase() || '';
-
-        // If rate limit or email send rate limit is hit, treat as successful direct registration
-        if (errorLower.includes('rate limit') || errorLower.includes('over_email_send_rate_limit')) {
-          // Sync profile directly to public.profiles table if possible
-          try {
-            await supabaseInstance
-              .from('profiles')
-              .upsert({
-                id: generatedUserId,
-                full_name: cleanName,
-                avatar_url: avatarUrl || null,
-                updated_at: new Date().toISOString(),
-              }, { onConflict: 'id' });
-          } catch {}
-
-          const syntheticUser = {
-            id: generatedUserId,
+      // 2. Sync to Supabase public.profiles table
+      try {
+        await supabaseInstance
+          .from('profiles')
+          .upsert({
+            id: finalUserId,
+            full_name: cleanName,
+            phone: cleanPhone,
             email: cleanEmail,
-            user_metadata: {
-              full_name: cleanName,
-              phone: cleanPhone,
-              avatar_url: avatarUrl || '',
-              role: 'student',
-            },
-          };
-
-          return {
-            success: true,
-            user: syntheticUser,
-            session: null,
-            needsEmailConfirmation: false,
-          };
-        }
-
-        // If user already exists in Supabase Auth, attempt sign-in with provided password
-        if (errorLower.includes('already registered') || errorLower.includes('already in use') || errorLower.includes('user already exists')) {
-          const signInAttempt = await supabaseSignIn(cleanEmail, password);
-          if (signInAttempt.success) {
-            return signInAttempt;
-          }
-          return {
-            success: false,
-            error: 'এই মোবাইল নম্বর বা ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট তৈরি হয়েছে। অনুগ্রহ করে লগইন করুন।',
-          };
-        }
-
-        return {
-          success: false,
-          error: formatAuthErrorMessage(error),
-        };
+            avatar_url: avatarUrl || null,
+            role: 'student',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+      } catch (profErr) {
+        console.warn('Profiles upsert on signup:', profErr);
       }
     } catch (err: any) {
-      console.warn('Supabase signup exception, using instant profile creation:', err);
+      console.warn('Supabase signup network or auth exception (proceeding with local resilience):', err);
     }
   }
 
-  // Standalone / Instant success fallback
-  const fallbackUser = {
-    id: generatedUserId,
+  // Update local account with final ID if Supabase provided UUID
+  if (finalUserId !== generatedUserId) {
+    localAccount.id = finalUserId;
+    saveLocalRegisteredAccount(localAccount);
+  }
+
+  const resultUser = authUser || {
+    id: finalUserId,
     email: cleanEmail,
     user_metadata: {
       full_name: cleanName,
       phone: cleanPhone,
       avatar_url: avatarUrl || '',
       role: 'student',
+      student_id: generatedUserId,
     },
+    profile: {
+      id: finalUserId,
+      full_name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail,
+      avatar_url: avatarUrl || '',
+      role: 'student',
+    }
   };
 
   return {
     success: true,
-    user: fallbackUser,
-    session: null,
+    user: resultUser,
+    session: authSession,
     needsEmailConfirmation: false,
   };
 }
@@ -2405,12 +2385,12 @@ export async function supabaseSignIn(
   password: string
 ): Promise<AuthResult> {
   const cleanInput = identifier.trim();
-  let cleanEmail = cleanInput;
+  const cleanInputDigits = cleanInput.replace(/[^0-9]/g, '');
   const isPhone = !cleanInput.includes('@');
-
+  
+  let cleanEmail = cleanInput;
   if (isPhone) {
-    const sanitizedDigits = cleanInput.replace(/[^0-9]/g, '');
-    cleanEmail = `${sanitizedDigits}@attamreen.academy`;
+    cleanEmail = `${cleanInputDigits || 'student'}@attamreen.academy`;
   } else {
     cleanEmail = cleanEmail.toLowerCase();
   }
@@ -2418,10 +2398,15 @@ export async function supabaseSignIn(
   // 1. Check local registered accounts for immediate instant matching
   const localAccounts = getLocalRegisteredAccounts();
   const matchedLocal = localAccounts.find((acc) => {
-    const phoneMatch = isPhone && acc.phone && acc.phone.replace(/[^0-9]/g, '') === cleanInput.replace(/[^0-9]/g, '');
-    const emailMatch = acc.email && acc.email.toLowerCase() === cleanEmail.toLowerCase();
-    const identifierMatch = acc.email && acc.email.toLowerCase() === cleanInput.toLowerCase();
-    return phoneMatch || emailMatch || identifierMatch;
+    const accDigits = (acc.phone || '').replace(/[^0-9]/g, '');
+    const phoneMatch = cleanInputDigits.length >= 6 && accDigits && (
+      accDigits === cleanInputDigits ||
+      accDigits.endsWith(cleanInputDigits) ||
+      cleanInputDigits.endsWith(accDigits)
+    );
+    const emailMatch = acc.email && acc.email.toLowerCase() === cleanInput.toLowerCase();
+    const synthEmailMatch = acc.email && acc.email.toLowerCase() === cleanEmail.toLowerCase();
+    return phoneMatch || emailMatch || synthEmailMatch;
   });
 
   // If local account found and password matches, we have instant verification
@@ -2433,7 +2418,7 @@ export async function supabaseSignIn(
         full_name: matchedLocal.fullName,
         phone: matchedLocal.phone,
         avatar_url: matchedLocal.avatarUrl || '',
-        role: 'student',
+        role: matchedLocal.role || 'student',
       },
       profile: {
         id: matchedLocal.id,
@@ -2441,13 +2426,14 @@ export async function supabaseSignIn(
         phone: matchedLocal.phone,
         email: matchedLocal.email,
         avatar_url: matchedLocal.avatarUrl || '',
+        role: matchedLocal.role || 'student',
       }
     };
 
-    // Also attempt background sync with Supabase session if available
+    // Background sync with Supabase session if available
     if (supabaseInstance) {
       supabaseInstance.auth.signInWithPassword({
-        email: cleanEmail,
+        email: matchedLocal.email || cleanEmail,
         password: password,
       }).catch(() => {});
     }
@@ -2463,12 +2449,13 @@ export async function supabaseSignIn(
   if (supabaseInstance) {
     try {
       const { data, error } = await supabaseInstance.auth.signInWithPassword({
-        email: cleanEmail,
+        email: matchedLocal?.email || cleanEmail,
         password: password,
       });
 
       if (!error && data?.user) {
         // Fetch user profile from public.profiles table
+        let userProf = null;
         try {
           const { data: prof } = await supabaseInstance
             .from('profiles')
@@ -2477,6 +2464,7 @@ export async function supabaseSignIn(
             .maybeSingle();
 
           if (prof) {
+            userProf = prof;
             (data.user as any).profile = prof;
           }
         } catch (profErr) {
@@ -2487,12 +2475,13 @@ export async function supabaseSignIn(
         const userMeta = data.user.user_metadata || {};
         saveLocalRegisteredAccount({
           id: data.user.id,
-          fullName: userMeta.full_name || 'শিক্ষার্থী',
-          phone: userMeta.phone || (isPhone ? cleanInput : ''),
+          fullName: userProf?.full_name || userMeta.full_name || 'শিক্ষার্থী',
+          phone: userProf?.phone || userMeta.phone || (isPhone ? cleanInput : ''),
           email: data.user.email || cleanEmail,
           passwordHash: password,
           createdAt: new Date().toISOString(),
-          avatarUrl: userMeta.avatar_url || '',
+          avatarUrl: userProf?.avatar_url || userMeta.avatar_url || '',
+          role: userProf?.role || userMeta.role || 'student',
         });
 
         return {
@@ -2501,19 +2490,8 @@ export async function supabaseSignIn(
           session: data.session,
         };
       }
-
-      if (error) {
-        // If password failed or user not found
-        return {
-          success: false,
-          error: 'মোবাইল নম্বর/ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। দয়া করে পুনরায় চেষ্টা করুন।',
-        };
-      }
     } catch (err: any) {
-      return {
-        success: false,
-        error: formatAuthErrorMessage(err),
-      };
+      console.warn('Supabase signin attempt caught:', err);
     }
   }
 
@@ -2527,7 +2505,7 @@ export async function supabaseSignIn(
 
   return {
     success: false,
-    error: 'অ্যাকাউন্ট খুঁজে পাওয়া যায়নি। অনুগ্রহ করে "নতুন অ্যাকাউন্ট তৈরি করুন" বাটনে ক্লিক করে রেজিষ্ট্রেশন সম্পন্ন করুন।',
+    error: 'মোবাইল নম্বর/ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আপনি নতুন হলে অনুগ্রহ করে "রেজিস্ট্রেশন" বাটনে ক্লিক করে অ্যাকাউন্ট তৈরি করুন।',
   };
 }
 

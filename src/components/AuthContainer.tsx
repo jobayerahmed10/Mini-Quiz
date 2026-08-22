@@ -255,33 +255,29 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
   return (
     <div 
       id="auth-container-card"
-      className={`w-full max-w-[440px] bg-[#F8FAF9] dark:bg-[#070D1E] rounded-[32px] shadow-2xl border border-emerald-900/10 dark:border-emerald-500/20 overflow-hidden relative text-slate-800 dark:text-slate-100 transition-all ${className}`}
+      className={`w-full max-w-[460px] bg-[#FAFBF9] dark:bg-[#091224] rounded-[32px] shadow-2xl border border-emerald-900/15 dark:border-emerald-500/25 overflow-hidden relative text-slate-800 dark:text-slate-100 transition-all ${className}`}
     >
-      {/* Top Islamic Geometric / Subtle Accent Ribbon */}
-      <div className="h-2 bg-gradient-to-r from-[#07532B] via-[#EAB308] to-[#046A38] w-full" />
+      {/* Top Islamic Geometric Accent Ribbon */}
+      <div className="h-2.5 bg-gradient-to-r from-[#046A38] via-[#EAB308] to-[#07532B] w-full" />
 
-      <div className="p-6 sm:p-8 space-y-6">
+      <div className="p-5 sm:p-7 space-y-5">
 
-        {/* Top Header Row with Navigation */}
+        {/* Top Header Row with Logo & Close Button */}
         <div className="flex items-center justify-between">
-          {mode !== 'login' ? (
-            <button
-              id="auth-container-back-to-login"
-              type="button"
-              onClick={() => switchMode('login')}
-              className="inline-flex items-center gap-1.5 text-xs font-black text-[#07532B] dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 p-2 -ml-2 rounded-xl transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>লগইনে ফিরুন</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#07532B] dark:bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
-                নিরাপদ অথেনটিকেশন
-              </span>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-gradient-to-br from-[#046A38] to-[#064e29] shadow-md ring-2 ring-[#EAB308]/40 inline-flex items-center justify-center">
+              <AtTamreenLogo className="w-8 h-8" />
             </div>
-          )}
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-[#046A38] dark:text-emerald-400 font-tiro leading-tight">
+                আত-তামরীন একাডেমি
+              </h2>
+              <p className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#EAB308]" />
+                <span>প্রস্তুতি হোক আরও স্মার্ট</span>
+              </p>
+            </div>
+          </div>
 
           {/* Optional Cancel/Close Button */}
           {onCancel && (
@@ -289,7 +285,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
               id="auth-container-cancel-btn"
               type="button"
               onClick={onCancel}
-              className="w-8 h-8 rounded-full bg-slate-200/70 dark:bg-slate-800/80 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer text-sm font-bold"
+              className="w-8 h-8 rounded-full bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors cursor-pointer text-sm font-black"
               aria-label="বন্ধ করুন"
             >
               ✕
@@ -297,30 +293,66 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
           )}
         </div>
 
-        {/* Brand Logo & Hero Branding */}
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <div className="p-2.5 rounded-[22px] bg-gradient-to-br from-[#07532B] to-[#046A38] shadow-md ring-2 ring-[#EAB308]/40 inline-flex items-center justify-center">
-              <AtTamreenLogo className="w-12 h-12" />
-            </div>
-          </div>
+        {/* ================================================================== */}
+        {/* TWO PROMINENT TOP TOGGLE BUTTONS: LOGIN & REGISTRATION             */}
+        {/* ================================================================== */}
+        {mode !== 'forgot_password' && (
+          <div 
+            id="auth-mode-segmented-control"
+            className="grid grid-cols-2 p-1.5 bg-emerald-950/10 dark:bg-emerald-950/40 rounded-2xl border border-emerald-800/20 dark:border-emerald-600/30 gap-1.5 shadow-inner"
+          >
+            {/* Button 1: Login */}
+            <button
+              id="auth-tab-login-btn"
+              type="button"
+              onClick={() => switchMode('login')}
+              className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                mode === 'login'
+                  ? 'bg-[#046A38] text-white shadow-md shadow-emerald-950/20 scale-[1.01]'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Lock className={`w-4 h-4 ${mode === 'login' ? 'text-amber-300' : 'text-slate-400'}`} />
+              <span>লগইন</span>
+            </button>
 
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[#07532B] dark:text-emerald-400 font-tiro tracking-wide">
-              আত-তামরীন একাডেমি
-            </h2>
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1 mt-0.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#EAB308]" />
-              <span>প্রস্তুতি হোক আরও স্মার্ট</span>
-            </p>
+            {/* Button 2: Registration */}
+            <button
+              id="auth-tab-register-btn"
+              type="button"
+              onClick={() => switchMode('register')}
+              className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                mode === 'register'
+                  ? 'bg-[#046A38] text-white shadow-md shadow-emerald-950/20 scale-[1.01]'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className={`w-4 h-4 ${mode === 'register' ? 'text-amber-300' : 'text-slate-400'}`} />
+              <span>রেজিস্ট্রেশন</span>
+            </button>
           </div>
-        </div>
+        )}
+
+        {/* Back button if in Forgot Password mode */}
+        {mode === 'forgot_password' && (
+          <div className="flex items-center">
+            <button
+              id="auth-container-back-to-login"
+              type="button"
+              onClick={() => switchMode('login')}
+              className="inline-flex items-center gap-1.5 text-xs font-black text-[#046A38] dark:text-emerald-400 hover:underline p-1 rounded-xl transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>লগইনে ফিরে যান</span>
+            </button>
+          </div>
+        )}
 
         {/* Feedback Banners */}
         {errorMessage && (
           <div 
             id="auth-container-error-banner"
-            className="p-3.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/80 rounded-2xl flex items-start gap-2.5 text-xs font-bold text-rose-700 dark:text-rose-300 animate-fade-in"
+            className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/80 rounded-2xl flex items-start gap-2.5 text-xs font-bold text-rose-700 dark:text-rose-300 animate-fade-in"
           >
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div className="flex-1">{errorMessage}</div>
@@ -330,53 +362,52 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         {successMessage && (
           <div 
             id="auth-container-success-banner"
-            className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl flex items-start gap-2.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 animate-fade-in"
+            className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl flex items-start gap-2.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 animate-fade-in"
           >
-            <CheckCircle2 className="w-4 h-4 text-[#07532B] dark:text-emerald-400 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-[#046A38] dark:text-emerald-400 shrink-0 mt-0.5" />
             <div className="flex-1">{successMessage}</div>
           </div>
         )}
 
         {/* ================================================================== */}
-        {/* VIEW 1: ISLAMIC STYLE LOGIN                                      */}
+        {/* VIEW 1: ISLAMIC STYLE LOGIN FORM                                  */}
         {/* ================================================================== */}
         {mode === 'login' && (
-          <div className="space-y-5 animate-fade-in">
-            <div className="text-center">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center justify-center gap-1.5">
-                <span>স্বাগতম!</span>
-                <span className="text-base">👋</span>
+          <div className="space-y-4 animate-fade-in">
+            <div className="space-y-0.5">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>অ্যাকাউন্টে প্রবেশ করুন</span>
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-                আপনার অ্যাকাউন্টে প্রবেশ করতে লগইন করুন
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                মোবাইল নম্বর বা ইমেইল এবং পাসওয়ার্ড দিয়ে সরাসরি লগইন করুন
               </p>
             </div>
 
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
               {/* Mobile / Email Input */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                  মোবাইল নম্বর / ইমেইল <span className="text-rose-500">*</span>
+                  মোবাইল নম্বর অথবা ইমেইল <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
+                    <Phone className="w-4 h-4 text-emerald-600" />
                   </div>
                   <input
                     id="container-login-identifier"
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="017XXXXXXXX বা user@email.com"
+                    placeholder="যেমন: 017XXXXXXXX অথবা email@gmail.com"
                     disabled={isLoading}
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                   />
                 </div>
               </div>
 
               {/* Password Input */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
                     পাসওয়ার্ড <span className="text-rose-500">*</span>
@@ -385,7 +416,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                     id="container-forgot-link"
                     type="button"
                     onClick={() => switchMode('forgot_password')}
-                    className="text-[11px] font-bold text-[#07532B] dark:text-emerald-400 hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-[#046A38] dark:text-emerald-400 hover:underline cursor-pointer"
                   >
                     পাসওয়ার্ড ভুলে গেছেন?
                   </button>
@@ -393,7 +424,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
 
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
+                    <Lock className="w-4 h-4 text-emerald-600" />
                   </div>
                   <input
                     id="container-login-password"
@@ -403,7 +434,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                     placeholder="আপনার পাসওয়ার্ড লিখুন"
                     disabled={isLoading}
                     required
-                    className="w-full pl-10 pr-11 py-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                   />
                   <button
                     id="container-login-toggle-eye"
@@ -426,7 +457,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                 id="container-login-submit-btn"
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#07532B] hover:bg-[#064423] dark:bg-[#046A38] dark:hover:bg-[#05572e] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
               >
                 {isLoading ? (
                   <>
@@ -439,17 +470,17 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
               </button>
             </form>
 
-            {/* Switch to Register */}
+            {/* Quick Switch Helper */}
             <div className="pt-2 text-center border-t border-slate-200/80 dark:border-slate-800">
               <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                অ্যাকাউন্ট নেই?{' '}
+                নতুন শিক্ষার্থী?{' '}
                 <button
                   id="container-switch-to-register"
                   type="button"
                   onClick={() => switchMode('register')}
-                  className="font-black text-[#07532B] dark:text-[#EAB308] hover:underline cursor-pointer ml-1"
+                  className="font-black text-[#046A38] dark:text-[#EAB308] hover:underline cursor-pointer ml-1"
                 >
-                  নতুন অ্যাকাউন্ট তৈরি করুন
+                  এখনই রেজিস্ট্রেশন করুন
                 </button>
               </p>
             </div>
@@ -457,20 +488,20 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         )}
 
         {/* ================================================================== */}
-        {/* VIEW 2: ISLAMIC STYLE CREATE ACCOUNT                              */}
+        {/* VIEW 2: ISLAMIC STYLE REGISTRATION FORM (NO OTP REQUIRED)         */}
         {/* ================================================================== */}
         {mode === 'register' && (
           <div className="space-y-4 animate-fade-in">
-            <div className="text-center">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                নতুন অ্যাকাউন্ট তৈরি করুন
+            <div className="space-y-0.5">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>নতুন অ্যাকাউন্ট তৈরি করুন</span>
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-                সঠিক তথ্য প্রদান করে অ্যাকাউন্ট তৈরি সম্পন্ন করুন
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                মোবাইল নম্বর ও তথ্য দিন, কোনো কোড ছাড়াই সাথে সাথে আইডি তৈরি হবে
               </p>
             </div>
 
-            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+            <form onSubmit={handleRegisterSubmit} className="space-y-3">
               {/* Full Name */}
               <div className="space-y-1">
                 <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
@@ -478,32 +509,29 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <User className="w-4 h-4" />
+                    <User className="w-4 h-4 text-emerald-600" />
                   </div>
                   <input
                     id="container-register-name"
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="মোঃ আব্দুর রহমান"
+                    placeholder="যেমন: মোঃ আব্দুর রহমান"
                     disabled={isLoading}
                     required
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                   />
                 </div>
               </div>
 
               {/* Mobile Number */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                    মোবাইল নম্বর <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-400">অথবা ইমেইল</span>
-                </div>
+                <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
+                  মোবাইল নম্বর <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="w-4 h-4" />
+                    <Phone className="w-4 h-4 text-emerald-600" />
                   </div>
                   <input
                     id="container-register-phone"
@@ -512,21 +540,20 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                     onChange={(e) => setRegisterPhone(e.target.value)}
                     placeholder="017XXXXXXXX"
                     disabled={isLoading}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                    required
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                   />
                 </div>
               </div>
 
-              {/* Email Address */}
+              {/* Email Address (Optional) */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                    ইমেইল ঠিকানা <span className="text-slate-400 text-[10px] font-bold">(ঐচ্ছিক)</span>
-                  </label>
-                </div>
+                <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
+                  ইমেইল ঠিকানা <span className="text-slate-400 text-[10px] font-normal">(ঐচ্ছিক)</span>
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
+                    <Mail className="w-4 h-4 text-emerald-600" />
                   </div>
                   <input
                     id="container-register-email"
@@ -535,84 +562,85 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     placeholder="student@example.com"
                     disabled={isLoading}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="space-y-1">
-                <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                  পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
+                    পাসওয়ার্ড <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <input
+                      id="container-register-password"
+                      type={showRegisterPassword ? 'text' : 'password'}
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      placeholder="কমপক্ষে ৬ অক্ষর"
+                      disabled={isLoading}
+                      required
+                      minLength={6}
+                      className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] transition-all shadow-2xs disabled:opacity-60"
+                    />
+                    <button
+                      id="container-register-toggle-eye"
+                      type="button"
+                      onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showRegisterPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <input
-                    id="container-register-password"
-                    type={showRegisterPassword ? 'text' : 'password'}
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    placeholder="গোপন পাসওয়ার্ড দিন"
-                    disabled={isLoading}
-                    required
-                    minLength={6}
-                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
-                  />
-                  <button
-                    id="container-register-toggle-eye"
-                    type="button"
-                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
 
-              {/* Confirm Password */}
-              <div className="space-y-1">
-                <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                  পাসওয়ার্ড নিশ্চিত করুন <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
+                    নিশ্চিত করুন <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <input
+                      id="container-register-confirm"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="পাসওয়ার্ড পুনরায়"
+                      disabled={isLoading}
+                      required
+                      minLength={6}
+                      className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] transition-all shadow-2xs disabled:opacity-60"
+                    />
+                    <button
+                      id="container-confirm-toggle-eye"
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <input
-                    id="container-register-confirm"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="পাসওয়ার্ড পুনরায় লিখুন"
-                    disabled={isLoading}
-                    required
-                    minLength={6}
-                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
-                  />
-                  <button
-                    id="container-confirm-toggle-eye"
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
               </div>
 
               {/* Terms Checkbox */}
-              <div className="flex items-start gap-2.5 pt-1">
+              <div className="flex items-start gap-2 pt-0.5">
                 <input
                   id="container-terms-checkbox"
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 text-[#07532B] rounded-md border-slate-300 dark:border-slate-700 focus:ring-[#07532B] cursor-pointer"
+                  className="mt-0.5 w-3.5 h-3.5 text-[#046A38] rounded-md border-slate-300 dark:border-slate-700 focus:ring-[#046A38] cursor-pointer"
                 />
                 <label htmlFor="container-terms-checkbox" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 select-none cursor-pointer">
-                  আমি আত-তামরীন একাডেমির <span className="text-[#07532B] dark:text-emerald-400 underline">শর্তাবলী</span> ও <span className="text-[#07532B] dark:text-emerald-400 underline">গোপনীয়তা নীতি</span> মেনে নিচ্ছি।
+                  আমি আত-তামরীন একাডেমির <span className="text-[#046A38] dark:text-emerald-400 underline">শর্তাবলী</span> মেনে নিচ্ছি।
                 </label>
               </div>
 
@@ -621,7 +649,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                 id="container-register-submit-btn"
                 type="submit"
                 disabled={isLoading || !agreeTerms}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#07532B] hover:bg-[#064423] dark:bg-[#046A38] dark:hover:bg-[#05572e] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
               >
                 {isLoading ? (
                   <>
@@ -629,12 +657,12 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                     <span>অ্যাকাউন্ট তৈরি হচ্ছে...</span>
                   </>
                 ) : (
-                  <span>অ্যাকাউন্ট তৈরি করুন</span>
+                  <span>রেজিস্ট্রেশন সম্পন্ন করুন</span>
                 )}
               </button>
             </form>
 
-            {/* Switch to Login */}
+            {/* Quick Switch to Login */}
             <div className="pt-2 text-center border-t border-slate-200/80 dark:border-slate-800">
               <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 আগেই অ্যাকাউন্ট আছে?{' '}
@@ -642,7 +670,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                   id="container-switch-to-login"
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="font-black text-[#07532B] dark:text-[#EAB308] hover:underline cursor-pointer ml-1"
+                  className="font-black text-[#046A38] dark:text-[#EAB308] hover:underline cursor-pointer ml-1"
                 >
                   লগইন করুন
                 </button>
@@ -656,24 +684,24 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         {/* ================================================================== */}
         {mode === 'forgot_password' && (
           <div className="space-y-4 animate-fade-in">
-            <div className="text-center">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+            <div className="space-y-0.5">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                 পাসওয়ার্ড পুনরুদ্ধার
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 আপনার নিবন্ধিত ইমেইল দিন, আমরা একটি রিসেট লিংক পাঠাবো
               </p>
             </div>
 
             {!resetSent ? (
-              <form onSubmit={handleForgotSubmit} className="space-y-4">
-                <div className="space-y-1.5">
+              <form onSubmit={handleForgotSubmit} className="space-y-3.5">
+                <div className="space-y-1">
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
                     ইমেইল ঠিকানা <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-4 h-4" />
+                      <Mail className="w-4 h-4 text-emerald-600" />
                     </div>
                     <input
                       id="container-forgot-email"
@@ -683,7 +711,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                       placeholder="student@example.com"
                       disabled={isLoading}
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#07532B] dark:focus:ring-emerald-500 transition-all shadow-xs disabled:opacity-60"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                     />
                   </div>
                 </div>
@@ -692,7 +720,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                   id="container-forgot-submit-btn"
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-[#07532B] hover:bg-[#064423] dark:bg-[#046A38] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>
@@ -706,12 +734,12 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
               </form>
             ) : (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-[#07532B] dark:text-emerald-400 mx-auto" />
+                <CheckCircle2 className="w-8 h-8 text-[#046A38] dark:text-emerald-400 mx-auto" />
                 <h4 className="text-sm font-black text-emerald-900 dark:text-emerald-200">
                   ইমেইল সফলভাবে পাঠানো হয়েছে!
                 </h4>
                 <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                  {resetEmail} ঠিকানায় রিসেট লিংক পাঠানো হয়েছে। লিংকটিতে ক্লিক করে নতুন পাসওয়ার্ড সেট করুন।
+                  {resetEmail} ঠিকানায় রিসেট লিংক পাঠানো হয়েছে।
                 </p>
               </div>
             )}
@@ -721,7 +749,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                 id="container-forgot-back-btn"
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-xs font-black text-[#07532B] dark:text-[#EAB308] hover:underline cursor-pointer"
+                className="text-xs font-black text-[#046A38] dark:text-[#EAB308] hover:underline cursor-pointer"
               >
                 ← লগইন পেজে ফিরুন
               </button>
