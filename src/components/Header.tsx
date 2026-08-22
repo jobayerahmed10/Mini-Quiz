@@ -512,28 +512,12 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
                   >
-                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                       <BarChart3 className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="block font-black">📊 ড্যাশবোর্ড ও পরিসংখ্যান</span>
-                      <span className="block text-[10px] font-medium opacity-60">মোট পরীক্ষা, পয়েন্ট ও নির্ভুলতা</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      if (onOpenLeaderboard) onOpenLeaderboard();
-                    }}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                      <Trophy className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="block font-black">🏆 লিডারবোর্ড</span>
-                      <span className="block text-[10px] font-medium opacity-60">মেধা অবস্থান ও সেরা পারফরমার</span>
+                      <span className="block font-black">📊 স্টাডি ড্যাশবোর্ড ও অগ্রগতি</span>
+                      <span className="block text-[10px] font-medium opacity-60">মোট পরীক্ষা, বিষয়ভিত্তিক নির্ভুলতা ও গ্রোথ</span>
                     </div>
                   </button>
 

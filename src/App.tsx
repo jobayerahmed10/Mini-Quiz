@@ -630,7 +630,7 @@ export default function App() {
       />
 
       {/* Bottom Neumorphic Sticky Nav Bar */}
-      {currentPage !== 'practice' && (
+      {currentPage !== 'practice' && !showAuthModal && !showDirectRegModal && !showRegPromptModal && !sharedExamData && (
         <BottomNav
           activeTab={activeTab}
           onTabChange={handleTabChange}

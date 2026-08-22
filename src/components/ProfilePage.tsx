@@ -337,8 +337,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <LayoutGrid className="w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <span className="text-base font-black block">পারফরম্যান্স ড্যাশবোর্ড</span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">পরীক্ষার ফলাফল, পয়েন্ট ও নির্ভুলতা</span>
+                  <span className="text-base font-black block">স্টাডি ড্যাশবোর্ড ও গ্রোথ</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">পরীক্ষার ফলাফল, বিষয়ভিত্তিক নির্ভুলতা ও অগ্রগতি</span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-[#0b705c]" />
@@ -356,34 +356,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <span className="text-base font-black">আমার কোর্সসমূহ</span>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-400" />
-            </button>
-
-            {/* 3.5 My Applications (আমার ভর্তি আবেদনসমূহ) */}
-            <button
-              onClick={() => setActiveTab('applications')}
-              className="w-full p-4 rounded-2xl bg-white dark:bg-[#0D172A] hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
-                  <FileCheck2 className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <span className="text-base font-black block">আমার ভর্তি আবেদনসমূহ</span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {applications.length > 0 
-                      ? `${toBengaliNumeral(applications.length)}টি আবেদন জমা আছে` 
-                      : 'আবেদন স্ট্যাটাস ও ট্রানজেকশন ট্র্যাকিং'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {applications.some(a => a.status === 'pending') && (
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse">
-                    যাচাইাধীন
-                  </span>
-                )}
-                <ChevronRight className="w-5 h-5 text-slate-400" />
-              </div>
             </button>
 
             {/* 4. Bookmarked Questions */}
@@ -435,21 +407,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <ChevronRight className="w-5 h-5 text-slate-400" />
             </button>
 
-            {/* 7. Leaderboard */}
-            <button
-              onClick={onOpenLeaderboard}
-              className="w-full p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-amber-400 text-[#0B132B] flex items-center justify-center shrink-0 shadow-xs">
-                  <Trophy className="w-5 h-5 fill-[#0B132B]" />
-                </div>
-                <span className="text-base font-black">লিডারবোর্ড</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-600" />
-            </button>
-
-            {/* 8. Premium Membership */}
+            {/* 7. Premium Membership */}
             <button
               onClick={() => setActiveTab('vip_membership')}
               className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 to-amber-600/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-xs"

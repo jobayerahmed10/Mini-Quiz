@@ -23,7 +23,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div 
       id="auth-modal-overlay"
-      className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in"
     >
       <AuthContainer
         initialMode={initialMode}
