@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { 
   ArrowLeft,
   Share2,
@@ -90,6 +91,71 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   
   const obtainedMarksVal = Math.max(0, Number((result.correctCount - negativeMarkVal).toFixed(2)));
   const isPassed = result.percentage >= 40;
+
+  // Calculate score percentage (supporting both result.percentage and raw questions score)
+  const scorePercentage = result.percentage !== undefined && result.percentage > 0
+    ? result.percentage
+    : (result.totalQuestions > 0 ? (result.correctCount / result.totalQuestions) * 100 : 0);
+
+  // Check if user achieved a score higher than 80%
+  const isHighScore = scorePercentage > 80;
+  const hasTriggeredConfetti = useRef(false);
+
+  // Confetti celebration trigger with multi-stage burst effect
+  const triggerCelebrationConfetti = () => {
+    try {
+      // Stage 1: Big center explosion
+      confetti({
+        particleCount: 100,
+        spread: 90,
+        origin: { y: 0.6 },
+        colors: ['#046A38', '#EAB308', '#0288D1', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'],
+        disableForReducedMotion: true,
+      });
+
+      // Stage 2: Left & Right side cannon streams
+      const duration = 2400;
+      const animationEnd = Date.now() + duration;
+      const celebrationColors = ['#046A38', '#EAB308', '#0288D1', '#10B981', '#F59E0B'];
+
+      const frame = () => {
+        confetti({
+          particleCount: 4,
+          angle: 60,
+          spread: 65,
+          origin: { x: 0, y: 0.7 },
+          colors: celebrationColors,
+          disableForReducedMotion: true,
+        });
+        confetti({
+          particleCount: 4,
+          angle: 120,
+          spread: 65,
+          origin: { x: 1, y: 0.7 },
+          colors: celebrationColors,
+          disableForReducedMotion: true,
+        });
+
+        if (Date.now() < animationEnd) {
+          requestAnimationFrame(frame);
+        }
+      };
+      requestAnimationFrame(frame);
+    } catch (err) {
+      console.warn('Celebration confetti effect notice:', err);
+    }
+  };
+
+  // Trigger confetti automatically when user achieves score higher than 80%
+  useEffect(() => {
+    if (isHighScore && !hasTriggeredConfetti.current) {
+      hasTriggeredConfetti.current = true;
+      const timer = setTimeout(() => {
+        triggerCelebrationConfetti();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isHighScore]);
 
   // Load Leaderboard from Supabase / Server without default mock data
   useEffect(() => {
@@ -336,6 +402,43 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             <span className="truncate">ফলাফল শেয়ার করুন</span>
           </button>
         </div>
+
+        {/* 1.1 HIGH SCORE CELEBRATION BADGE (> 80%) */}
+        {isHighScore && (
+          <div 
+            id="high-score-celebration-banner"
+            className="bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-amber-500/15 dark:from-amber-950/40 dark:via-emerald-950/40 dark:to-amber-950/40 border border-amber-400/50 dark:border-amber-500/50 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs animate-fade-in"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-sm">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-black text-amber-900 dark:text-amber-200">
+                    🎉 অসাধারণ ফলাফল! ({toBengaliNumeral(Math.round(scorePercentage))}%)
+                  </span>
+                  <span className="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-black rounded-md bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
+                    ৮০%+ স্কোর
+                  </span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">
+                  আপনি ৮০% এর বেশি নম্বর পেয়ে বিশেষ কৃতিত্ব অর্জন করেছেন!
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={triggerCelebrationConfetti}
+              title="কনফেটি আবার দেখুন"
+              className="px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs shrink-0 flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">কনফেটি</span>
+            </button>
+          </div>
+        )}
 
         {/* 2. USER PROFILE HERO BANNER (EXACT CYAN/BLUE BANNER IN SCREENSHOT 1) */}
         <div className="rounded-[28px] p-4 sm:p-5 bg-gradient-to-r from-[#0288D1] via-[#039BE5] to-[#29B6F6] text-white shadow-md flex items-center gap-4 relative overflow-hidden">
