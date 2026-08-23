@@ -15,7 +15,8 @@ import {
   fetchCourseApplicationsFromSupabase, 
   supabaseGetSession, 
   supabaseSignOut, 
-  supabaseOnAuthStateChange 
+  supabaseOnAuthStateChange,
+  supabaseUpdateUserProfile
 } from '../lib/supabase';
 import { CourseEnrollmentRecord } from '../types';
 import { AuthModal } from './AuthModal';
@@ -174,13 +175,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMsg('অনুগ্রহ করে নাম প্রদান করুন');
       return;
     }
-    saveUserProfile(name, phone, avatar);
+    const currentProfile = getUserProfile();
+    saveUserProfile(name, phone, avatar, true, currentProfile?.email);
+    supabaseUpdateUserProfile({ fullName: name, avatarUrl: avatar, phone });
     setErrorMsg('');
     setSuccessMsg('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
     setTimeout(() => {

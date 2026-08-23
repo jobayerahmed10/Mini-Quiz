@@ -195,6 +195,19 @@ export default function App() {
     };
   }, []);
 
+  // Listen to profile updates & exam completion to keep studentStats in sync
+  useEffect(() => {
+    const handleSyncStats = () => {
+      setStudentStats(getStudentStats());
+    };
+    window.addEventListener('tamreen_profile_updated', handleSyncStats);
+    window.addEventListener('tamreen_exam_completed', handleSyncStats);
+    return () => {
+      window.removeEventListener('tamreen_profile_updated', handleSyncStats);
+      window.removeEventListener('tamreen_exam_completed', handleSyncStats);
+    };
+  }, []);
+
   // Load published questions on mount
   const loadQuestions = useCallback(async () => {
     setIsLoading(true);

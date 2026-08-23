@@ -2638,14 +2638,76 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
   }
 
   const userMeta = user.user_metadata || {};
+  let finalFullName = userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী';
+  let finalPhone = userProfile?.phone || userMeta.phone || '';
+  let finalEmail = userProfile?.email || user.email || '';
+  let finalAvatar = userProfile?.avatar_url || userMeta.avatar_url || '';
+
+  // Synchronize cross-browser progress (exams, stats, avatar) from server
+  try {
+    const qParams = new URLSearchParams({
+      userId: user.id,
+      phone: finalPhone,
+      email: finalEmail,
+    });
+    const progressRes = await fetch(`/api/user/progress?${qParams.toString()}`);
+    if (progressRes.ok) {
+      const progressData = await progressRes.json();
+      if (progressData?.success) {
+        if (progressData.avatarUrl && !finalAvatar) {
+          finalAvatar = progressData.avatarUrl;
+        }
+        if (progressData.fullName && (!finalFullName || finalFullName === 'শিক্ষার্থী')) {
+          finalFullName = progressData.fullName;
+        }
+
+        if (typeof window !== 'undefined') {
+          // Restore completed exams across browsers
+          if (Array.isArray(progressData.completedExams) && progressData.completedExams.length > 0) {
+            try {
+              const currentExams = JSON.parse(localStorage.getItem('tamreen_completed_exams') || '[]');
+              const mergedExams = Array.from(new Set([...currentExams, ...progressData.completedExams]));
+              localStorage.setItem('tamreen_completed_exams', JSON.stringify(mergedExams));
+            } catch {}
+          }
+
+          // Restore practice stats across browsers
+          if (progressData.studentStats && typeof progressData.studentStats === 'object') {
+            try {
+              const currentStatsRaw = localStorage.getItem('tamreen_student_stats');
+              const currentStats = currentStatsRaw ? JSON.parse(currentStatsRaw) : null;
+              if (!currentStats || (progressData.studentStats.totalQuestionsAnswered > (currentStats.totalQuestionsAnswered || 0))) {
+                localStorage.setItem('tamreen_student_stats', JSON.stringify(progressData.studentStats));
+              }
+            } catch {}
+          }
+
+          // Restore bookmarks & goal
+          if (Array.isArray(progressData.bookmarkedIds) && progressData.bookmarkedIds.length > 0) {
+            try {
+              const curBm = JSON.parse(localStorage.getItem('tamreen_bookmarked_ids') || '[]');
+              const mergedBm = Array.from(new Set([...curBm, ...progressData.bookmarkedIds]));
+              localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(mergedBm));
+            } catch {}
+          }
+          if (progressData.goal) {
+            localStorage.setItem('tamreen_user_exam_goal', progressData.goal);
+          }
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.warn('Cross-browser progress sync notice:', syncErr);
+  }
+
   const profile = {
     id: user.id,
-    full_name: userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী',
-    phone: userProfile?.phone || userMeta.phone || '',
-    email: userProfile?.email || user.email || '',
+    full_name: finalFullName,
+    phone: finalPhone,
+    email: finalEmail,
     role: userProfile?.role || userMeta.role || 'student',
-    student_id: userMeta.student_id || `STD-${(userProfile?.phone || userMeta.phone || '').replace(/[^0-9]/g, '').slice(-6) || 'STUDENT'}`,
-    avatar_url: userProfile?.avatar_url || userMeta.avatar_url || '',
+    student_id: userMeta.student_id || `STD-${finalPhone.replace(/[^0-9]/g, '').slice(-6) || 'STUDENT'}`,
+    avatar_url: finalAvatar,
   };
 
   (user as any).profile = profile;
@@ -2675,6 +2737,53 @@ export async function supabaseGetUser(): Promise<any> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Update authenticated user profile in Supabase Auth and cloud server store
+ */
+export async function supabaseUpdateUserProfile(updates: {
+  fullName?: string;
+  avatarUrl?: string;
+  phone?: string;
+}): Promise<boolean> {
+  let success = false;
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance.auth.updateUser({
+        data: {
+          ...(updates.fullName ? { full_name: updates.fullName } : {}),
+          ...(updates.avatarUrl !== undefined ? { avatar_url: updates.avatarUrl } : {}),
+          ...(updates.phone ? { phone: updates.phone } : {}),
+        },
+      });
+      if (!error && data?.user) {
+        success = true;
+      }
+    } catch (err) {
+      console.warn('Supabase auth.updateUser error:', err);
+    }
+  }
+
+  // Also sync to server user progress
+  try {
+    let userId = '';
+    if (typeof window !== 'undefined') {
+      userId = localStorage.getItem('tamreen_user_id') || '';
+    }
+    await fetch('/api/user/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        phone: updates.phone || '',
+        fullName: updates.fullName || '',
+        avatarUrl: updates.avatarUrl || '',
+      }),
+    });
+  } catch {}
+
+  return success;
 }
 
 /**

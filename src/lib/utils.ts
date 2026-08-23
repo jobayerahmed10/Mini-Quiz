@@ -165,6 +165,24 @@ export function saveQuizResultToStats(correctCount: number, totalQuestions: numb
   } catch {
     // ignore localstorage errors
   }
+
+  // Cross-browser progress sync to cloud server
+  try {
+    const uId = getUserUniqueId();
+    const prof = getUserProfile();
+    fetch('/api/user/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uId,
+        phone: prof?.phone || '',
+        email: prof?.email || '',
+        fullName: prof?.name || '',
+        studentStats: updated,
+      }),
+    }).catch(() => {});
+  } catch {}
+
   return updated;
 }
 
@@ -295,6 +313,22 @@ export function saveUserProfile(
     }).catch(() => {});
   } catch {}
 
+  // Sync profile to cloud server progress store
+  try {
+    const uId = getUserUniqueId();
+    fetch('/api/user/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uId,
+        phone: phone ? phone.trim() : '',
+        email: email ? email.trim() : '',
+        fullName: name.trim(),
+        avatarUrl: avatar || '',
+      }),
+    }).catch(() => {});
+  } catch {}
+
   // Broadcast events for real-time UI refresh across windows/components
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tamreen_profile_updated', { detail: profile }));
@@ -357,6 +391,24 @@ export function addCompletedExamId(examIdentifier: string): void {
     } catch {
       // ignore
     }
+
+    // Cross-browser progress sync to cloud server
+    try {
+      const uId = getUserUniqueId();
+      const prof = getUserProfile();
+      fetch('/api/user/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: uId,
+          phone: prof?.phone || '',
+          email: prof?.email || '',
+          fullName: prof?.name || '',
+          completedExamId: examIdentifier,
+        }),
+      }).catch(() => {});
+    } catch {}
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tamreen_exam_completed', { detail: { examIdentifier } }));
     }

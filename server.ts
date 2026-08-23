@@ -16,6 +16,7 @@ app.use(express.json({ limit: '10mb' }));
 const LEADERBOARD_FILE_PATH = path.join(process.cwd(), 'leaderboard_store.json');
 const EXAM_RESULTS_FILE_PATH = path.join(process.cwd(), 'exam_results_store.json');
 const REGISTERED_USERS_FILE_PATH = path.join(process.cwd(), 'registered_users_store.json');
+const USER_PROGRESS_FILE_PATH = path.join(process.cwd(), 'user_progress_store.json');
 
 export interface ServerUserAccount {
   id: string;
@@ -28,6 +29,24 @@ export interface ServerUserAccount {
   role?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ServerUserProgress {
+  userId: string;
+  phone?: string;
+  email?: string;
+  fullName?: string;
+  avatarUrl?: string;
+  completedExams: string[];
+  studentStats?: {
+    todayPracticeCount: number;
+    lastPracticeDate: string;
+    totalQuestionsAnswered: number;
+    lastQuizScore: any;
+  };
+  goal?: string;
+  bookmarkedIds?: string[];
+  updatedAt: string;
 }
 
 interface ServerLeaderboardEntry {
@@ -64,6 +83,7 @@ interface ServerExamResult {
 let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 let serverExamResultsStore: ServerExamResult[] = [];
 let serverRegisteredUsersStore: ServerUserAccount[] = [];
+let serverUserProgressStore: ServerUserProgress[] = [];
 
 // Load existing stores from disk on startup
 try {
@@ -74,6 +94,16 @@ try {
   }
 } catch (err) {
   console.warn('Could not load registered_users_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(USER_PROGRESS_FILE_PATH)) {
+    const raw = fs.readFileSync(USER_PROGRESS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverUserProgressStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load user_progress_store.json:', err);
 }
 
 try {
@@ -101,6 +131,14 @@ function saveRegisteredUsersStoreToDisk() {
     fs.writeFileSync(REGISTERED_USERS_FILE_PATH, JSON.stringify(serverRegisteredUsersStore, null, 2), 'utf-8');
   } catch (err) {
     console.warn('Could not write registered_users_store.json:', err);
+  }
+}
+
+function saveUserProgressStoreToDisk() {
+  try {
+    fs.writeFileSync(USER_PROGRESS_FILE_PATH, JSON.stringify(serverUserProgressStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write user_progress_store.json:', err);
   }
 }
 
@@ -418,6 +456,163 @@ app.post('/api/auth/sync', (req, res) => {
     return res.json({ success: true, addedCount, total: serverRegisteredUsersStore.length });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Sync error' });
+  }
+});
+
+/**
+ * Endpoint to fetch user progress (completed exams, quiz stats, avatar, goal) across browsers/devices
+ */
+app.get('/api/user/progress', (req, res) => {
+  try {
+    const rawUserId = String(req.query.userId || '').trim();
+    const rawPhone = String(req.query.phone || '').trim();
+    const rawEmail = String(req.query.email || '').trim().toLowerCase();
+    const phoneNorm = normalizePhoneNumber(rawPhone);
+
+    // Find progress record
+    let progress = serverUserProgressStore.find((p) => {
+      const pPhoneNorm = normalizePhoneNumber(p.phone || '');
+      const userMatch = rawUserId && p.userId && (p.userId === rawUserId || p.userId.includes(rawUserId));
+      const phoneMatch = phoneNorm && pPhoneNorm && (phoneNorm === pPhoneNorm || phoneNorm.endsWith(pPhoneNorm.slice(-10)) || pPhoneNorm.endsWith(phoneNorm.slice(-10)));
+      const emailMatch = rawEmail && p.email && p.email.toLowerCase() === rawEmail;
+      return Boolean(userMatch || phoneMatch || emailMatch);
+    });
+
+    // Also check serverExamResultsStore to aggregate any completed exams and stats
+    const matchingExamResults = serverExamResultsStore.filter((er) => {
+      const uMatch = rawUserId && er.user_id && (er.user_id === rawUserId || er.user_id.includes(rawUserId));
+      const nameMatch = progress?.fullName && er.full_name && er.full_name.trim().toLowerCase() === progress.fullName.trim().toLowerCase();
+      return Boolean(uMatch || nameMatch);
+    });
+
+    const completedExamsSet = new Set<string>(progress?.completedExams || []);
+    let aggregatedTotalQuestions = progress?.studentStats?.totalQuestionsAnswered || 0;
+    let lastQuizScore = progress?.studentStats?.lastQuizScore || null;
+
+    matchingExamResults.forEach((er) => {
+      if (er.exam_id) completedExamsSet.add(er.exam_id);
+      if (er.exam_title) completedExamsSet.add(er.exam_title);
+      if (!progress?.studentStats) {
+        aggregatedTotalQuestions += (er.total_marks || 0);
+        if (!lastQuizScore && er.total_marks) {
+          lastQuizScore = {
+            correct: er.correct_answers || er.score || 0,
+            total: er.total_marks,
+            percentage: Math.round(((er.correct_answers || er.score || 0) / er.total_marks) * 100),
+            date: new Date(er.submitted_at || Date.now()).toLocaleDateString('bn-BD', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            }),
+          };
+        }
+      }
+    });
+
+    // Find user profile in registered users store for avatar/name fallback
+    const registeredAcc = serverRegisteredUsersStore.find((acc) => {
+      const accNorm = normalizePhoneNumber(acc.phone);
+      const uMatch = rawUserId && acc.id === rawUserId;
+      const pMatch = phoneNorm && accNorm && (phoneNorm === accNorm || phoneNorm.endsWith(accNorm.slice(-10)) || accNorm.endsWith(phoneNorm.slice(-10)));
+      const eMatch = rawEmail && acc.email && acc.email.toLowerCase() === rawEmail;
+      return Boolean(uMatch || pMatch || eMatch);
+    });
+
+    const result = {
+      success: true,
+      userId: rawUserId || progress?.userId || registeredAcc?.id || '',
+      fullName: progress?.fullName || registeredAcc?.full_name || '',
+      avatarUrl: progress?.avatarUrl || registeredAcc?.avatar_url || '',
+      completedExams: Array.from(completedExamsSet),
+      studentStats: progress?.studentStats || {
+        todayPracticeCount: 0,
+        lastPracticeDate: new Date().toISOString().split('T')[0],
+        totalQuestionsAnswered: aggregatedTotalQuestions,
+        lastQuizScore: lastQuizScore,
+      },
+      goal: progress?.goal || '১৮তম শিক্ষক নিবন্ধন প্রিলি/ভাইভা',
+      bookmarkedIds: progress?.bookmarkedIds || [],
+    };
+
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * Endpoint to save user progress (completed exams, stats, avatar) to cloud server
+ */
+app.post('/api/user/progress', (req, res) => {
+  try {
+    const { userId, phone, email, fullName, avatarUrl, completedExamId, studentStats, goal, bookmarkedIds } = req.body;
+    if (!userId && !phone && !email) {
+      return res.status(400).json({ success: false, error: 'User identifier required' });
+    }
+
+    const phoneNorm = normalizePhoneNumber(phone || '');
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    let existingIdx = serverUserProgressStore.findIndex((p) => {
+      const pPhoneNorm = normalizePhoneNumber(p.phone || '');
+      const userMatch = userId && p.userId && (p.userId === userId);
+      const phoneMatch = phoneNorm && pPhoneNorm && (phoneNorm === pPhoneNorm || phoneNorm.endsWith(pPhoneNorm.slice(-10)) || pPhoneNorm.endsWith(phoneNorm.slice(-10)));
+      const emailMatch = cleanEmail && p.email && p.email.toLowerCase() === cleanEmail;
+      return Boolean(userMatch || phoneMatch || emailMatch);
+    });
+
+    let record: ServerUserProgress;
+    if (existingIdx >= 0) {
+      record = serverUserProgressStore[existingIdx];
+      if (fullName) record.fullName = fullName;
+      if (avatarUrl !== undefined) record.avatarUrl = avatarUrl;
+      if (phone) record.phone = phone;
+      if (email) record.email = email;
+      if (goal) record.goal = goal;
+      if (Array.isArray(bookmarkedIds)) record.bookmarkedIds = bookmarkedIds;
+      if (studentStats) record.studentStats = studentStats;
+      if (completedExamId && !record.completedExams.includes(completedExamId)) {
+        record.completedExams.push(completedExamId);
+      }
+      record.updatedAt = new Date().toISOString();
+      serverUserProgressStore[existingIdx] = record;
+    } else {
+      record = {
+        userId: userId || `usr_${Date.now()}`,
+        phone: phone || '',
+        email: email || '',
+        fullName: fullName || 'শিক্ষার্থী',
+        avatarUrl: avatarUrl || '',
+        completedExams: completedExamId ? [completedExamId] : [],
+        studentStats: studentStats || undefined,
+        goal: goal || '১৮তম শিক্ষক নিবন্ধন প্রিলি/ভাইভা',
+        bookmarkedIds: Array.isArray(bookmarkedIds) ? bookmarkedIds : [],
+        updatedAt: new Date().toISOString(),
+      };
+      serverUserProgressStore.push(record);
+    }
+    saveUserProgressStoreToDisk();
+
+    // Also update serverRegisteredUsersStore if avatarUrl or fullName changed
+    if (fullName || avatarUrl) {
+      const accIdx = serverRegisteredUsersStore.findIndex((acc) => {
+        const accNorm = normalizePhoneNumber(acc.phone);
+        const uMatch = userId && acc.id === userId;
+        const pMatch = phoneNorm && accNorm && (phoneNorm === accNorm || phoneNorm.endsWith(accNorm.slice(-10)) || accNorm.endsWith(phoneNorm.slice(-10)));
+        const eMatch = cleanEmail && acc.email && acc.email.toLowerCase() === cleanEmail;
+        return Boolean(uMatch || pMatch || eMatch);
+      });
+      if (accIdx >= 0) {
+        if (fullName) serverRegisteredUsersStore[accIdx].full_name = fullName;
+        if (avatarUrl !== undefined) serverRegisteredUsersStore[accIdx].avatar_url = avatarUrl;
+        serverRegisteredUsersStore[accIdx].updated_at = new Date().toISOString();
+        saveRegisteredUsersStoreToDisk();
+      }
+    }
+
+    return res.json({ success: true, record });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
   }
 });
 
