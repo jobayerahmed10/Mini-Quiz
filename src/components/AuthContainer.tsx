@@ -22,7 +22,7 @@ import {
 } from '../lib/supabase';
 import { saveUserProfile, UserProfile } from '../lib/utils';
 
-export type AuthMode = 'login' | 'register' | 'forgot_password';
+export type AuthMode = 'login' | 'register' | 'forgot_password' | 'password-reset' | 'password_reset';
 
 export interface AuthContainerProps {
   initialMode?: AuthMode;
@@ -56,7 +56,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(true);
 
-  // Forgot Password States
+  // Forgot Password / Password Reset States
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
@@ -64,6 +64,8 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const isPasswordResetMode = mode === 'password-reset' || mode === 'forgot_password' || mode === 'password_reset';
 
   // Sync initial mode
   useEffect(() => {
@@ -296,7 +298,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         {/* ================================================================== */}
         {/* TWO PROMINENT TOP TOGGLE BUTTONS: LOGIN & REGISTRATION             */}
         {/* ================================================================== */}
-        {mode !== 'forgot_password' && (
+        {!isPasswordResetMode && (
           <div 
             id="auth-mode-segmented-control"
             className="grid grid-cols-2 p-1.5 bg-emerald-950/10 dark:bg-emerald-950/40 rounded-2xl border border-emerald-800/20 dark:border-emerald-600/30 gap-1.5 shadow-inner"
@@ -333,18 +335,23 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
           </div>
         )}
 
-        {/* Back button if in Forgot Password mode */}
-        {mode === 'forgot_password' && (
-          <div className="flex items-center">
+        {/* Back button if in Password Reset mode */}
+        {isPasswordResetMode && (
+          <div className="flex items-center justify-between pb-1">
             <button
               id="auth-container-back-to-login"
               type="button"
               onClick={() => switchMode('login')}
-              className="inline-flex items-center gap-1.5 text-xs font-black text-[#046A38] dark:text-emerald-400 hover:underline p-1 rounded-xl transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-black text-[#046A38] dark:text-emerald-400 hover:underline p-1.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>লগইনে ফিরে যান</span>
             </button>
+
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300/40 flex items-center gap-1">
+              <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+              পাসওয়ার্ড রিসেট
+            </span>
           </div>
         )}
 
@@ -415,7 +422,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                   <button
                     id="container-forgot-link"
                     type="button"
-                    onClick={() => switchMode('forgot_password')}
+                    onClick={() => switchMode('password-reset')}
                     className="text-[11px] font-bold text-[#046A38] dark:text-emerald-400 hover:underline cursor-pointer"
                   >
                     পাসওয়ার্ড ভুলে গেছেন?
@@ -680,16 +687,17 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         )}
 
         {/* ================================================================== */}
-        {/* VIEW 3: PASSWORD RECOVERY                                          */}
+        {/* VIEW 3: PASSWORD RECOVERY / RESET VIA EMAIL                        */}
         {/* ================================================================== */}
-        {mode === 'forgot_password' && (
+        {isPasswordResetMode && (
           <div className="space-y-4 animate-fade-in">
-            <div className="space-y-0.5">
-              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                পাসওয়ার্ড পুনরুদ্ধার
+            <div className="space-y-1">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#046A38] dark:text-emerald-400" />
+                <span>পাসওয়ার্ড রিসেট করুন</span>
               </h3>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                আপনার নিবন্ধিত ইমেইল দিন, আমরা একটি রিসেট লিংক পাঠাবো
+                আপনার অ্যাকাউন্টে ব্যবহৃত ইমেইল ঠিকানা দিন। আমরা পাসওয়ার্ড রিসেট করার একটি নিরাপদ লিংক পাঠাবো।
               </p>
             </div>
 
@@ -697,7 +705,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
               <form onSubmit={handleForgotSubmit} className="space-y-3.5">
                 <div className="space-y-1">
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300">
-                    ইমেইল ঠিকানা <span className="text-rose-500">*</span>
+                    নিবন্ধিত ইমেইল ঠিকানা <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -708,50 +716,79 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
                       type="email"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="student@example.com"
+                      placeholder="যেমন: student@example.com"
                       disabled={isLoading}
                       required
                       className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#046A38] dark:focus:ring-emerald-500 transition-all shadow-2xs disabled:opacity-60"
                     />
                   </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    নিবন্ধিত ইমেইলে রিসেট নির্দেশনা ও ভেরিফিকেশন লিংক পৌঁছে যাবে।
+                  </p>
                 </div>
 
                 <button
                   id="container-forgot-submit-btn"
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !resetEmail.trim()}
                   className="w-full py-3.5 px-4 rounded-2xl bg-[#046A38] hover:bg-[#03522b] text-white font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-emerald-900/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>লিংক পাঠানো হচ্ছে...</span>
+                      <span>রিসেট লিংক পাঠানো হচ্ছে...</span>
                     </>
                   ) : (
-                    <span>রিসেট লিংক পাঠান</span>
+                    <>
+                      <Mail className="w-4 h-4 text-amber-300" />
+                      <span>ইমেইলে রিসেট লিংক পাঠান</span>
+                    </>
                   )}
                 </button>
               </form>
             ) : (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-[#046A38] dark:text-emerald-400 mx-auto" />
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-center space-y-2.5 animate-fade-in">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/80 text-[#046A38] dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
                 <h4 className="text-sm font-black text-emerald-900 dark:text-emerald-200">
-                  ইমেইল সফলভাবে পাঠানো হয়েছে!
+                  রিসেট লিংক সফলভাবে পাঠানো হয়েছে!
                 </h4>
-                <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                  {resetEmail} ঠিকানায় রিসেট লিংক পাঠানো হয়েছে।
+                <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                  <span className="font-black text-slate-900 dark:text-white underline">{resetEmail}</span> ঠিকানায় পাসওয়ার্ড রিসেট নির্দেশনা পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।
                 </p>
+                <div className="pt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetSent(false);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    ভিন্ন ইমেইল দিয়ে চেষ্টা করুন
+                  </button>
+                </div>
               </div>
             )}
 
-            <div className="pt-2 text-center border-t border-slate-200/80 dark:border-slate-800">
+            <div className="pt-3 flex items-center justify-between border-t border-slate-200/80 dark:border-slate-800 text-xs">
               <button
                 id="container-forgot-back-btn"
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-xs font-black text-[#046A38] dark:text-[#EAB308] hover:underline cursor-pointer"
+                className="font-black text-[#046A38] dark:text-[#EAB308] hover:underline cursor-pointer flex items-center gap-1"
               >
-                ← লগইন পেজে ফিরুন
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>লগইন করুন</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => switchMode('register')}
+                className="font-bold text-slate-600 dark:text-slate-400 hover:text-[#046A38] dark:hover:text-emerald-400 cursor-pointer"
+              >
+                নতুন অ্যাকাউন্ট তৈরি করুন →
               </button>
             </div>
           </div>

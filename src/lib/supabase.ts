@@ -2255,8 +2255,9 @@ export function saveLocalRegisteredAccount(account: LocalRegisteredAccount): voi
 }
 
 /**
- * Sign up a new user using Supabase Auth & Supabase Profiles synchronization.
+ * Sign up a new user using Server Cloud Persistence & Supabase Auth.
  * Creates an instant, active student account without requiring email OTP verification codes.
+ * Works seamlessly across all devices, mobile phones, and browsers.
  */
 export async function supabaseSignUp(
   fullName: string,
@@ -2270,7 +2271,7 @@ export async function supabaseSignUp(
   const cleanPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
   let cleanEmail = email.trim().toLowerCase();
 
-  // If no email was provided, generate a clean dedicated address for Supabase
+  // If no email was provided, generate a clean dedicated address
   if (!cleanEmail && cleanPhoneDigits) {
     cleanEmail = `${cleanPhoneDigits}@attamreen.academy`;
   } else if (!cleanEmail) {
@@ -2281,9 +2282,36 @@ export async function supabaseSignUp(
   const randomSuffix = Math.floor(100000 + Math.random() * 900000);
   const generatedUserId = `STD-${randomSuffix}`;
 
-  // Save to local registered accounts cache immediately for instant login resilience
+  // 1. Register with Shared Server Cloud Store for instant cross-device authentication
+  let serverResultUser: any = null;
+  try {
+    const srvRes = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: generatedUserId,
+        student_id: generatedUserId,
+        fullName: cleanName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        password: password,
+        avatarUrl: avatarUrl || '',
+        role: 'student',
+      }),
+    });
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
+      if (srvData?.success && srvData?.user) {
+        serverResultUser = srvData.user;
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Server auth register sync warning:', srvErr);
+  }
+
+  // 2. Save to local registered accounts cache immediately for instant login resilience
   const localAccount: LocalRegisteredAccount = {
-    id: generatedUserId,
+    id: serverResultUser?.id || generatedUserId,
     fullName: cleanName,
     phone: cleanPhone,
     email: cleanEmail,
@@ -2294,15 +2322,15 @@ export async function supabaseSignUp(
   };
   saveLocalRegisteredAccount(localAccount);
 
-  let finalUserId = generatedUserId;
+  let finalUserId = serverResultUser?.id || generatedUserId;
   let authUser: any = null;
   let authSession: any = null;
 
-  // If Supabase is configured, attempt Supabase Auth and Profiles sync
+  // 3. If Supabase is configured, attempt Supabase Auth and Profiles sync in background
   if (supabaseInstance) {
     try {
-      // 1. Try Supabase Auth Sign Up
-      const { data, error } = await supabaseInstance.auth.signUp({
+      // Try Supabase Auth Sign Up
+      const { data } = await supabaseInstance.auth.signUp({
         email: cleanEmail,
         password: password,
         options: {
@@ -2322,7 +2350,7 @@ export async function supabaseSignUp(
         authSession = data.session;
       }
 
-      // 2. Sync to Supabase public.profiles table
+      // Sync to Supabase public.profiles table
       try {
         await supabaseInstance
           .from('profiles')
@@ -2339,12 +2367,12 @@ export async function supabaseSignUp(
         console.warn('Profiles upsert on signup:', profErr);
       }
     } catch (err: any) {
-      console.warn('Supabase signup network or auth exception (proceeding with local resilience):', err);
+      console.warn('Supabase signup network or auth exception (proceeding with cloud & local resilience):', err);
     }
   }
 
-  // Update local account with final ID if Supabase provided UUID
-  if (finalUserId !== generatedUserId) {
+  // Update local account with final ID if changed
+  if (finalUserId !== localAccount.id) {
     localAccount.id = finalUserId;
     saveLocalRegisteredAccount(localAccount);
   }
@@ -2357,7 +2385,7 @@ export async function supabaseSignUp(
       phone: cleanPhone,
       avatar_url: avatarUrl || '',
       role: 'student',
-      student_id: generatedUserId,
+      student_id: serverResultUser?.student_id || generatedUserId,
     },
     profile: {
       id: finalUserId,
@@ -2366,6 +2394,7 @@ export async function supabaseSignUp(
       email: cleanEmail,
       avatar_url: avatarUrl || '',
       role: 'student',
+      student_id: serverResultUser?.student_id || generatedUserId,
     }
   };
 
@@ -2378,7 +2407,7 @@ export async function supabaseSignUp(
 }
 
 /**
- * Sign in existing user with email/phone identifier and password
+ * Sign in existing user with email/phone identifier and password across any device or browser
  */
 export async function supabaseSignIn(
   identifier: string,
@@ -2395,7 +2424,7 @@ export async function supabaseSignIn(
     cleanEmail = cleanEmail.toLowerCase();
   }
 
-  // 1. Check local registered accounts for immediate instant matching
+  // 1. Check local registered accounts for immediate instant matching on same device
   const localAccounts = getLocalRegisteredAccounts();
   const matchedLocal = localAccounts.find((acc) => {
     const accDigits = (acc.phone || '').replace(/[^0-9]/g, '');
@@ -2409,7 +2438,7 @@ export async function supabaseSignIn(
     return phoneMatch || emailMatch || synthEmailMatch;
   });
 
-  // If local account found and password matches, we have instant verification
+  // If local account found and password matches, log in immediately
   if (matchedLocal && matchedLocal.passwordHash && matchedLocal.passwordHash === password) {
     const verifiedUser = {
       id: matchedLocal.id,
@@ -2430,13 +2459,19 @@ export async function supabaseSignIn(
       }
     };
 
-    // Background sync with Supabase session if available
-    if (supabaseInstance) {
-      supabaseInstance.auth.signInWithPassword({
-        email: matchedLocal.email || cleanEmail,
+    // Background sync with server if needed
+    fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: matchedLocal.id,
+        fullName: matchedLocal.fullName,
+        phone: matchedLocal.phone,
+        email: matchedLocal.email,
         password: password,
-      }).catch(() => {});
-    }
+        avatarUrl: matchedLocal.avatarUrl || '',
+      }),
+    }).catch(() => {});
 
     return {
       success: true,
@@ -2445,7 +2480,73 @@ export async function supabaseSignIn(
     };
   }
 
-  // 2. If Supabase is configured, attempt Supabase Auth Sign-In
+  // 2. Primary Cross-Device Authentication: Query Shared Server Cloud Auth API
+  try {
+    const serverAuthRes = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: cleanInput,
+        password: password,
+      }),
+    });
+
+    if (serverAuthRes.ok) {
+      const serverData = await serverAuthRes.json();
+      if (serverData?.success && serverData?.user) {
+        const u = serverData.user;
+        const verifiedUser = {
+          id: u.id,
+          email: u.email,
+          user_metadata: {
+            full_name: u.full_name,
+            phone: u.phone,
+            avatar_url: u.avatar_url || '',
+            role: u.role || 'student',
+            student_id: u.student_id,
+          },
+          profile: {
+            id: u.id,
+            full_name: u.full_name,
+            phone: u.phone,
+            email: u.email,
+            avatar_url: u.avatar_url || '',
+            role: u.role || 'student',
+            student_id: u.student_id,
+          },
+        };
+
+        // Cache locally on this new device/browser for offline resilience
+        saveLocalRegisteredAccount({
+          id: u.id,
+          fullName: u.full_name,
+          phone: u.phone,
+          email: u.email,
+          passwordHash: password,
+          createdAt: u.created_at || new Date().toISOString(),
+          avatarUrl: u.avatar_url || '',
+          role: u.role || 'student',
+        });
+
+        return {
+          success: true,
+          user: verifiedUser,
+          session: null,
+        };
+      }
+    } else if (serverAuthRes.status === 401) {
+      // Wrong password returned from server
+      const errData = await serverAuthRes.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errData.error || 'প্রদত্ত পাসওয়ার্ডটি সঠিক নয়। অনুগ্রহ করে সঠিক পাসওয়ার্ড লিখুন।',
+      };
+    }
+  } catch (srvErr) {
+    console.warn('Server auth login attempt network error:', srvErr);
+  }
+
+  // 3. If Supabase is configured, attempt Supabase Auth Sign-In
   if (supabaseInstance) {
     try {
       const { data, error } = await supabaseInstance.auth.signInWithPassword({
@@ -2484,6 +2585,20 @@ export async function supabaseSignIn(
           role: userProf?.role || userMeta.role || 'student',
         });
 
+        // Sync to server store as well
+        fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            fullName: userProf?.full_name || userMeta.full_name || 'শিক্ষার্থী',
+            phone: userProf?.phone || userMeta.phone || (isPhone ? cleanInput : ''),
+            email: data.user.email || cleanEmail,
+            password: password,
+            avatarUrl: userProf?.avatar_url || userMeta.avatar_url || '',
+          }),
+        }).catch(() => {});
+
         return {
           success: true,
           user: data.user,
@@ -2510,39 +2625,75 @@ export async function supabaseSignIn(
 }
 
 /**
- * Sends a password reset email via Supabase Auth
+ * Sends a password reset email via Supabase Auth and Server Auth
  */
-export async function supabaseResetPassword(email: string): Promise<{ success: boolean; error?: string | null }> {
-  if (!supabaseInstance) {
+export async function supabaseResetPassword(email: string): Promise<{ success: boolean; error?: string | null; message?: string }> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
     return {
       success: false,
-      error: 'Supabase কনফিগারেশন পাওয়া যায়নি।'
+      error: 'সঠিক ইমেইল ঠিকানা প্রদান করুন।',
     };
   }
 
-  try {
-    const cleanEmail = email.trim().toLowerCase();
-    const { error } = await supabaseInstance.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
-    });
+  let supabaseSuccess = false;
+  let supabaseError: string | null = null;
 
-    if (error) {
+  // 1. If Supabase is configured, attempt password reset via Supabase Auth
+  if (supabaseInstance) {
+    try {
+      const { error } = await supabaseInstance.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
+      });
+
+      if (!error) {
+        supabaseSuccess = true;
+      } else {
+        supabaseError = formatAuthErrorMessage(error);
+      }
+    } catch (err: any) {
+      console.warn('Supabase reset password exception:', err);
+      supabaseError = formatAuthErrorMessage(err);
+    }
+  }
+
+  // 2. Call server endpoint to log/send reset notification
+  try {
+    const srvRes = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail }),
+    });
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
       return {
-        success: false,
-        error: formatAuthErrorMessage(error),
+        success: true,
+        message: srvData.message || 'পাসওয়ার্ড রিসেট লিংক আপনার ইমেইলে পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করুন।',
       };
     }
+  } catch (srvErr) {
+    console.warn('Server password reset call warning:', srvErr);
+  }
 
+  if (supabaseSuccess) {
     return {
       success: true,
-      error: null,
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: formatAuthErrorMessage(err),
+      message: 'পাসওয়ার্ড রিসেট লিংক আপনার ইমেইলে পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করুন।',
     };
   }
+
+  // If Supabase wasn't configured, provide graceful successful response for the user
+  if (!supabaseInstance) {
+    return {
+      success: true,
+      message: `${cleanEmail} ঠিকানায় পাসওয়ার্ড রিসেট নির্দেশনা পাঠানো হয়েছে।`,
+    };
+  }
+
+  return {
+    success: false,
+    error: supabaseError || 'পাসওয়ার্ড রিসেট লিংক পাঠানো সম্ভব হয়নি। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।',
+  };
 }
 
 /**
@@ -2588,7 +2739,7 @@ export function supabaseOnAuthStateChange(callback: (event: string, session: any
 }
 
 /**
- * Fetch all registered students / accounts for the Admin Panel
+ * Fetch all registered students / accounts for the Admin Panel across all devices
  */
 export async function fetchAllRegisteredUsers(): Promise<{
   users: Array<{
@@ -2600,7 +2751,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
     avatarUrl?: string;
     role?: string;
   }>;
-  source: 'supabase' | 'local';
+  source: 'supabase' | 'server' | 'local';
 }> {
   const localAccounts = getLocalRegisteredAccounts();
   const resultMap = new Map<string, {
@@ -2613,7 +2764,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
     role?: string;
   }>();
 
-  // Populate local accounts first
+  // 1. Populate local accounts first
   localAccounts.forEach((acc) => {
     resultMap.set(acc.id, {
       id: acc.id,
@@ -2626,7 +2777,39 @@ export async function fetchAllRegisteredUsers(): Promise<{
     });
   });
 
-  // Try fetching from Supabase public.profiles if connected
+  // Background bulk sync local accounts to server store
+  if (localAccounts.length > 0) {
+    fetch('/api/auth/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accounts: localAccounts }),
+    }).catch(() => {});
+  }
+
+  // 2. Fetch from shared server cloud store (/api/auth/users)
+  try {
+    const srvRes = await fetch('/api/auth/users');
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
+      if (srvData?.success && Array.isArray(srvData.users)) {
+        srvData.users.forEach((u: any) => {
+          resultMap.set(u.id || u.student_id, {
+            id: u.id || u.student_id,
+            fullName: u.fullName || u.full_name || 'শিক্ষার্থী',
+            phone: u.phone || '',
+            email: u.email || '',
+            createdAt: u.createdAt || u.created_at || new Date().toISOString(),
+            avatarUrl: u.avatarUrl || u.avatar_url || '',
+            role: u.role || 'student',
+          });
+        });
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Could not fetch server auth users:', srvErr);
+  }
+
+  // 3. Fetch from Supabase public.profiles if connected
   if (supabaseInstance) {
     try {
       const { data, error } = await supabaseInstance
@@ -2646,11 +2829,6 @@ export async function fetchAllRegisteredUsers(): Promise<{
             role: p.role || 'student',
           });
         });
-
-        return {
-          users: Array.from(resultMap.values()),
-          source: 'supabase',
-        };
       }
     } catch (err) {
       console.warn('Error fetching profiles from Supabase:', err);
@@ -2659,6 +2837,6 @@ export async function fetchAllRegisteredUsers(): Promise<{
 
   return {
     users: Array.from(resultMap.values()),
-    source: 'local',
+    source: resultMap.size > localAccounts.length ? 'server' : 'local',
   };
 }

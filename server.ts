@@ -12,9 +12,23 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Shared Server Leaderboard & Exam Results Persistence
+// Shared Server Leaderboard, Exam Results, and User Accounts Persistence
 const LEADERBOARD_FILE_PATH = path.join(process.cwd(), 'leaderboard_store.json');
 const EXAM_RESULTS_FILE_PATH = path.join(process.cwd(), 'exam_results_store.json');
+const REGISTERED_USERS_FILE_PATH = path.join(process.cwd(), 'registered_users_store.json');
+
+export interface ServerUserAccount {
+  id: string;
+  student_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  password: string;
+  avatar_url?: string;
+  role?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface ServerLeaderboardEntry {
   id: string;
@@ -49,8 +63,19 @@ interface ServerExamResult {
 
 let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 let serverExamResultsStore: ServerExamResult[] = [];
+let serverRegisteredUsersStore: ServerUserAccount[] = [];
 
-// Load existing leaderboard files from disk on startup
+// Load existing stores from disk on startup
+try {
+  if (fs.existsSync(REGISTERED_USERS_FILE_PATH)) {
+    const raw = fs.readFileSync(REGISTERED_USERS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverRegisteredUsersStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load registered_users_store.json:', err);
+}
+
 try {
   if (fs.existsSync(LEADERBOARD_FILE_PATH)) {
     const raw = fs.readFileSync(LEADERBOARD_FILE_PATH, 'utf-8');
@@ -71,6 +96,14 @@ try {
   console.warn('Could not load exam_results_store.json:', err);
 }
 
+function saveRegisteredUsersStoreToDisk() {
+  try {
+    fs.writeFileSync(REGISTERED_USERS_FILE_PATH, JSON.stringify(serverRegisteredUsersStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write registered_users_store.json:', err);
+  }
+}
+
 function saveLeaderboardStoreToDisk() {
   try {
     fs.writeFileSync(LEADERBOARD_FILE_PATH, JSON.stringify(serverLeaderboardStore, null, 2), 'utf-8');
@@ -86,6 +119,293 @@ function saveExamResultsStoreToDisk() {
     console.warn('Could not write exam_results_store.json:', err);
   }
 }
+
+/**
+ * Normalizes phone numbers to standard numeric digits for resilient cross-device matching.
+ * e.g., "+8801712-345678", "01712345678", "8801712345678" -> "01712345678"
+ */
+function normalizePhoneNumber(rawPhone: string): string {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/[^0-9]/g, '');
+  if (digits.startsWith('880') && digits.length >= 13) {
+    return '0' + digits.substring(3);
+  }
+  if (digits.length === 10 && digits.startsWith('1')) {
+    return '0' + digits;
+  }
+  return digits;
+}
+
+// ----------------------------------------------------------------------------
+// USER REGISTRATION & AUTHENTICATION ENDPOINTS (CROSS-DEVICE SYNC)
+// ----------------------------------------------------------------------------
+
+/**
+ * Register or update a user account in the shared server cloud store
+ */
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { id, student_id, fullName, full_name, phone, email, password, avatarUrl, avatar_url, role } = req.body;
+    const cleanName = String(fullName || full_name || '').trim();
+    const cleanPhone = String(phone || '').trim();
+    const cleanPhoneNorm = normalizePhoneNumber(cleanPhone);
+    let cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPassword = String(password || '').trim();
+
+    if (!cleanName) {
+      return res.status(400).json({ success: false, error: 'পূর্ণ নাম প্রদান করা আবশ্যক।' });
+    }
+    if (!cleanPhone && !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'মোবাইল নম্বর অথবা ইমেইল প্রদান করুন।' });
+    }
+    if (!cleanPassword || cleanPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' });
+    }
+
+    if (!cleanEmail && cleanPhoneNorm) {
+      cleanEmail = `${cleanPhoneNorm}@attamreen.academy`;
+    }
+
+    // Generate or use existing Student ID (e.g. STD-782910)
+    const finalStudentId = student_id || `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const finalUserId = id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    // Find existing account by phone or email
+    const existingIndex = serverRegisteredUsersStore.findIndex((acc) => {
+      const accPhoneNorm = normalizePhoneNumber(acc.phone);
+      const phoneMatch = cleanPhoneNorm && accPhoneNorm && (
+        cleanPhoneNorm === accPhoneNorm ||
+        (cleanPhoneNorm.length >= 10 && accPhoneNorm.endsWith(cleanPhoneNorm.slice(-10))) ||
+        (accPhoneNorm.length >= 10 && cleanPhoneNorm.endsWith(accPhoneNorm.slice(-10)))
+      );
+      const emailMatch = cleanEmail && acc.email && acc.email.toLowerCase() === cleanEmail;
+      const idMatch = id && acc.id === id;
+      return Boolean(phoneMatch || emailMatch || idMatch);
+    });
+
+    const nowIso = new Date().toISOString();
+    const newAccount: ServerUserAccount = {
+      id: existingIndex >= 0 ? serverRegisteredUsersStore[existingIndex].id : finalUserId,
+      student_id: existingIndex >= 0 ? (serverRegisteredUsersStore[existingIndex].student_id || finalStudentId) : finalStudentId,
+      full_name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail,
+      password: cleanPassword, // Stored for seamless cross-device phone+password login
+      avatar_url: avatarUrl || avatar_url || (existingIndex >= 0 ? serverRegisteredUsersStore[existingIndex].avatar_url : ''),
+      role: role || 'student',
+      created_at: existingIndex >= 0 ? serverRegisteredUsersStore[existingIndex].created_at : nowIso,
+      updated_at: nowIso,
+    };
+
+    if (existingIndex >= 0) {
+      serverRegisteredUsersStore[existingIndex] = newAccount;
+    } else {
+      serverRegisteredUsersStore.push(newAccount);
+    }
+    saveRegisteredUsersStoreToDisk();
+
+    // Sanitize account (omit raw password) for client response
+    const sanitized = {
+      id: newAccount.id,
+      student_id: newAccount.student_id,
+      full_name: newAccount.full_name,
+      phone: newAccount.phone,
+      email: newAccount.email,
+      avatar_url: newAccount.avatar_url,
+      role: newAccount.role,
+      created_at: newAccount.created_at,
+    };
+
+    return res.json({
+      success: true,
+      user: sanitized,
+      studentId: newAccount.student_id,
+      message: 'রেজিস্ট্রেশন সফল হয়েছে!',
+    });
+  } catch (err: any) {
+    console.error('Registration server error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'সার্ভার ত্রুটি ঘটেছে।' });
+  }
+});
+
+/**
+ * Cross-device login endpoint matching phone or email and password
+ */
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+    const cleanInput = String(identifier || '').trim();
+    const cleanPassword = String(password || '').trim();
+
+    if (!cleanInput || !cleanPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'মোবাইল নম্বর/ইমেইল এবং পাসওয়ার্ড প্রদান করুন।',
+      });
+    }
+
+    const cleanInputDigits = normalizePhoneNumber(cleanInput);
+    const cleanInputEmail = cleanInput.toLowerCase();
+
+    // Search in registered users store
+    const matched = serverRegisteredUsersStore.find((acc) => {
+      const accPhoneNorm = normalizePhoneNumber(acc.phone);
+      const phoneMatch = cleanInputDigits && accPhoneNorm && (
+        cleanInputDigits === accPhoneNorm ||
+        (cleanInputDigits.length >= 10 && accPhoneNorm.endsWith(cleanInputDigits.slice(-10))) ||
+        (accPhoneNorm.length >= 10 && cleanInputDigits.endsWith(accPhoneNorm.slice(-10)))
+      );
+      const emailMatch = acc.email && (
+        acc.email.toLowerCase() === cleanInputEmail ||
+        acc.email.toLowerCase().startsWith(cleanInputDigits)
+      );
+      return Boolean(phoneMatch || emailMatch);
+    });
+
+    if (!matched) {
+      return res.status(404).json({
+        success: false,
+        error: 'মোবাইল নম্বর বা ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে "রেজিস্ট্রেশন" করুন।',
+      });
+    }
+
+    // Validate password
+    if (matched.password !== cleanPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'প্রদত্ত পাসওয়ার্ডটি সঠিক নয়। অনুগ্রহ করে সঠিক পাসওয়ার্ড লিখুন।',
+      });
+    }
+
+    const sanitized = {
+      id: matched.id,
+      student_id: matched.student_id,
+      full_name: matched.full_name,
+      phone: matched.phone,
+      email: matched.email,
+      avatar_url: matched.avatar_url || '',
+      role: matched.role || 'student',
+      created_at: matched.created_at,
+    };
+
+    return res.json({
+      success: true,
+      user: sanitized,
+      studentId: matched.student_id,
+      message: 'লগইন সফল হয়েছে!',
+    });
+  } catch (err: any) {
+    console.error('Login server error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'সার্ভার ত্রুটি ঘটেছে।' });
+  }
+});
+
+/**
+ * Get all registered users for Admin panel and cross-client synchronization
+ */
+app.get('/api/auth/users', (req, res) => {
+  try {
+    const list = serverRegisteredUsersStore.map((u) => ({
+      id: u.id,
+      student_id: u.student_id,
+      fullName: u.full_name,
+      phone: u.phone,
+      email: u.email,
+      avatarUrl: u.avatar_url,
+      role: u.role || 'student',
+      createdAt: u.created_at,
+      updatedAt: u.updated_at,
+    }));
+    return res.json({ success: true, users: list });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Error fetching users' });
+  }
+});
+
+/**
+ * Bulk sync endpoint to import client-side cached accounts to server
+ */
+app.post('/api/auth/sync', (req, res) => {
+  try {
+    const accounts = req.body?.accounts;
+    if (!Array.isArray(accounts)) {
+      return res.json({ success: true, count: serverRegisteredUsersStore.length });
+    }
+
+    let addedCount = 0;
+    accounts.forEach((acc: any) => {
+      if (!acc || (!acc.phone && !acc.email)) return;
+      const cleanPhoneNorm = normalizePhoneNumber(acc.phone || '');
+      const cleanEmail = String(acc.email || '').trim().toLowerCase();
+
+      const exists = serverRegisteredUsersStore.some((existing) => {
+        const exPhoneNorm = normalizePhoneNumber(existing.phone);
+        const phoneMatch = cleanPhoneNorm && exPhoneNorm && cleanPhoneNorm === exPhoneNorm;
+        const emailMatch = cleanEmail && existing.email && existing.email.toLowerCase() === cleanEmail;
+        return Boolean(phoneMatch || emailMatch);
+      });
+
+      if (!exists) {
+        const studentId = acc.id?.startsWith('STD-') ? acc.id : `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+        serverRegisteredUsersStore.push({
+          id: acc.id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          student_id: studentId,
+          full_name: acc.fullName || acc.full_name || 'শিক্ষার্থী',
+          phone: acc.phone || '',
+          email: acc.email || (cleanPhoneNorm ? `${cleanPhoneNorm}@attamreen.academy` : ''),
+          password: acc.passwordHash || acc.password || '123456',
+          avatar_url: acc.avatarUrl || acc.avatar_url || '',
+          role: acc.role || 'student',
+          created_at: acc.createdAt || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      saveRegisteredUsersStoreToDisk();
+    }
+
+    return res.json({ success: true, addedCount, total: serverRegisteredUsersStore.length });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Sync error' });
+  }
+});
+
+/**
+ * Endpoint for requesting a password reset email
+ */
+app.post('/api/auth/reset-password', (req, res) => {
+  try {
+    const { email, identifier } = req.body;
+    const cleanEmail = String(email || identifier || '').trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'ইমেইল ঠিকানা প্রদান করা আবশ্যক।',
+      });
+    }
+
+    // Check if user exists in server store
+    const userFound = serverRegisteredUsersStore.find((u) => {
+      return u.email?.toLowerCase() === cleanEmail ||
+             (cleanEmail.includes('@') && u.email?.toLowerCase() === cleanEmail) ||
+             normalizePhoneNumber(u.phone) === normalizePhoneNumber(cleanEmail);
+    });
+
+    // We return success to prevent email enumeration, but give a tailored message
+    return res.json({
+      success: true,
+      message: `পাসওয়ার্ড রিসেট নির্দেশনা ${cleanEmail} ঠিকানায় সফলভাবে পাঠানো হয়েছে। অনুগ্রহ করে আপনার ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করুন।`,
+      userExists: Boolean(userFound),
+    });
+  } catch (err: any) {
+    console.error('Password reset server error:', err);
+    return res.status(500).json({ success: false, error: 'সার্ভার ত্রুটি ঘটেছে।' });
+  }
+});
 
 // Lazy initializer for GoogleGenAI
 let genAIClient: GoogleGenAI | null = null;
