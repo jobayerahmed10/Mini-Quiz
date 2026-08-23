@@ -2638,10 +2638,25 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
   }
 
   const userMeta = user.user_metadata || {};
-  let finalFullName = userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী';
-  let finalPhone = userProfile?.phone || userMeta.phone || '';
+  let localAvatar = '';
+  let localName = '';
+  let localPhone = '';
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('tamreen_user_profile');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        localAvatar = parsed.avatar || '';
+        localName = parsed.name || '';
+        localPhone = parsed.phone || '';
+      }
+    } catch {}
+  }
+
+  let finalFullName = userProfile?.full_name || userMeta.full_name || localName || 'শিক্ষার্থী';
+  let finalPhone = userProfile?.phone || userMeta.phone || localPhone || '';
   let finalEmail = userProfile?.email || user.email || '';
-  let finalAvatar = userProfile?.avatar_url || userMeta.avatar_url || '';
+  let finalAvatar = userProfile?.avatar_url || userMeta.avatar_url || localAvatar || '';
 
   // Synchronize cross-browser progress (exams, stats, avatar) from server
   try {
@@ -2698,6 +2713,13 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
     }
   } catch (syncErr) {
     console.warn('Cross-browser progress sync notice:', syncErr);
+  }
+
+  // If localAvatar exists but auth.user metadata was missing it, update metadata in the background
+  if (finalAvatar && !userMeta.avatar_url && supabaseInstance) {
+    supabaseInstance.auth.updateUser({
+      data: { avatar_url: finalAvatar }
+    }).catch(() => {});
   }
 
   const profile = {

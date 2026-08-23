@@ -9,7 +9,7 @@ import {
 import { 
   saveUserProfile, UserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
-  getBookmarkedIds, clearUserProfile 
+  getBookmarkedIds, clearUserProfile, compressAndResizeAvatar 
 } from '../lib/utils';
 import { 
   supabaseGetSession, 
@@ -95,19 +95,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMsg('ছবি সাইজ ৫ মেগাবাইটের কম হতে হবে');
+      if (file.size > 8 * 1024 * 1024) {
+        setErrorMsg('ছবি সাইজ ৮ মেগাবাইটের কম হতে হবে');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-        setErrorMsg('');
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressAndResizeAvatar(file, 280, 0.82);
+        if (compressedBase64) {
+          setAvatar(compressedBase64);
+          setErrorMsg('');
+        } else {
+          setErrorMsg('ছবি প্রসেস করা সম্ভব হয়নি, অন্য ছবি নির্বাচন করুন');
+        }
+      } catch {
+        setErrorMsg('ছবি আপলোডে সমস্যা হয়েছে');
+      }
     }
   };
 
@@ -117,9 +122,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setErrorMsg('অনুগ্রহ করে নাম প্রদান করুন');
       return;
     }
-    const currentProfile = getUserProfile();
-    saveUserProfile(name, phone, avatar, true, currentProfile?.email);
-    supabaseUpdateUserProfile({ fullName: name, avatarUrl: avatar, phone });
+    const currentProf = getUserProfile();
+    saveUserProfile(name, phone, avatar, true, currentProf?.email);
+    await supabaseUpdateUserProfile({ fullName: name, avatarUrl: avatar, phone });
     setErrorMsg('');
     setSuccessMsg('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
     setTimeout(() => {

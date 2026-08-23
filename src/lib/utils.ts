@@ -229,6 +229,60 @@ export function getUserUniqueId(): string {
   }
 }
 
+export async function compressAndResizeAvatar(
+  file: File,
+  maxDimension: number = 280,
+  quality: number = 0.82
+): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(readerEvent.target?.result as string);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve(readerEvent.target?.result as string);
+        };
+        img.src = readerEvent.target?.result as string;
+      };
+      reader.onerror = () => {
+        resolve('');
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      resolve('');
+    }
+  });
+}
+
 export function getUserProfile(): UserProfile | null {
   try {
     const data = localStorage.getItem(PROFILE_STORAGE_KEY);
@@ -259,11 +313,14 @@ export function saveUserProfile(
   const previousProfile = getUserProfile();
   const oldName = previousProfile?.name?.trim()?.toLowerCase();
 
+  // If avatar is provided as a non-empty string, use it; otherwise preserve existing avatar
+  const finalAvatar = (avatar && avatar.trim().length > 0) ? avatar.trim() : (previousProfile?.avatar || '');
+
   const profile: UserProfile = {
     name: name.trim(),
-    phone: phone ? phone.trim() : '',
-    avatar: avatar || '',
-    email: email || '',
+    phone: phone ? phone.trim() : (previousProfile?.phone || ''),
+    avatar: finalAvatar,
+    email: email !== undefined ? email : (previousProfile?.email || ''),
     isRegistered: isRegistered,
   };
   try {
