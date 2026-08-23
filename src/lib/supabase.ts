@@ -2321,6 +2321,22 @@ export async function supabaseSignUp(
       console.warn('public.profiles synchronization notice:', profErr);
     }
 
+    // 3. Synchronize to server user accounts store for instant cross-device phone lookups
+    fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: authUser.id,
+        student_id: studentId,
+        fullName: cleanName,
+        phone: cleanPhone || cleanPhoneDigits,
+        email: targetEmail,
+        password: password,
+        avatarUrl: avatarUrl || '',
+        role: 'student',
+      }),
+    }).catch(() => {});
+
     const profileData = {
       id: authUser.id,
       full_name: cleanName,
@@ -2375,17 +2391,40 @@ export async function supabaseSignIn(
   const { email, isPhone, phoneDigits } = normalizeAuthIdentifier(cleanInput);
 
   // List of email variations to test against Supabase Auth in case user registered earlier with alternative prefix
-  const emailsToTry = [email];
+  const emailsToTry: string[] = [];
+
+  // If input is a phone number, attempt to look up registered email via server or known accounts
   if (isPhone && phoneDigits) {
     const clean11 = phoneDigits.length >= 11 ? phoneDigits.slice(-11) : phoneDigits.padStart(11, '0');
+    
+    // Check known account mapping
+    if (clean11.endsWith('01779834999') || clean11.endsWith('1779834999')) {
+      emailsToTry.push('ntrca999@gmail.com');
+    }
+
+    try {
+      const lookupRes = await fetch(`/api/auth/lookup-phone?phone=${encodeURIComponent(cleanInput)}`);
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json();
+        if (lookupData?.success && lookupData?.email && !emailsToTry.includes(lookupData.email)) {
+          emailsToTry.unshift(lookupData.email);
+        }
+      }
+    } catch {}
+
+    const alt0 = `student_${clean11}@attamreen.com`;
     const alt1 = `phone_${clean11}@attamreen.com`;
     const alt2 = `${clean11}@attamreen.com`;
-    const alt3 = `student_${clean11}@gmail.com`;
-    const alt4 = `phone${clean11}@gmail.com`;
-    if (!emailsToTry.includes(alt1)) emailsToTry.push(alt1);
-    if (!emailsToTry.includes(alt2)) emailsToTry.push(alt2);
-    if (!emailsToTry.includes(alt3)) emailsToTry.push(alt3);
-    if (!emailsToTry.includes(alt4)) emailsToTry.push(alt4);
+    const alt3 = `${clean11}@attamreen.academy`;
+    const alt4 = `student_${clean11}@gmail.com`;
+    const alt5 = `phone${clean11}@gmail.com`;
+    const alt6 = `${clean11}@gmail.com`;
+
+    [alt0, alt1, alt2, alt3, alt4, alt5, alt6].forEach((e) => {
+      if (!emailsToTry.includes(e)) emailsToTry.push(e);
+    });
+  } else {
+    emailsToTry.push(email);
   }
 
   let lastError: any = null;

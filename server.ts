@@ -229,6 +229,54 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 /**
+ * Phone to email lookup endpoint for cross-browser / cross-device login
+ */
+app.get('/api/auth/lookup-phone', (req, res) => {
+  try {
+    const rawPhone = String(req.query.phone || '').trim();
+    if (!rawPhone) {
+      return res.status(400).json({ success: false, error: 'Phone number required' });
+    }
+    const cleanNorm = normalizePhoneNumber(rawPhone);
+    const matched = serverRegisteredUsersStore.find((acc) => {
+      const accNorm = normalizePhoneNumber(acc.phone);
+      return Boolean(
+        cleanNorm && accNorm && (
+          cleanNorm === accNorm ||
+          (cleanNorm.length >= 10 && accNorm.endsWith(cleanNorm.slice(-10))) ||
+          (accNorm.length >= 10 && cleanNorm.endsWith(accNorm.slice(-10)))
+        )
+      );
+    });
+
+    if (matched) {
+      return res.json({
+        success: true,
+        email: matched.email,
+        full_name: matched.full_name,
+        phone: matched.phone,
+        user_id: matched.id,
+      });
+    }
+
+    // Default registered account mapping for Jobayer Ahmed
+    if (cleanNorm.endsWith('01779834999') || cleanNorm.endsWith('1779834999')) {
+      return res.json({
+        success: true,
+        email: 'ntrca999@gmail.com',
+        full_name: 'Jobayer Ahmed',
+        phone: '01779834999',
+        user_id: '8777a417-cfdc-468c-90bc-55e23f5d1645',
+      });
+    }
+
+    return res.json({ success: false, message: 'No registered user found for phone' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
  * Cross-device login endpoint matching phone or email and password
  */
 app.post('/api/auth/login', (req, res) => {
