@@ -25,9 +25,10 @@ import {
   LeaderboardEntry,
   supabaseGetSession,
   supabaseGetUser,
-  supabaseOnAuthStateChange
+  supabaseOnAuthStateChange,
+  syncUserProfileFromSupabase
 } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered, saveUserProfile } from './lib/utils';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered, saveUserProfile, clearUserProfile } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
@@ -136,54 +137,60 @@ export default function App() {
     localStorage.setItem('miniquiz_showharakat', String(showHarakat));
   }, [showHarakat]);
 
-  // Synchronize Supabase Auth session on mount and listen to state changes
+  // Robust session management strictly handled by Supabase Auth
   useEffect(() => {
-    supabaseGetSession().then((session) => {
+    let isMounted = true;
+
+    // 1. Initial session check on mount via supabase.auth.getSession
+    supabaseGetSession().then(async (session) => {
+      if (!isMounted) return;
       if (session?.user) {
-        supabaseGetUser().then((user) => {
-          if (user) {
-            const meta = user.user_metadata || {};
-            const prof = user.profile || {};
-            saveUserProfile(
-              prof.full_name || meta.full_name || 'শিক্ষার্থী',
-              prof.phone || meta.phone || '',
-              prof.avatar_url || meta.avatar_url || '',
-              true,
-              prof.email || user.email || ''
-            );
-            window.dispatchEvent(new Event('tamreen_profile_updated'));
-            window.dispatchEvent(new Event('tamreen_auth_status_changed'));
-          }
-        });
+        // Synchronize the profile once upon successful authentication
+        const synced = await syncUserProfileFromSupabase(session.user);
+        if (synced && isMounted) {
+          saveUserProfile(
+            synced.full_name,
+            synced.phone,
+            synced.avatar_url,
+            true,
+            synced.email
+          );
+          window.dispatchEvent(new Event('tamreen_profile_updated'));
+          window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+        }
       }
     });
 
-    const unsubscribe = supabaseOnAuthStateChange((event, session) => {
-      if (session?.user) {
-        supabaseGetUser().then((user) => {
-          if (user) {
-            const meta = user.user_metadata || {};
-            const prof = user.profile || {};
-            saveUserProfile(
-              prof.full_name || meta.full_name || 'শিক্ষার্থী',
-              prof.phone || meta.phone || '',
-              prof.avatar_url || meta.avatar_url || '',
-              true,
-              prof.email || user.email || ''
-            );
-            window.dispatchEvent(new Event('tamreen_profile_updated'));
-            window.dispatchEvent(new Event('tamreen_auth_status_changed'));
-          }
-        });
+    // 2. Continuous session management via supabase.auth.onAuthStateChange
+    const unsubscribe = supabaseOnAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (
+        session?.user &&
+        (event === 'SIGNED_IN' ||
+          event === 'INITIAL_SESSION' ||
+          event === 'TOKEN_REFRESHED' ||
+          event === 'USER_UPDATED')
+      ) {
+        const synced = await syncUserProfileFromSupabase(session.user);
+        if (synced && isMounted) {
+          saveUserProfile(
+            synced.full_name,
+            synced.phone,
+            synced.avatar_url,
+            true,
+            synced.email
+          );
+          window.dispatchEvent(new Event('tamreen_profile_updated'));
+          window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+        }
       } else if (event === 'SIGNED_OUT') {
-        localStorage.removeItem('tamreen_user_profile');
-        localStorage.removeItem('tamreen_user_auth_status');
-        window.dispatchEvent(new Event('tamreen_profile_updated'));
-        window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+        clearUserProfile();
       }
     });
 
     return () => {
+      isMounted = false;
       unsubscribe();
     };
   }, []);

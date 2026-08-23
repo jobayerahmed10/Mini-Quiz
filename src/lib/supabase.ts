@@ -92,7 +92,14 @@ let supabaseInstance: SupabaseClient | null = null;
 
 if (isSupabaseConfigured) {
   try {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      },
+    });
   } catch (err) {
     console.warn('Failed to initialize Supabase client:', err);
   }
@@ -2608,6 +2615,53 @@ export function supabaseOnAuthStateChange(callback: (event: string, session: any
 }
 
 /**
+ * Synchronize user profile from public.profiles table or user_metadata upon successful authentication
+ */
+export async function syncUserProfileFromSupabase(user: any): Promise<any> {
+  if (!user) return null;
+  let userProfile: any = null;
+
+  if (supabaseInstance) {
+    try {
+      const { data: prof, error } = await supabaseInstance
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!error && prof) {
+        userProfile = prof;
+      }
+    } catch (profErr) {
+      console.warn('public.profiles query error:', profErr);
+    }
+  }
+
+  const userMeta = user.user_metadata || {};
+  const profile = {
+    id: user.id,
+    full_name: userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী',
+    phone: userProfile?.phone || userMeta.phone || '',
+    email: userProfile?.email || user.email || '',
+    role: userProfile?.role || userMeta.role || 'student',
+    student_id: userMeta.student_id || `STD-${(userProfile?.phone || userMeta.phone || '').replace(/[^0-9]/g, '').slice(-6) || 'STUDENT'}`,
+    avatar_url: userProfile?.avatar_url || userMeta.avatar_url || '',
+  };
+
+  (user as any).profile = profile;
+
+  // Persist user ID and profile to browser persistent storage
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('tamreen_user_id', user.id);
+      localStorage.setItem('tamreen_user_auth_status', 'registered');
+    } catch {}
+  }
+
+  return profile;
+}
+
+/**
  * Get current authenticated user profile from Supabase Auth & public.profiles
  */
 export async function supabaseGetUser(): Promise<any> {
@@ -2616,31 +2670,7 @@ export async function supabaseGetUser(): Promise<any> {
     const { data: { user }, error } = await supabaseInstance.auth.getUser();
     if (error || !user) return null;
 
-    let userProfile = null;
-    try {
-      const { data: prof } = await supabaseInstance
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (prof) {
-        userProfile = prof;
-      }
-    } catch {}
-
-    const userMeta = user.user_metadata || {};
-    const profile = {
-      id: user.id,
-      full_name: userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী',
-      phone: userProfile?.phone || userMeta.phone || '',
-      email: userProfile?.email || user.email || '',
-      role: userProfile?.role || userMeta.role || 'student',
-      student_id: userMeta.student_id || `STD-${(userProfile?.phone || userMeta.phone || '').replace(/[^0-9]/g, '').slice(-6)}`,
-      avatar_url: userProfile?.avatar_url || userMeta.avatar_url || '',
-    };
-
-    (user as any).profile = profile;
+    await syncUserProfileFromSupabase(user);
     return user;
   } catch {
     return null;

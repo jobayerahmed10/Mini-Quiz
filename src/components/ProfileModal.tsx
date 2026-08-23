@@ -9,7 +9,7 @@ import {
 import { 
   saveUserProfile, UserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
-  getBookmarkedIds 
+  getBookmarkedIds, clearUserProfile 
 } from '../lib/utils';
 import { 
   supabaseGetSession, 
@@ -81,6 +81,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handleSignOut = async () => {
     await supabaseSignOut();
+    clearUserProfile();
     setAuthSession(null);
     setSuccessMsg('সফলভাবে লগআউট হয়েছে');
     setTimeout(() => setSuccessMsg(''), 2000);
