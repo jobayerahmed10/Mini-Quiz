@@ -169,12 +169,6 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
       return;
     }
     
-    // Auto-generate synthesized email if user registered with phone only
-    if (!cleanEmail && cleanPhone) {
-      const sanitizedPhone = cleanPhone.replace(/[^0-9]/g, '');
-      cleanEmail = `${sanitizedPhone || 'student'}@attamreen.academy`;
-    }
-
     if (!registerPassword || registerPassword.length < 6) {
       setErrorMessage('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
       return;
@@ -191,7 +185,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await supabaseSignUp(cleanName, cleanEmail, cleanPhone || '', registerPassword);
+      const res = await supabaseSignUp(cleanName, cleanEmail || cleanPhone, cleanPhone || '', registerPassword);
 
       if (!res.success) {
         setErrorMessage(res.error || 'অ্যাকাউন্ট তৈরি সম্ভব হয়নি। পুনরায় চেষ্টা করুন।');
@@ -199,7 +193,7 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
         return;
       }
 
-      const saved = saveUserProfile(cleanName, cleanPhone, '', true, cleanEmail);
+      const saved = saveUserProfile(cleanName, cleanPhone, '', true, cleanEmail || (res.user?.email ?? ''));
       window.dispatchEvent(new Event('tamreen_profile_updated'));
       window.dispatchEvent(new Event('tamreen_auth_status_changed'));
 

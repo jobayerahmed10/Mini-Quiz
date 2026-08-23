@@ -17,8 +17,17 @@ import { AuthModal } from './components/AuthModal';
 import { SharedExamEntranceCard } from './components/SharedExamEntranceCard';
 import { RegistrationPromptModal } from './components/RegistrationPromptModal';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
-import { fetchPublishedQuestions, fetchExamsFromSupabase, saveLeaderboardEntryToSupabase, submitExamResultToSupabase, LeaderboardEntry } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered } from './lib/utils';
+import { 
+  fetchPublishedQuestions, 
+  fetchExamsFromSupabase, 
+  saveLeaderboardEntryToSupabase, 
+  submitExamResultToSupabase, 
+  LeaderboardEntry,
+  supabaseGetSession,
+  supabaseGetUser,
+  supabaseOnAuthStateChange
+} from './lib/supabase';
+import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered, saveUserProfile } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
@@ -126,6 +135,58 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('miniquiz_showharakat', String(showHarakat));
   }, [showHarakat]);
+
+  // Synchronize Supabase Auth session on mount and listen to state changes
+  useEffect(() => {
+    supabaseGetSession().then((session) => {
+      if (session?.user) {
+        supabaseGetUser().then((user) => {
+          if (user) {
+            const meta = user.user_metadata || {};
+            const prof = user.profile || {};
+            saveUserProfile(
+              prof.full_name || meta.full_name || 'শিক্ষার্থী',
+              prof.phone || meta.phone || '',
+              prof.avatar_url || meta.avatar_url || '',
+              true,
+              prof.email || user.email || ''
+            );
+            window.dispatchEvent(new Event('tamreen_profile_updated'));
+            window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+          }
+        });
+      }
+    });
+
+    const unsubscribe = supabaseOnAuthStateChange((event, session) => {
+      if (session?.user) {
+        supabaseGetUser().then((user) => {
+          if (user) {
+            const meta = user.user_metadata || {};
+            const prof = user.profile || {};
+            saveUserProfile(
+              prof.full_name || meta.full_name || 'শিক্ষার্থী',
+              prof.phone || meta.phone || '',
+              prof.avatar_url || meta.avatar_url || '',
+              true,
+              prof.email || user.email || ''
+            );
+            window.dispatchEvent(new Event('tamreen_profile_updated'));
+            window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+          }
+        });
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('tamreen_user_profile');
+        localStorage.removeItem('tamreen_user_auth_status');
+        window.dispatchEvent(new Event('tamreen_profile_updated'));
+        window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Load published questions on mount
   const loadQuestions = useCallback(async () => {

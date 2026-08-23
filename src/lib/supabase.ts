@@ -2206,421 +2206,251 @@ export function formatAuthErrorMessage(error: any): string {
 }
 
 /**
- * Local Registered Accounts Store to guarantee instant, offline-resilient login with Phone/Email & Password
+ * Formats a phone number into a valid, deterministic Supabase Auth email
+ * e.g., "01712345678" -> "student_01712345678@attamreen.com"
  */
-const REGISTERED_ACCOUNTS_KEY = 'tamreen_registered_accounts';
-
-export interface LocalRegisteredAccount {
-  id: string;
-  fullName: string;
-  phone: string;
-  email: string;
-  passwordHash?: string;
-  createdAt: string;
-  avatarUrl?: string;
-  role?: string;
-}
-
-export function getLocalRegisteredAccounts(): LocalRegisteredAccount[] {
-  try {
-    const raw = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveLocalRegisteredAccount(account: LocalRegisteredAccount): void {
-  try {
-    const accounts = getLocalRegisteredAccounts();
-    const cleanPhoneDigits = (account.phone || '').replace(/[^0-9]/g, '');
-    const cleanEmailLower = (account.email || '').trim().toLowerCase();
-
-    const existingIndex = accounts.findIndex((a) => {
-      const aPhoneDigits = (a.phone || '').replace(/[^0-9]/g, '');
-      const aEmailLower = (a.email || '').trim().toLowerCase();
-      const phoneMatch = cleanPhoneDigits && aPhoneDigits && cleanPhoneDigits === aPhoneDigits;
-      const emailMatch = cleanEmailLower && aEmailLower && cleanEmailLower === aEmailLower;
-      const idMatch = a.id === account.id;
-      return phoneMatch || emailMatch || idMatch;
-    });
-
-    if (existingIndex >= 0) {
-      accounts[existingIndex] = { ...accounts[existingIndex], ...account };
-    } else {
-      accounts.push(account);
-    }
-    localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(accounts));
-  } catch {}
+export function formatPhoneForSupabaseAuth(phone: string): string {
+  const digits = (phone || '').replace(/[^0-9]/g, '');
+  const clean11 = digits.length >= 11 ? digits.slice(-11) : digits.padStart(11, '0');
+  return `student_${clean11}@attamreen.com`;
 }
 
 /**
- * Sign up a new user using Server Cloud Persistence & Supabase Auth.
- * Creates an instant, active student account without requiring email OTP verification codes.
- * Works seamlessly across all devices, mobile phones, and browsers.
+ * Normalizes input identifier (phone or email) for Supabase Auth
+ */
+export function normalizeAuthIdentifier(identifier: string): { email: string; isPhone: boolean; phoneDigits: string } {
+  const clean = (identifier || '').trim();
+  if (clean.includes('@')) {
+    return {
+      email: clean.toLowerCase(),
+      isPhone: false,
+      phoneDigits: clean.replace(/[^0-9]/g, ''),
+    };
+  }
+  const digits = clean.replace(/[^0-9]/g, '');
+  return {
+    email: formatPhoneForSupabaseAuth(clean),
+    isPhone: true,
+    phoneDigits: digits,
+  };
+}
+
+/**
+ * Sign up a new user using Supabase Auth as the single source of truth.
+ * Role is strictly set to 'student' (users cannot choose admin).
+ * User ID is the Supabase Auth UUID (auth.users.id).
+ * User profile is synchronized to public.profiles with profiles.id = auth.users.id.
  */
 export async function supabaseSignUp(
   fullName: string,
-  email: string,
+  emailOrPhone: string,
   phone: string,
   password: string,
   avatarUrl?: string
 ): Promise<AuthResult> {
-  const cleanName = fullName.trim();
-  const cleanPhone = phone.trim();
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase ডাটাবেজ সংযোগ পাওয়া যায়নি।',
+    };
+  }
+
+  const cleanName = (fullName || '').trim();
+  const cleanPhone = (phone || '').trim();
   const cleanPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
-  let cleanEmail = email.trim().toLowerCase();
-
-  // If no email was provided, generate a clean dedicated address
-  if (!cleanEmail && cleanPhoneDigits) {
-    cleanEmail = `${cleanPhoneDigits}@attamreen.academy`;
-  } else if (!cleanEmail) {
-    cleanEmail = `student_${Date.now()}@attamreen.academy`;
+  
+  let targetEmail = (emailOrPhone || '').trim().toLowerCase();
+  if (!targetEmail.includes('@')) {
+    targetEmail = formatPhoneForSupabaseAuth(cleanPhone || emailOrPhone);
   }
 
-  // Generate unique readable Student ID (e.g. STD-728190)
-  const randomSuffix = Math.floor(100000 + Math.random() * 900000);
-  const generatedUserId = `STD-${randomSuffix}`;
+  if (!cleanName) {
+    return { success: false, error: 'অনুগ্রহ করে আপনার পূর্ণ নাম লিখুন।' };
+  }
+  if (!password || password.length < 6) {
+    return { success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
+  }
 
-  // 1. Register with Shared Server Cloud Store for instant cross-device authentication
-  let serverResultUser: any = null;
+  const studentId = `STD-${cleanPhoneDigits.slice(-6) || Math.floor(100000 + Math.random() * 900000)}`;
+
   try {
-    const srvRes = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: generatedUserId,
-        student_id: generatedUserId,
-        fullName: cleanName,
-        phone: cleanPhone,
-        email: cleanEmail,
-        password: password,
-        avatarUrl: avatarUrl || '',
-        role: 'student',
-      }),
-    });
-    if (srvRes.ok) {
-      const srvData = await srvRes.json();
-      if (srvData?.success && srvData?.user) {
-        serverResultUser = srvData.user;
-      }
-    }
-  } catch (srvErr) {
-    console.warn('Server auth register sync warning:', srvErr);
-  }
-
-  // 2. Save to local registered accounts cache immediately for instant login resilience
-  const localAccount: LocalRegisteredAccount = {
-    id: serverResultUser?.id || generatedUserId,
-    fullName: cleanName,
-    phone: cleanPhone,
-    email: cleanEmail,
-    passwordHash: password, // For instant fallback authentication matching
-    createdAt: new Date().toISOString(),
-    avatarUrl: avatarUrl || '',
-    role: 'student',
-  };
-  saveLocalRegisteredAccount(localAccount);
-
-  let finalUserId = serverResultUser?.id || generatedUserId;
-  let authUser: any = null;
-  let authSession: any = null;
-
-  // 3. If Supabase is configured, attempt Supabase Auth and Profiles sync in background
-  if (supabaseInstance) {
-    try {
-      // Try Supabase Auth Sign Up
-      const { data } = await supabaseInstance.auth.signUp({
-        email: cleanEmail,
-        password: password,
-        options: {
-          data: {
-            full_name: cleanName,
-            phone: cleanPhone,
-            avatar_url: avatarUrl || null,
-            role: 'student',
-            student_id: generatedUserId,
-          },
+    // 1. Create real Supabase Auth user (auth.users)
+    const { data, error } = await supabaseInstance.auth.signUp({
+      email: targetEmail,
+      password: password,
+      options: {
+        data: {
+          full_name: cleanName,
+          phone: cleanPhone || cleanPhoneDigits,
+          role: 'student', // Strictly enforced: new signups are always 'student'
+          student_id: studentId,
+          avatar_url: avatarUrl || '',
         },
-      });
+      },
+    });
 
-      if (data?.user) {
-        finalUserId = data.user.id;
-        authUser = data.user;
-        authSession = data.session;
-      }
-
-      // Sync to Supabase public.profiles table
-      try {
-        await supabaseInstance
-          .from('profiles')
-          .upsert({
-            id: finalUserId,
-            full_name: cleanName,
-            phone: cleanPhone,
-            email: cleanEmail,
-            avatar_url: avatarUrl || null,
-            role: 'student',
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'id' });
-      } catch (profErr) {
-        console.warn('Profiles upsert on signup:', profErr);
-      }
-    } catch (err: any) {
-      console.warn('Supabase signup network or auth exception (proceeding with cloud & local resilience):', err);
+    if (error) {
+      return {
+        success: false,
+        error: formatAuthErrorMessage(error),
+      };
     }
-  }
 
-  // Update local account with final ID if changed
-  if (finalUserId !== localAccount.id) {
-    localAccount.id = finalUserId;
-    saveLocalRegisteredAccount(localAccount);
-  }
-
-  const resultUser = authUser || {
-    id: finalUserId,
-    email: cleanEmail,
-    user_metadata: {
-      full_name: cleanName,
-      phone: cleanPhone,
-      avatar_url: avatarUrl || '',
-      role: 'student',
-      student_id: serverResultUser?.student_id || generatedUserId,
-    },
-    profile: {
-      id: finalUserId,
-      full_name: cleanName,
-      phone: cleanPhone,
-      email: cleanEmail,
-      avatar_url: avatarUrl || '',
-      role: 'student',
-      student_id: serverResultUser?.student_id || generatedUserId,
+    const authUser = data?.user;
+    if (!authUser) {
+      return {
+        success: false,
+        error: 'অ্যাকাউন্ট তৈরি করা সম্ভব হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।',
+      };
     }
-  };
 
-  return {
-    success: true,
-    user: resultUser,
-    session: authSession,
-    needsEmailConfirmation: false,
-  };
+    // 2. Synchronize to public.profiles table (profiles.id = auth.users.id)
+    try {
+      await supabaseInstance
+        .from('profiles')
+        .upsert({
+          id: authUser.id,
+          full_name: cleanName,
+          phone: cleanPhone || cleanPhoneDigits,
+          email: targetEmail,
+          role: 'student',
+          avatar_url: avatarUrl || '',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+    } catch (profErr) {
+      console.warn('public.profiles synchronization notice:', profErr);
+    }
+
+    const profileData = {
+      id: authUser.id,
+      full_name: cleanName,
+      phone: cleanPhone || cleanPhoneDigits,
+      email: targetEmail,
+      role: 'student',
+      student_id: studentId,
+      avatar_url: avatarUrl || '',
+    };
+
+    (authUser as any).profile = profileData;
+
+    return {
+      success: true,
+      user: authUser,
+      session: data.session,
+      needsEmailConfirmation: !data.session && Boolean(authUser && !authUser.confirmed_at),
+    };
+  } catch (err: any) {
+    console.error('Supabase signup error:', err);
+    return {
+      success: false,
+      error: formatAuthErrorMessage(err),
+    };
+  }
 }
 
 /**
- * Sign in existing user with email/phone identifier and password across any device or browser
+ * Sign in existing user using Supabase Auth as the single source of truth.
+ * Supports Phone Number or Email + Password.
+ * Loads public.profiles using profiles.id = auth.users.id.
  */
 export async function supabaseSignIn(
   identifier: string,
   password: string
 ): Promise<AuthResult> {
-  const cleanInput = identifier.trim();
-  const cleanInputDigits = cleanInput.replace(/[^0-9]/g, '');
-  const isPhone = !cleanInput.includes('@');
-  
-  let cleanEmail = cleanInput;
-  if (isPhone) {
-    cleanEmail = `${cleanInputDigits || 'student'}@attamreen.academy`;
-  } else {
-    cleanEmail = cleanEmail.toLowerCase();
-  }
-
-  // 1. Check local registered accounts for immediate instant matching on same device
-  const localAccounts = getLocalRegisteredAccounts();
-  const matchedLocal = localAccounts.find((acc) => {
-    const accDigits = (acc.phone || '').replace(/[^0-9]/g, '');
-    const phoneMatch = cleanInputDigits.length >= 6 && accDigits && (
-      accDigits === cleanInputDigits ||
-      accDigits.endsWith(cleanInputDigits) ||
-      cleanInputDigits.endsWith(accDigits)
-    );
-    const emailMatch = acc.email && acc.email.toLowerCase() === cleanInput.toLowerCase();
-    const synthEmailMatch = acc.email && acc.email.toLowerCase() === cleanEmail.toLowerCase();
-    return phoneMatch || emailMatch || synthEmailMatch;
-  });
-
-  // If local account found and password matches, log in immediately
-  if (matchedLocal && matchedLocal.passwordHash && matchedLocal.passwordHash === password) {
-    const verifiedUser = {
-      id: matchedLocal.id,
-      email: matchedLocal.email,
-      user_metadata: {
-        full_name: matchedLocal.fullName,
-        phone: matchedLocal.phone,
-        avatar_url: matchedLocal.avatarUrl || '',
-        role: matchedLocal.role || 'student',
-      },
-      profile: {
-        id: matchedLocal.id,
-        full_name: matchedLocal.fullName,
-        phone: matchedLocal.phone,
-        email: matchedLocal.email,
-        avatar_url: matchedLocal.avatarUrl || '',
-        role: matchedLocal.role || 'student',
-      }
-    };
-
-    // Background sync with server if needed
-    fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: matchedLocal.id,
-        fullName: matchedLocal.fullName,
-        phone: matchedLocal.phone,
-        email: matchedLocal.email,
-        password: password,
-        avatarUrl: matchedLocal.avatarUrl || '',
-      }),
-    }).catch(() => {});
-
+  if (!supabaseInstance) {
     return {
-      success: true,
-      user: verifiedUser,
-      session: null,
+      success: false,
+      error: 'Supabase ডাটাবেজ সংযোগ পাওয়া যায়নি।',
     };
   }
 
-  // 2. Primary Cross-Device Authentication: Query Shared Server Cloud Auth API
-  try {
-    const serverAuthRes = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        identifier: cleanInput,
-        password: password,
-      }),
-    });
-
-    if (serverAuthRes.ok) {
-      const serverData = await serverAuthRes.json();
-      if (serverData?.success && serverData?.user) {
-        const u = serverData.user;
-        const verifiedUser = {
-          id: u.id,
-          email: u.email,
-          user_metadata: {
-            full_name: u.full_name,
-            phone: u.phone,
-            avatar_url: u.avatar_url || '',
-            role: u.role || 'student',
-            student_id: u.student_id,
-          },
-          profile: {
-            id: u.id,
-            full_name: u.full_name,
-            phone: u.phone,
-            email: u.email,
-            avatar_url: u.avatar_url || '',
-            role: u.role || 'student',
-            student_id: u.student_id,
-          },
-        };
-
-        // Cache locally on this new device/browser for offline resilience
-        saveLocalRegisteredAccount({
-          id: u.id,
-          fullName: u.full_name,
-          phone: u.phone,
-          email: u.email,
-          passwordHash: password,
-          createdAt: u.created_at || new Date().toISOString(),
-          avatarUrl: u.avatar_url || '',
-          role: u.role || 'student',
-        });
-
-        return {
-          success: true,
-          user: verifiedUser,
-          session: null,
-        };
-      }
-    } else if (serverAuthRes.status === 401) {
-      // Wrong password returned from server
-      const errData = await serverAuthRes.json().catch(() => ({}));
-      return {
-        success: false,
-        error: errData.error || 'প্রদত্ত পাসওয়ার্ডটি সঠিক নয়। অনুগ্রহ করে সঠিক পাসওয়ার্ড লিখুন।',
-      };
-    }
-  } catch (srvErr) {
-    console.warn('Server auth login attempt network error:', srvErr);
+  const cleanInput = (identifier || '').trim();
+  if (!cleanInput) {
+    return { success: false, error: 'মোবাইল নম্বর বা ইমেইল প্রদান করুন।' };
+  }
+  if (!password) {
+    return { success: false, error: 'আপনার পাসওয়ার্ড লিখুন।' };
   }
 
-  // 3. If Supabase is configured, attempt Supabase Auth Sign-In
-  if (supabaseInstance) {
+  const { email, isPhone, phoneDigits } = normalizeAuthIdentifier(cleanInput);
+
+  // List of email variations to test against Supabase Auth in case user registered earlier with alternative prefix
+  const emailsToTry = [email];
+  if (isPhone && phoneDigits) {
+    const clean11 = phoneDigits.length >= 11 ? phoneDigits.slice(-11) : phoneDigits.padStart(11, '0');
+    const alt1 = `phone_${clean11}@attamreen.com`;
+    const alt2 = `${clean11}@attamreen.com`;
+    const alt3 = `student_${clean11}@gmail.com`;
+    const alt4 = `phone${clean11}@gmail.com`;
+    if (!emailsToTry.includes(alt1)) emailsToTry.push(alt1);
+    if (!emailsToTry.includes(alt2)) emailsToTry.push(alt2);
+    if (!emailsToTry.includes(alt3)) emailsToTry.push(alt3);
+    if (!emailsToTry.includes(alt4)) emailsToTry.push(alt4);
+  }
+
+  let lastError: any = null;
+
+  for (const candidateEmail of emailsToTry) {
     try {
       const { data, error } = await supabaseInstance.auth.signInWithPassword({
-        email: matchedLocal?.email || cleanEmail,
+        email: candidateEmail,
         password: password,
       });
 
       if (!error && data?.user) {
-        // Fetch user profile from public.profiles table
-        let userProf = null;
+        const authUser = data.user;
+
+        // Load profile from public.profiles where profiles.id = auth.users.id
+        let userProfile = null;
         try {
           const { data: prof } = await supabaseInstance
             .from('profiles')
             .select('*')
-            .eq('id', data.user.id)
+            .eq('id', authUser.id)
             .maybeSingle();
 
           if (prof) {
-            userProf = prof;
-            (data.user as any).profile = prof;
+            userProfile = prof;
           }
         } catch (profErr) {
-          console.warn('Error fetching profile on login:', profErr);
+          console.warn('Error fetching public.profiles on signin:', profErr);
         }
 
-        // Cache locally for seamless future logins
-        const userMeta = data.user.user_metadata || {};
-        saveLocalRegisteredAccount({
-          id: data.user.id,
-          fullName: userProf?.full_name || userMeta.full_name || 'শিক্ষার্থী',
-          phone: userProf?.phone || userMeta.phone || (isPhone ? cleanInput : ''),
-          email: data.user.email || cleanEmail,
-          passwordHash: password,
-          createdAt: new Date().toISOString(),
-          avatarUrl: userProf?.avatar_url || userMeta.avatar_url || '',
-          role: userProf?.role || userMeta.role || 'student',
-        });
+        const userMeta = authUser.user_metadata || {};
+        const profile = {
+          id: authUser.id,
+          full_name: userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী',
+          phone: userProfile?.phone || userMeta.phone || (isPhone ? cleanInput : ''),
+          email: userProfile?.email || authUser.email || candidateEmail,
+          role: userProfile?.role || userMeta.role || 'student',
+          student_id: userMeta.student_id || `STD-${(userProfile?.phone || userMeta.phone || '').replace(/[^0-9]/g, '').slice(-6)}`,
+          avatar_url: userProfile?.avatar_url || userMeta.avatar_url || '',
+        };
 
-        // Sync to server store as well
-        fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: data.user.id,
-            fullName: userProf?.full_name || userMeta.full_name || 'শিক্ষার্থী',
-            phone: userProf?.phone || userMeta.phone || (isPhone ? cleanInput : ''),
-            email: data.user.email || cleanEmail,
-            password: password,
-            avatarUrl: userProf?.avatar_url || userMeta.avatar_url || '',
-          }),
-        }).catch(() => {});
+        (authUser as any).profile = profile;
 
         return {
           success: true,
-          user: data.user,
+          user: authUser,
           session: data.session,
         };
       }
-    } catch (err: any) {
-      console.warn('Supabase signin attempt caught:', err);
-    }
-  }
 
-  // If local account exists but password did not match
-  if (matchedLocal) {
-    return {
-      success: false,
-      error: 'প্রদত্ত পাসওয়ার্ডটি সঠিক নয়। অনুগ্রহ করে সঠিক পাসওয়ার্ড লিখুন।',
-    };
+      if (error) {
+        lastError = error;
+        // If error is something other than invalid_credentials (e.g. email_not_confirmed), don't keep trying fallbacks
+        if (error.status !== 400 || (error as any).code === 'email_not_confirmed') {
+          break;
+        }
+      }
+    } catch (err: any) {
+      lastError = err;
+    }
   }
 
   return {
     success: false,
-    error: 'মোবাইল নম্বর/ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আপনি নতুন হলে অনুগ্রহ করে "রেজিস্ট্রেশন" বাটনে ক্লিক করে অ্যাকাউন্ট তৈরি করুন।',
+    error: formatAuthErrorMessage(lastError || new Error('লগইন ব্যর্থ হয়েছে। তথ্য যাচাই করুন।')),
   };
 }
 
@@ -2739,6 +2569,46 @@ export function supabaseOnAuthStateChange(callback: (event: string, session: any
 }
 
 /**
+ * Get current authenticated user profile from Supabase Auth & public.profiles
+ */
+export async function supabaseGetUser(): Promise<any> {
+  if (!supabaseInstance) return null;
+  try {
+    const { data: { user }, error } = await supabaseInstance.auth.getUser();
+    if (error || !user) return null;
+
+    let userProfile = null;
+    try {
+      const { data: prof } = await supabaseInstance
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (prof) {
+        userProfile = prof;
+      }
+    } catch {}
+
+    const userMeta = user.user_metadata || {};
+    const profile = {
+      id: user.id,
+      full_name: userProfile?.full_name || userMeta.full_name || 'শিক্ষার্থী',
+      phone: userProfile?.phone || userMeta.phone || '',
+      email: userProfile?.email || user.email || '',
+      role: userProfile?.role || userMeta.role || 'student',
+      student_id: userMeta.student_id || `STD-${(userProfile?.phone || userMeta.phone || '').replace(/[^0-9]/g, '').slice(-6)}`,
+      avatar_url: userProfile?.avatar_url || userMeta.avatar_url || '',
+    };
+
+    (user as any).profile = profile;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch all registered students / accounts for the Admin Panel across all devices
  */
 export async function fetchAllRegisteredUsers(): Promise<{
@@ -2753,7 +2623,6 @@ export async function fetchAllRegisteredUsers(): Promise<{
   }>;
   source: 'supabase' | 'server' | 'local';
 }> {
-  const localAccounts = getLocalRegisteredAccounts();
   const resultMap = new Map<string, {
     id: string;
     fullName: string;
@@ -2764,52 +2633,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
     role?: string;
   }>();
 
-  // 1. Populate local accounts first
-  localAccounts.forEach((acc) => {
-    resultMap.set(acc.id, {
-      id: acc.id,
-      fullName: acc.fullName,
-      phone: acc.phone,
-      email: acc.email,
-      createdAt: acc.createdAt || new Date().toISOString(),
-      avatarUrl: acc.avatarUrl,
-      role: 'student',
-    });
-  });
-
-  // Background bulk sync local accounts to server store
-  if (localAccounts.length > 0) {
-    fetch('/api/auth/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accounts: localAccounts }),
-    }).catch(() => {});
-  }
-
-  // 2. Fetch from shared server cloud store (/api/auth/users)
-  try {
-    const srvRes = await fetch('/api/auth/users');
-    if (srvRes.ok) {
-      const srvData = await srvRes.json();
-      if (srvData?.success && Array.isArray(srvData.users)) {
-        srvData.users.forEach((u: any) => {
-          resultMap.set(u.id || u.student_id, {
-            id: u.id || u.student_id,
-            fullName: u.fullName || u.full_name || 'শিক্ষার্থী',
-            phone: u.phone || '',
-            email: u.email || '',
-            createdAt: u.createdAt || u.created_at || new Date().toISOString(),
-            avatarUrl: u.avatarUrl || u.avatar_url || '',
-            role: u.role || 'student',
-          });
-        });
-      }
-    }
-  } catch (srvErr) {
-    console.warn('Could not fetch server auth users:', srvErr);
-  }
-
-  // 3. Fetch from Supabase public.profiles if connected
+  // 1. Fetch from Supabase public.profiles if connected
   if (supabaseInstance) {
     try {
       const { data, error } = await supabaseInstance
@@ -2835,8 +2659,33 @@ export async function fetchAllRegisteredUsers(): Promise<{
     }
   }
 
+  // 2. Fetch from shared server store as secondary data source
+  try {
+    const srvRes = await fetch('/api/auth/users');
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
+      if (srvData?.success && Array.isArray(srvData.users)) {
+        srvData.users.forEach((u: any) => {
+          if (!resultMap.has(u.id)) {
+            resultMap.set(u.id || u.student_id, {
+              id: u.id || u.student_id,
+              fullName: u.fullName || u.full_name || 'শিক্ষার্থী',
+              phone: u.phone || '',
+              email: u.email || '',
+              createdAt: u.createdAt || u.created_at || new Date().toISOString(),
+              avatarUrl: u.avatarUrl || u.avatar_url || '',
+              role: u.role || 'student',
+            });
+          }
+        });
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Could not fetch server auth users:', srvErr);
+  }
+
   return {
     users: Array.from(resultMap.values()),
-    source: resultMap.size > localAccounts.length ? 'server' : 'local',
+    source: 'supabase',
   };
 }
