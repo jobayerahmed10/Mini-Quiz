@@ -13,6 +13,7 @@ import { detectQuestionSubject } from '../lib/subjects';
 interface PracticePageProps {
   questions: Question[];
   initialSubject?: string;
+  initialTopic?: string;
   targetQuestionCount?: number;
   timeMinutes?: number;
   onFinishQuiz: (userAnswers: UserAnswer[], timeTakenSeconds?: number) => void;
@@ -23,6 +24,7 @@ interface PracticePageProps {
 export const PracticePage: React.FC<PracticePageProps> = ({
   questions,
   initialSubject = 'all',
+  initialTopic,
   targetQuestionCount,
   timeMinutes = 30,
   onFinishQuiz,
@@ -30,6 +32,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   showHarakat = true,
 }) => {
   const [activeSubject] = useState<string>(initialSubject);
+  const [activeTopic] = useState<string | undefined>(initialTopic);
   const [userSelections, setUserSelections] = useState<Record<string, 'option_a' | 'option_b' | 'option_c' | 'option_d'>>({});
   
   const safeTimeMinutes = Math.max(1, timeMinutes || 30);
@@ -42,10 +45,27 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   }, [safeTimeMinutes]);
 
   // Robust multi-tier question matching so exam never collapses to 0
-  const getResolvedQuestions = (pool: Question[], subj: string, count?: number): Question[] => {
+  const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number): Question[] => {
     const rawPool = pool || [];
-    if (!subj || subj === 'all' || subj === 'সকল বিষয়') {
+    if ((!subj || subj === 'all' || subj === 'সকল বিষয়') && !topic) {
       return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
+    }
+
+    // Tier 0: Direct Topic-specific matching if a topic is requested
+    if (topic && topic.trim()) {
+      const topicTerms = topic
+        .replace(/[\(\)（）\[\]\-\_\,\.\/•]/g, ' ')
+        .split(/\s+/)
+        .filter((k) => k.trim().length > 1);
+
+      const topicMatched = rawPool.filter((q) => {
+        const fullText = `${q.topic || ''} ${q.question || ''} ${q.explanation || ''} ${q.subject || ''}`.toLowerCase();
+        return topicTerms.some((term) => fullText.includes(term.toLowerCase()));
+      });
+
+      if (topicMatched.length > 0) {
+        return count && count > 0 && topicMatched.length > count ? topicMatched.slice(0, count) : topicMatched;
+      }
     }
 
     // Stream-based matching for the special exam post buttons
@@ -141,7 +161,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   // Lock exam questions on session mount so background Supabase updates don't wipe active exam
   const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
-    return getResolvedQuestions(questions, initialSubject, targetQuestionCount);
+    return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount);
   });
 
   // If questions was completely empty on mount and now arrived, populate once
@@ -149,11 +169,11 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   useEffect(() => {
     if (!isInitializedRef.current && (!examQuestions || examQuestions.length === 0) && questions && questions.length > 0) {
       isInitializedRef.current = true;
-      setExamQuestions(getResolvedQuestions(questions, activeSubject, targetQuestionCount));
+      setExamQuestions(getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount));
     }
-  }, [questions, activeSubject, targetQuestionCount, examQuestions]);
+  }, [questions, activeSubject, activeTopic, targetQuestionCount, examQuestions]);
 
-  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, targetQuestionCount);
+  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount);
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;
   const unansweredCount = totalQuestions - answeredCount;

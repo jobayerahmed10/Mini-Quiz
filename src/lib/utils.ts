@@ -586,12 +586,91 @@ export function getUserStreakDays(): number {
 }
 
 /**
- * Premium Membership Status Helper
+ * Premium Membership & Post-Specific Package Access Helpers
  */
 const PREMIUM_STORAGE_KEY = 'tamreen_is_premium';
+const UNLOCKED_POSTS_KEY = 'tamreen_unlocked_posts';
+const PENDING_POSTS_KEY = 'tamreen_pending_posts';
+
+export function getUnlockedPostIds(): string[] {
+  try {
+    const raw = localStorage.getItem(UNLOCKED_POSTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    const status = localStorage.getItem('tamreen_premium_status');
+    if (status === 'approved') {
+      // By default if full premium is approved, all posts are unlocked
+      return ['arabic_lecturer', 'assistant_moulvi', 'assistant_moulvi_qari', 'ebtedayee_moulvi', 'ebtedayee_qari', 'general_subjects'];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export function isPostUnlocked(postId: string): boolean {
+  if (!postId) return false;
+  const unlocked = getUnlockedPostIds();
+  return unlocked.includes(postId);
+}
+
+export function unlockPosts(postIds: string[]): void {
+  try {
+    const current = getUnlockedPostIds();
+    const updated = Array.from(new Set([...current, ...postIds]));
+    localStorage.setItem(UNLOCKED_POSTS_KEY, JSON.stringify(updated));
+    // Remove from pending
+    const pending = getPendingPostIds().filter(id => !postIds.includes(id));
+    localStorage.setItem(PENDING_POSTS_KEY, JSON.stringify(pending));
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_unlocked_posts_updated', { detail: updated }));
+      window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: updated.length > 0 ? 'approved' : 'none' }));
+    }
+  } catch {}
+}
+
+export function getPendingPostIds(): string[] {
+  try {
+    const raw = localStorage.getItem(PENDING_POSTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    const status = localStorage.getItem('tamreen_premium_status');
+    if (status === 'pending') {
+      return ['assistant_moulvi'];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export function isPostPending(postId: string): boolean {
+  if (!postId) return false;
+  const pending = getPendingPostIds();
+  return pending.includes(postId);
+}
+
+export function setPendingPosts(postIds: string[]): void {
+  try {
+    const current = getPendingPostIds();
+    const updated = Array.from(new Set([...current, ...postIds]));
+    localStorage.setItem(PENDING_POSTS_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_unlocked_posts_updated', { detail: updated }));
+    }
+  } catch {}
+}
 
 export function isUserPremium(): boolean {
   try {
+    const unlocked = getUnlockedPostIds();
+    if (unlocked.length > 0) return true;
+
     const status = localStorage.getItem('tamreen_premium_status');
     if (status === 'approved') return true;
     if (status === 'pending' || status === 'rejected') return false;
@@ -608,9 +687,16 @@ export function setUserPremium(isPremium: boolean): void {
   try {
     localStorage.setItem(PREMIUM_STORAGE_KEY, isPremium ? 'true' : 'false');
     localStorage.setItem('tamreen_premium_status', isPremium ? 'approved' : 'none');
+    if (isPremium) {
+      unlockPosts(['arabic_lecturer', 'assistant_moulvi', 'assistant_moulvi_qari', 'ebtedayee_moulvi', 'ebtedayee_qari', 'general_subjects']);
+    } else {
+      localStorage.setItem(UNLOCKED_POSTS_KEY, JSON.stringify([]));
+      localStorage.setItem(PENDING_POSTS_KEY, JSON.stringify([]));
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tamreen_premium_updated', { detail: isPremium }));
       window.dispatchEvent(new CustomEvent('tamreen_premium_status_changed', { detail: isPremium ? 'approved' : 'none' }));
+      window.dispatchEvent(new CustomEvent('tamreen_unlocked_posts_updated', { detail: isPremium ? ['arabic_lecturer', 'assistant_moulvi', 'assistant_moulvi_qari', 'ebtedayee_moulvi', 'ebtedayee_qari', 'general_subjects'] : [] }));
     }
   } catch {}
 }

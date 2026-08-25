@@ -55,6 +55,7 @@ export default function App() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
+  const [selectedTopic, setSelectedTopic] = useState<string | undefined>(undefined);
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
   const [activeExamId, setActiveExamId] = useState<string | undefined>(undefined);
@@ -436,19 +437,24 @@ export default function App() {
     navigateWithHistory('leaderboard');
   };
 
-  const handleStartPractice = (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string } = 'সকল বিষয়') => {
+  const handleStartPractice = (subjectOrOpts: string | { subject: string; topic?: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string } = 'সকল বিষয়') => {
     if (typeof subjectOrOpts === 'string') {
       setSelectedSubject(subjectOrOpts);
+      setSelectedTopic(undefined);
       setExamQuestionCount(undefined);
       setExamTimeMinutes(30);
       setActiveExamId(undefined);
       setActiveExamTitle(subjectOrOpts);
     } else {
       setSelectedSubject(subjectOrOpts.subject);
+      setSelectedTopic(subjectOrOpts.topic);
       setExamQuestionCount(subjectOrOpts.questionCount);
       setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
       setActiveExamId(subjectOrOpts.examId || subjectOrOpts.examType);
-      setActiveExamTitle(subjectOrOpts.examType || subjectOrOpts.subject);
+      const title = subjectOrOpts.topic
+        ? `${subjectOrOpts.subject} (${subjectOrOpts.topic})`
+        : (subjectOrOpts.examType || subjectOrOpts.subject);
+      setActiveExamTitle(title);
     }
     navigateWithHistory('practice');
   };
@@ -538,6 +544,7 @@ export default function App() {
           <PracticePage
             questions={questions}
             initialSubject={selectedSubject}
+            initialTopic={selectedTopic}
             targetQuestionCount={examQuestionCount}
             timeMinutes={examTimeMinutes}
             onFinishQuiz={handleFinishQuiz}
