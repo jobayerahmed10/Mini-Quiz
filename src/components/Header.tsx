@@ -22,11 +22,13 @@ import {
   LogIn,
   UserPlus,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Wifi
 } from 'lucide-react';
 import { PageRoute, TabRoute } from '../types';
 import { getUserProfile, isUserRegistered, clearUserProfile, UserProfile } from '../lib/utils';
 import { supabaseSignOut } from '../lib/supabase';
+import { NetworkHelpModal } from './NetworkHelpModal';
 
 export type FontFamilyType = 'hind' | 'noto' | 'tiro' | 'anek' | 'amiri' | 'scheherazade' | 'cairo';
 
@@ -75,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNetworkHelp, setShowNetworkHelp] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
   const [isRegistered, setIsRegistered] = useState<boolean>(() => isUserRegistered());
 
@@ -537,6 +540,22 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setShowNetworkHelp(true);
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-800/80 pt-2.5"
+                  >
+                    <div className="p-2 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                      <Wifi className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block font-black">📶 মোবাইল ডাটা ও স্পিড গাইড</span>
+                      <span className="block text-[10px] font-medium opacity-60">যেকোনো সিমে দ্রুত ওপেনের সমাধান</span>
+                    </div>
+                  </button>
+
                   {/* Log Out Button at the very bottom of the user menu */}
                   {isRegistered && (
                     <button
@@ -669,6 +688,12 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Mobile Data and WiFi Help Modal */}
+      <NetworkHelpModal 
+        isOpen={showNetworkHelp} 
+        onClose={() => setShowNetworkHelp(false)} 
+      />
     </header>
   );
 };

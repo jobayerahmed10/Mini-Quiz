@@ -144,6 +144,11 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     }
   } catch {}
 
+  // If no cache yet, provide SAMPLE_QUESTIONS so mobile data / offline users immediately see questions
+  if (cachedQuestions.length === 0 && Array.isArray(SAMPLE_QUESTIONS) && SAMPLE_QUESTIONS.length > 0) {
+    cachedQuestions = SAMPLE_QUESTIONS;
+  }
+
   if (!supabaseInstance) {
     return {
       questions: cachedQuestions,
@@ -163,11 +168,11 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
 
     if (error) {
-      console.error('Supabase fetch error:', error);
+      console.warn('Supabase fetch notice (using cache/presets):', error.message || error);
       return {
         questions: cachedQuestions,
-        isFromSupabase: true,
-        error: cachedQuestions.length > 0 ? null : `Supabase কুয়েরি ত্রুটি: ${error.message}`,
+        isFromSupabase: false,
+        error: null,
       };
     }
 
@@ -211,11 +216,10 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
       error: null,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown database error';
     return {
       questions: cachedQuestions,
-      isFromSupabase: true,
-      error: cachedQuestions.length > 0 ? null : `Supabase সংযোগ ত্রুটি: ${errorMsg}`,
+      isFromSupabase: false,
+      error: null,
     };
   }
 }
