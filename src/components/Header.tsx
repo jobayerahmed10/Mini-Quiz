@@ -128,22 +128,22 @@ export const Header: React.FC<HeaderProps> = ({
       isDarkMode ? 'bg-[#0B132B]/95 border-slate-800 text-white' : 'bg-[#EEF2F6]/95 border-slate-200/60 text-slate-900'
     }`}>
       {/* 1. TOP BRANDING ROW */}
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-3 pb-2 flex items-center justify-between gap-2">
+      <div className="max-w-6xl mx-auto px-2.5 sm:px-6 pt-2.5 pb-2 flex items-center justify-between gap-1.5 sm:gap-2">
         {/* Left: Back Button OR Logo + Brand Title */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
           {!isAtHomeRoot ? (
             /* Circular Neumorphic Back Button */
             <button
               onClick={onGoBack || onNavigateHome}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full neu-pill flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full neu-pill flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform"
               title="পিছনে ফিরে যান"
             >
-              <ArrowLeft className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={2.6} />
+              <ArrowLeft className="w-4.5 h-4.5 text-amber-500 shrink-0" strokeWidth={2.6} />
             </button>
           ) : (
             /* Green Squircle Logo Box with Golden Graduation Cap (Exact match to Screenshot) */
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] sm:rounded-[20px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-[2px_3px_8px_rgba(4,106,56,0.35)] border border-emerald-500/40">
-              <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-[#EAB308]" strokeWidth={2.3} />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-[16px] bg-[#046A38] dark:bg-[#064E3B] flex items-center justify-center shrink-0 shadow-[0_2px_6px_rgba(4,106,56,0.3)] border border-emerald-500/40">
+              <GraduationCap className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-[#FACC15]" strokeWidth={2.2} />
             </div>
           )}
 
@@ -154,23 +154,25 @@ export const Header: React.FC<HeaderProps> = ({
             title="হোম পেজে যান"
           >
             <div className="min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={`font-hind font-extrabold text-2xl sm:text-[28px] md:text-[30px] tracking-tight whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-[#064E3B]'}`}>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className={`font-bold text-[19px] sm:text-2xl tracking-tight whitespace-nowrap leading-none transition-all ${
+                  isDarkMode ? 'text-white' : 'text-[#064E3B]'
+                }`}>
                   আত-তামরীন
                 </span>
-                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#EAB308] font-hind font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-0.5 rounded-full inline-flex items-center justify-center leading-tight shrink-0 shadow-xs">
+                <span className="bg-[#046A38] dark:bg-[#064E3B] text-[#FACC15] font-bold text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full inline-flex items-center justify-center leading-tight shrink-0 shadow-xs">
                   একাডেমি
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs font-hind font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-tight tracking-normal truncate">
+              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight tracking-normal truncate">
                 প্রস্তুতি হোক আরও স্মার্ট
               </p>
             </div>
           </button>
         </div>
 
-        {/* Right Controls: Font ('T') + DarkMode ('Moon/Sun') + User Avatar */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Right Controls: Font ('T') + DarkMode ('Moon/Sun') + User Avatar / Login */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Active Subject Pill on wide screens */}
           {selectedSubject && selectedSubject !== 'all' && selectedSubject !== 'সকল বিষয়' && (
             <div className={`hidden lg:flex items-center gap-2 px-3 py-1 border rounded-full text-xs font-bold ${
@@ -185,14 +187,14 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowFontMenu(!showFontMenu)}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
+              className={`w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl sm:rounded-2xl flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
                 showFontMenu
                   ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-400 ring-2 ring-amber-400/30'
                   : 'neu-pill'
               }`}
               title="ফন্ট স্টাইল, আরবি ফন্ট ও হরকত সেটিং"
             >
-              <span className="text-[#E65100] dark:text-[#FB923C] font-black text-lg sm:text-xl leading-none font-sans">
+              <span className="text-[#E65100] dark:text-[#FB923C] font-black text-base sm:text-lg leading-none font-sans">
                 T
               </span>
             </button>
@@ -347,13 +349,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Dark Mode Toggle Button (Moon / Sun) */}
           <button
             onClick={onToggleDarkMode}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl neu-pill flex items-center justify-center cursor-pointer transition-all active:scale-95"
+            className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl sm:rounded-2xl neu-pill flex items-center justify-center cursor-pointer transition-all active:scale-95"
             title={isDarkMode ? "লাইট মোডে পরিবর্তন করুন" : "ডার্ক মোডে পরিবর্তন করুন"}
           >
             {isDarkMode ? (
-              <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 animate-spin-slow" />
+              <Sun className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-400 animate-spin-slow" />
             ) : (
-              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-[#1E293B] dark:text-slate-200" strokeWidth={2.2} />
+              <Moon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#1E293B] dark:text-slate-200" strokeWidth={2.2} />
             )}
           </button>
 
@@ -370,7 +372,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }
                   setShowFontMenu(false);
                 }}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
                 title="ব্যবহারকারীর প্রোফাইল ও মেনু"
               >
                 {userProfile?.avatar ? (
@@ -381,12 +383,12 @@ export const Header: React.FC<HeaderProps> = ({
                   />
                 ) : (
                   <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
-                    <User className="w-4 h-4 text-amber-300" />
+                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
                   </div>
                 )}
               </button>
             ) : (
-              /* Unregistered Guest: Show Prominent Bengali "লগইন" Button */
+              /* Unregistered Guest: Show Exact Screenshot Matching "লগইন" Pill Button */
               <button
                 onClick={() => {
                   if (onOpenLogin) {
@@ -398,11 +400,11 @@ export const Header: React.FC<HeaderProps> = ({
                   }
                   setShowFontMenu(false);
                 }}
-                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#046A38] to-[#085a4a] hover:from-[#03542c] hover:to-[#064236] text-white font-hind font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(4,106,56,0.3)] hover:brightness-110 active:scale-95 transition-all border border-emerald-400/40 cursor-pointer shrink-0"
+                className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-[#046A38] hover:bg-[#03542c] text-[#FACC15] font-hind font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(4,106,56,0.3)] hover:brightness-110 active:scale-95 transition-all border border-emerald-500/50 cursor-pointer shrink-0"
                 title="লগইন বা অ্যাকাউন্ট তৈরি করুন"
               >
-                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" strokeWidth={2.4} />
-                <span className="whitespace-nowrap">লগইন</span>
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FACC15]" strokeWidth={2.4} />
+                <span className="whitespace-nowrap font-bold text-[#FACC15]">লগইন</span>
               </button>
             )}
 
