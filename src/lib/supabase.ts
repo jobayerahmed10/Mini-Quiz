@@ -2897,7 +2897,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
 /**
  * Dynamic Subject Posts & Syllabus Topics Management
  * Fetches custom posts and syllabus topics created from Admin Panel from Supabase or local cache,
- * combining them seamlessly with the default built-in posts.
+ * combining them seamlessly with the default built-in posts. Also seeds default posts to Supabase if empty.
  */
 export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]> {
   const fallback = MAIN_SUBJECT_POSTS;
@@ -2909,41 +2909,65 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const dynamicPosts: MainSubjectPost[] = data.map((item: any) => {
-          let topicsList: string[] = [];
-          if (Array.isArray(item.topics)) {
-            topicsList = item.topics;
-          } else if (typeof item.topics === 'string') {
-            try {
-              topicsList = JSON.parse(item.topics);
-            } catch {
-              topicsList = item.topics.split(',').map((t: string) => t.trim()).filter(Boolean);
+      if (!error && Array.isArray(data)) {
+        if (data.length > 0) {
+          const dynamicPosts: MainSubjectPost[] = data.map((item: any) => {
+            let topicsList: string[] = [];
+            if (Array.isArray(item.topics)) {
+              topicsList = item.topics;
+            } else if (typeof item.topics === 'string') {
+              try {
+                topicsList = JSON.parse(item.topics);
+              } catch {
+                topicsList = item.topics.split(',').map((t: string) => t.trim()).filter(Boolean);
+              }
             }
+
+            return {
+              id: String(item.id || item.slug || `post_${Date.now()}`),
+              name: item.name || item.title || 'বিষয়ভিত্তিক প্রস্তুতি',
+              code: item.code || item.post_code || '---',
+              tagline: item.tagline || '',
+              badge: item.badge || `${item.name || ''} • কোড: ${item.code || ''}`,
+              subtitle: item.subtitle || '',
+              iconName: item.icon_name || item.iconName || 'BookOpenCheck',
+              themeColor: item.theme_color || item.themeColor || '#6366F1',
+              accentGradient: item.accent_gradient || item.accentGradient || 'from-[#6366F1] to-[#4338CA]',
+              gradientClass: item.gradient_class || item.gradientClass || 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 shadow-indigo-500/25',
+              topics: topicsList.length > 0 ? topicsList : ['সাধারণ অনুশীলন ও বিষয়ভিত্তিক প্রশ্নব্যাংক'],
+              description: item.description || '',
+            };
+          });
+
+          // Store cached
+          try {
+            localStorage.setItem('tamreen_custom_subject_posts', JSON.stringify(dynamicPosts));
+          } catch {}
+
+          return dynamicPosts;
+        } else {
+          // Table exists but empty, seed the initial 6 posts automatically
+          try {
+            const seedPayload = MAIN_SUBJECT_POSTS.map(post => ({
+              id: post.id,
+              name: post.name,
+              code: post.code,
+              tagline: post.tagline,
+              badge: post.badge,
+              subtitle: post.subtitle,
+              icon_name: post.iconName,
+              theme_color: post.themeColor,
+              accent_gradient: post.accentGradient,
+              gradient_class: post.gradientClass,
+              topics: post.topics,
+              description: post.description
+            }));
+
+            await supabaseInstance.from('subject_posts').upsert(seedPayload, { onConflict: 'id' });
+          } catch (seedErr) {
+            console.warn('Auto-seeding default posts to Supabase failed:', seedErr);
           }
-
-          return {
-            id: String(item.id || item.slug || `post_${Date.now()}`),
-            name: item.name || item.title || 'বিষয়ভিত্তিক প্রস্তুতি',
-            code: item.code || item.post_code || '---',
-            tagline: item.tagline || '',
-            badge: item.badge || `${item.name || ''} • কোড: ${item.code || ''}`,
-            subtitle: item.subtitle || '',
-            iconName: item.icon_name || item.iconName || 'BookOpenCheck',
-            themeColor: item.theme_color || item.themeColor || '#6366F1',
-            accentGradient: item.accent_gradient || item.accentGradient || 'from-[#6366F1] to-[#4338CA]',
-            gradientClass: item.gradient_class || item.gradientClass || 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 shadow-indigo-500/25',
-            topics: topicsList.length > 0 ? topicsList : ['সাধারণ অনুশীলন ও বিষয়ভিত্তিক প্রশ্নব্যাংক'],
-            description: item.description || '',
-          };
-        });
-
-        // Store cached
-        try {
-          localStorage.setItem('tamreen_custom_subject_posts', JSON.stringify(dynamicPosts));
-        } catch {}
-
-        return dynamicPosts;
+        }
       }
     } catch (err) {
       console.warn('Could not fetch subject_posts from Supabase, checking local cache:', err);
