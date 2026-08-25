@@ -48,7 +48,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
     }
 
-    // Stream-based matching for the 5 primary post buttons
+    // Stream-based matching for the special exam post buttons
     const sLower = subj.toLowerCase();
     let streamMatches: Question[] = [];
 
@@ -59,6 +59,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                text.includes('বালাগাত') || text.includes('সাহিত্য') || text.includes('তাফসির') || 
                text.includes('হাদিস') || text.includes('ফিকহ') || text.includes('উসুল');
       });
+    } else if (sLower.includes('সহকারী মৌলভী ক্বারী') || (sLower.includes('মৌলভী') && sLower.includes('কারী'))) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('তাজবীদ') || text.includes('ক্বিরাআত') || text.includes('কুরআন') || 
+               text.includes('মাখরাজ') || text.includes('সিফাত') || text.includes('হাদিস') || 
+               text.includes('ফিকহ') || text.includes('আরবি');
+      });
     } else if (sLower.includes('সহকারী মৌলভী')) {
       streamMatches = rawPool.filter((q) => {
         const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
@@ -66,18 +73,25 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                text.includes('ফিকহ') || text.includes('আরবি') || text.includes('নাহু') || 
                text.includes('আকিদা') || text.includes('ইতিহাস');
       });
-    } else if (sLower.includes('ইবতেদায়ি মৌলভী')) {
+    } else if (sLower.includes('ইবতেদায়ি মৌলভী') || sLower.includes('ইবতেদায়ী মৌলভী')) {
       streamMatches = rawPool.filter((q) => {
         const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
         return text.includes('কুরআন') || text.includes('হাদিস') || text.includes('ফিকহ') || 
                text.includes('আকিদা') || text.includes('আরবি') || text.includes('দ্বীনিয়্যাত');
       });
-    } else if (sLower.includes('ইবতেদায়ি কারী') || sLower.includes('কারী')) {
+    } else if (sLower.includes('ইবতেদায়ি কারী') || sLower.includes('ইবতেদায়ী কারী') || sLower.includes('কারী')) {
       streamMatches = rawPool.filter((q) => {
         const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
         return text.includes('তাজবীদ') || text.includes('ক্বিরাআত') || text.includes('কুরআন') || 
                text.includes('মাখরাজ') || text.includes('সিফাত') || text.includes('হাদিস') || 
                text.includes('ফিকহ');
+      });
+    } else if (sLower.includes('গ্রামার') || sLower.includes('grammar') || sLower.includes('নাহু') || sLower.includes('সরফ')) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('নাহু') || text.includes('সরফ') || text.includes('গ্রামার') || 
+               text.includes('ব্যাকরণ') || text.includes('ইবরাব') || text.includes('তারকীব') || 
+               text.includes('সিগাহ') || text.includes('বালাগাত');
       });
     } else if (sLower.includes('জেনারেল') || sLower.includes('সাধারণ')) {
       streamMatches = rawPool.filter((q) => {
