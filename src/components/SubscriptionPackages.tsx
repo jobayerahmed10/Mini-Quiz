@@ -22,7 +22,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { CourseEnrollmentRecord } from '../types';
-import { submitEnrollmentToSupabase } from '../lib/supabase';
+import { submitEnrollmentToSupabase, fetchSubjectPostsFromSupabase } from '../lib/supabase';
 import { getUserProfile, toBengaliNumeral, setPendingPosts, unlockPosts } from '../lib/utils';
 import { MAIN_SUBJECT_POSTS, MainSubjectPost } from '../lib/subjects';
 
@@ -153,6 +153,26 @@ export const SubscriptionPackages: React.FC<SubscriptionPackagesProps> = ({
 }) => {
   const currentProfile = getUserProfile();
 
+  // Dynamic posts from Supabase or built-in default
+  const [subjectPosts, setSubjectPosts] = useState<MainSubjectPost[]>(() => {
+    try {
+      const cached = localStorage.getItem('tamreen_custom_subject_posts');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return MAIN_SUBJECT_POSTS;
+  });
+
+  useEffect(() => {
+    fetchSubjectPostsFromSupabase().then((posts) => {
+      if (posts && posts.length > 0) {
+        setSubjectPosts(posts);
+      }
+    });
+  }, []);
+
   // Selected package for inline checkout
   const [selectedPlanId, setSelectedPlanId] = useState<'monthly' | 'quarterly' | 'half_yearly' | 'yearly'>('yearly');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(true);
@@ -201,7 +221,7 @@ export const SubscriptionPackages: React.FC<SubscriptionPackagesProps> = ({
   };
 
   const handleSelectAllPosts = () => {
-    setSelectedPostIds(MAIN_SUBJECT_POSTS.map(p => p.id));
+    setSelectedPostIds(subjectPosts.map(p => p.id));
   };
 
   const handleSelectSinglePost = (postId: string) => {
@@ -256,7 +276,7 @@ export const SubscriptionPackages: React.FC<SubscriptionPackagesProps> = ({
     setIsSubmitting(true);
     setStatusMessage(null);
 
-    const selectedPostNames = MAIN_SUBJECT_POSTS
+    const selectedPostNames = subjectPosts
       .filter(p => selectedPostIds.includes(p.id))
       .map(p => p.name);
 
@@ -366,7 +386,7 @@ export const SubscriptionPackages: React.FC<SubscriptionPackagesProps> = ({
               onClick={handleSelectAllPosts}
               className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-200 cursor-pointer transition-all"
             >
-              সবগুলো পদ ({toBengaliNumeral(MAIN_SUBJECT_POSTS.length)}টি)
+              সবগুলো পদ ({toBengaliNumeral(subjectPosts.length)}টি)
             </button>
             <button
               type="button"
@@ -378,9 +398,9 @@ export const SubscriptionPackages: React.FC<SubscriptionPackagesProps> = ({
           </div>
         </div>
 
-        {/* 6 Post Selectable Cards Grid */}
+        {/* Post Selectable Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-          {MAIN_SUBJECT_POSTS.map((post) => {
+          {subjectPosts.map((post) => {
             const isSelected = selectedPostIds.includes(post.id);
             const isAlreadyUnlocked = unlockedPostIds.includes(post.id);
             const IconComponent = POST_ICON_MAP[post.iconName] || GraduationCap;

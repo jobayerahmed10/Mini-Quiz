@@ -36,7 +36,7 @@ import {
   isPostPending,
   unlockPosts 
 } from '../lib/utils';
-import { fetchEnrollmentsFromSupabase } from '../lib/supabase';
+import { fetchEnrollmentsFromSupabase, fetchSubjectPostsFromSupabase } from '../lib/supabase';
 import { SubscriptionPackages } from './SubscriptionPackages';
 import { CourseEnrollmentRecord } from '../types';
 
@@ -69,6 +69,18 @@ const TOPIC_ICONS = [
 export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Dynamic posts from Supabase or built-in default
+  const [subjectPosts, setSubjectPosts] = useState<MainSubjectPost[]>(() => {
+    try {
+      const cached = localStorage.getItem('tamreen_custom_subject_posts');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return MAIN_SUBJECT_POSTS;
+  });
+
   // Unlocked & Pending Posts
   const [unlockedPosts, setUnlockedPosts] = useState<string[]>(() => getUnlockedPostIds());
   const [pendingPosts, setPendingPostsState] = useState<string[]>(() => getPendingPostIds());
@@ -157,6 +169,13 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) =
   useEffect(() => {
     checkRemoteEnrollments();
 
+    // Fetch dynamic subject posts from Supabase
+    fetchSubjectPostsFromSupabase().then((posts) => {
+      if (posts && posts.length > 0) {
+        setSubjectPosts(posts);
+      }
+    });
+
     const handleUnlockedUpdate = () => {
       refreshAccessState();
     };
@@ -184,7 +203,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) =
   };
 
   // Filter the special exam posts based on search
-  const filteredPosts = MAIN_SUBJECT_POSTS.filter(post => {
+  const filteredPosts = subjectPosts.filter(post => {
     const query = searchTerm.toLowerCase().trim();
     if (!query) return true;
     return (
