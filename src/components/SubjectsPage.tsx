@@ -1,20 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
+  GraduationCap,
   BookOpen, 
-  Bookmark, 
-  CheckCircle, 
-  Scale, 
-  Compass, 
-  Feather, 
-  ShieldCheck, 
-  Languages, 
-  FileText, 
-  Calculator, 
-  Landmark, 
-  Globe, 
-  Cpu, 
+  Users, 
+  Volume2, 
+  Layers, 
   Search, 
-  Play, 
   Sparkles,
   Clock,
   ListOrdered,
@@ -23,19 +14,15 @@ import {
   ArrowLeft,
   Crown,
   Lock,
-  Unlock,
   ChevronRight,
-  ShieldAlert,
   Zap,
-  CreditCard,
-  AlertCircle,
-  FileCheck2,
-  Settings
+  CheckCircle2,
+  HelpCircle,
+  BookOpenCheck
 } from 'lucide-react';
-import { SUBJECT_CATEGORIES } from '../lib/subjects';
+import { MAIN_SUBJECT_POSTS, MainSubjectPost } from '../lib/subjects';
 import { isUserPremium, setUserPremium, toBengaliNumeral, getUserProfile } from '../lib/utils';
 import { fetchEnrollmentsFromSupabase } from '../lib/supabase';
-import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 import { SubscriptionPackages } from './SubscriptionPackages';
 import { CourseEnrollmentRecord } from '../types';
 
@@ -44,26 +31,18 @@ interface SubjectsPageProps {
   onOpenCourses?: () => void;
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
+const ICON_COMPONENTS: Record<string, React.ElementType> = {
+  GraduationCap,
   BookOpen,
-  Bookmark,
-  FileText,
-  CheckCircle,
-  Scale,
-  Compass,
-  Feather,
-  ShieldCheck,
-  Languages,
-  Calculator,
-  Landmark,
-  Globe,
-  Cpu,
-  Sparkles
+  Users,
+  Volume2,
+  Layers,
+  BookOpenCheck
 };
 
-export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onOpenCourses }) => {
+export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedPost, setSelectedPost] = useState<MainSubjectPost | null>(null);
   const [questionCount, setQuestionCount] = useState<number>(25);
   const [timeMinutes, setTimeMinutes] = useState<number>(20);
   
@@ -80,9 +59,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
   const isPending = premiumStatus === 'pending';
 
   // Modals and Inline View State
-  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [showInlinePackages, setShowInlinePackages] = useState<boolean>(false);
-  const [attemptedSubject, setAttemptedSubject] = useState<string>('');
   const [pendingTrxId, setPendingTrxId] = useState<string>(() => localStorage.getItem('tamreen_premium_trx') || '');
 
   // Check enrollment from Supabase & LocalStorage
@@ -114,7 +91,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         const ePhone = String(e.phone_number || '').trim();
 
         const isPremiumCourseId = cId.startsWith('tamreen_premium') || cId === 'tamreen_premium_package';
-        const isPremiumCourseTitle = cTitle.includes('১৫টি বিষয়ভিত্তিক') || cTitle.includes('প্রিমিয়াম');
+        const isPremiumCourseTitle = cTitle.includes('বিষয়ভিত্তিক') || cTitle.includes('প্রিমিয়াম');
         const isUserMatch = Boolean(userPhone && ePhone && (ePhone === userPhone || ePhone.includes(userPhone) || userPhone.includes(ePhone)));
 
         return isPremiumCourseId || isPremiumCourseTitle || (isUserMatch && isPremiumCourseId);
@@ -177,16 +154,21 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
     };
   }, [checkRemotePremiumStatus]);
 
-  const fifteenSubjects = SUBJECT_CATEGORIES.filter(s => s.id !== 'all');
+  // Filter the 5 main categories based on search
+  const filteredPosts = MAIN_SUBJECT_POSTS.filter(post => {
+    const query = searchTerm.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      post.name.toLowerCase().includes(query) ||
+      post.badge.toLowerCase().includes(query) ||
+      post.subtitle.toLowerCase().includes(query) ||
+      post.description.toLowerCase().includes(query) ||
+      post.topics.some(t => t.toLowerCase().includes(query))
+    );
+  });
 
-  const filteredSubjects = fifteenSubjects.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleSubjectClick = (subjectName: string) => {
+  const handlePostClick = (post: MainSubjectPost) => {
     if (isPending) {
-      setAttemptedSubject(subjectName);
       setShowInlinePackages(true);
       setTimeout(() => {
         const el = document.getElementById('subscription-packages-container');
@@ -196,7 +178,6 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
     }
 
     if (!isPremium) {
-      setAttemptedSubject(subjectName);
       setShowInlinePackages(true);
       setTimeout(() => {
         const el = document.getElementById('subscription-packages-container');
@@ -205,29 +186,22 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
       return;
     }
 
-    setSelectedSubject(subjectName);
+    setSelectedPost(post);
   };
 
   const handleStartExamFromModal = () => {
-    if (!selectedSubject) return;
+    if (!selectedPost) return;
     onSelectSubject({
-      subject: selectedSubject,
+      subject: selectedPost.name,
       questionCount,
       timeMinutes,
     });
   };
 
-  const handlePaymentSuccess = (record: CourseEnrollmentRecord) => {
-    setPremiumStatus('pending');
-    setPendingTrxId(record.transaction_id);
-    localStorage.setItem('tamreen_premium_status', 'pending');
-    localStorage.setItem('tamreen_premium_trx', record.transaction_id);
-  };
-
   return (
     <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-5 mb-24 space-y-5">
       
-      {/* 1. TOP GREEN THEMED CARD */}
+      {/* 1. TOP GREEN THEMED STATUS CARD */}
       <div className="neu-card !rounded-3xl p-5 sm:p-7 relative overflow-hidden border border-emerald-300/70 dark:border-emerald-700/50 bg-gradient-to-b from-[#F0FDF4]/90 via-[#F8FAFC]/90 to-white dark:from-[#06291C]/60 dark:via-[#0A1A2F]/80 dark:to-[#0B132B]">
         
         {/* Pills Header Row */}
@@ -269,7 +243,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
               )}
             </button>
 
-            {/* Pill 2: 15 Subjects Special Preparation */}
+            {/* Pill 2: 5 Post Categories Badge */}
             <button
               type="button"
               onClick={() => {
@@ -282,24 +256,24 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
               className="text-xs font-black px-3.5 py-1.5 bg-emerald-100/90 dark:bg-emerald-950/80 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-full inline-flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.03] active:scale-95 transition-all"
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>১৫টি বিষয়ভিত্তিক বিশেষ প্যাকেজ</span>
+              <span>মাদ্রাসা ও নিবন্ধন বিশেষ প্রস্তুতি</span>
             </button>
           </div>
         </div>
 
         {/* Heading in Bold Green */}
         <h1 className="text-2xl sm:text-3xl font-black text-[#064E3B] dark:text-emerald-400 font-hind tracking-tight leading-snug">
-          বিষয়ভিত্তিক প্রস্তুতি ও অনুশীলন
+          বিষয়ভিত্তিক ও পদভিত্তিক প্রস্তুতি
         </h1>
 
         {/* Description Text */}
         <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-1.5 leading-relaxed">
           {isPremium ? (
-            'আপনার প্রিমিয়াম মেম্বারশিপের আওতায় সকল বিষয়ের ৫,০০০+ প্রশ্নব্যাংক সম্পূর্ণ আনলক রয়েছে। নিচের যেকোনো বিষয়ে ক্লিক করে কাস্টম প্রশ্ন সংখ্যা ও মোড অনুযায়ী অনুশীলন শুরু করুন।'
+            'আপনার প্রিমিয়াম মেম্বারশিপের আওতায় আরবি প্রভাষক, সহকারী মৌলভী, ইবতেদায়ি মৌলভী, ইবতেদায়ি কারী ও জেনারেল বিষয়ের ৫,০০০+ প্রশ্নব্যাংক সম্পূর্ণ আনলক রয়েছে। নিচের যেকোনো ক্যাটাগরিতে ক্লিক করে অনুশীলন শুরু করুন।'
           ) : isPending ? (
-            `আপনার বিকাশ/নগদ TrxID (${pendingTrxId || 'যাচাইাধীন'}) ডাটাবেসে সফলভাবে জমা হয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই ১৫টি বিষয়ের সম্পূর্ণ প্রশ্নব্যাংক সক্রিয় হয়ে যাবে।`
+            `আপনার বিকাশ/নগদ TrxID (${pendingTrxId || 'যাচাইাধীন'}) ডাটাবেসে সফলভাবে জমা হয়েছে। এডমিন প্যানেল থেকে অনুমোদন করলেই সকল বিষয়ের পূর্ণাঙ্গ প্রশ্নব্যাংক সক্রিয় হয়ে যাবে।`
           ) : (
-            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। মাসিক, ত্রৈমাসিক, ষান্মাসিক বা বাৎসরিক প্রিমিয়াম প্যাকেজ বেছে নিয়ে বিকাশ/নগদে ফি পাঠিয়ে TrxID প্রদান করুন। এডমিন অনুমোদন করলেই সকল বিষয়ের প্রশ্নব্যাংক আনলক হয়ে যাবে।'
+            'আপনার অ্যাকাউন্টে বর্তমানে বিষয়ভিত্তিক প্রশ্নব্যাংক লক রয়েছে। মাসিক, ত্রৈমাসিক, ষান্মাসিক বা বাৎসরিক প্রিমিয়াম প্যাকেজ বেছে নিয়ে বিকাশ/নগদে ফি পাঠিয়ে TrxID প্রদান করুন। এডমিন অনুমোদন করলেই সম্পূর্ণ প্রশ্নব্যাংক আনলক হয়ে যাবে।'
           )}
         </p>
 
@@ -311,7 +285,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                 <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                   <Check className="w-3 h-3 stroke-[3]" />
                 </div>
-                <span>১৫টি বিষয়ের সকল প্রশ্ন ও ব্যাখ্যা সম্পূর্ণ আনলকড</span>
+                <span>সকল বিষয়ের প্রশ্ন ও ব্যাখ্যা সম্পূর্ণ আনলকড</span>
                 <span className="text-slate-500 dark:text-slate-400 font-medium">(প্রিমিয়াম মেম্বারশিপ সক্রিয়)</span>
               </>
             ) : isPending ? (
@@ -328,7 +302,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                 <div className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
                   <Lock className="w-2.5 h-2.5" />
                 </div>
-                <span className="text-amber-800 dark:text-amber-300">১৫টি বিষয়ের প্রশ্নব্যাংক বর্তমানে লক করা</span>
+                <span className="text-amber-800 dark:text-amber-300">বিষয়ভিত্তিক প্রশ্নব্যাংক বর্তমানে লক করা</span>
               </>
             )}
           </div>
@@ -359,7 +333,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         </div>
       </div>
 
-      {/* 2. CONDITIONAL VIEW: DIRECT SUBSCRIPTION PACKAGES OR SUBJECTS LIST */}
+      {/* 2. CONDITIONAL VIEW: DIRECT SUBSCRIPTION PACKAGES OR 5 BUTTONS LIST */}
       {showInlinePackages ? (
         <SubscriptionPackages
           isPremium={isPremium}
@@ -380,69 +354,110 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="বিষয় খুঁজুন (যেমন: ফিকহ, আরবি ব্যাকরণ, গণিত, কুরআন)..."
+              placeholder="পদ বা বিষয় খুঁজুন (যেমন: আরবি প্রভাষক, সহকারী মৌলভী, তাজবীদ, গণিত)..."
               className="neu-inset w-full !rounded-2xl pl-12 pr-4 py-3.5 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium focus:outline-none"
             />
           </div>
 
-          {/* 4. LIST OF 15 SUBJECT CARDS */}
-          <div className="space-y-3 sm:space-y-3.5">
-            {filteredSubjects.map((sub) => {
-              const IconComponent = ICON_MAP[sub.iconName] || BookOpen;
+          {/* 4. THE 5 PROFESSIONAL NEUMORPHIC BUTTONS / CARDS */}
+          <div className="space-y-3.5 sm:space-y-4">
+            {filteredPosts.map((post) => {
+              const IconComponent = ICON_COMPONENTS[post.iconName] || BookOpen;
 
               return (
                 <div
-                  key={sub.id}
-                  onClick={() => handleSubjectClick(sub.name)}
-                  className={`neu-card !rounded-3xl p-3.5 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group border ${
+                  key={post.id}
+                  id={`subject-card-${post.id}`}
+                  onClick={() => handlePostClick(post)}
+                  className={`neu-card !rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all group border relative overflow-hidden ${
                     isPremium 
-                      ? 'border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-400/60' 
+                      ? 'border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-400/70 hover:shadow-lg' 
                       : isPending
                       ? 'border-amber-300/80 dark:border-amber-800/80 hover:border-amber-400'
                       : 'border-slate-200/70 dark:border-slate-800/70 hover:border-amber-400/60'
                   }`}
                 >
-                  {/* Left: Green Squircle Icon Container */}
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="neu-icon-box w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 text-[#046A38] dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/60 border border-emerald-200/90 dark:border-emerald-800/60 group-hover:scale-105 transition-transform">
+                  {/* Subtle Top Gradient Accent Stripe */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${post.accentGradient} opacity-80 group-hover:opacity-100 transition-opacity`} />
+
+                  {/* Left & Middle Container */}
+                  <div className="flex items-start sm:items-center gap-3.5 sm:gap-4.5 min-w-0 flex-1">
+                    
+                    {/* 3D Neumorphic Icon Box */}
+                    <div 
+                      className={`neu-icon-box w-13 h-13 sm:w-15 sm:h-15 rounded-2xl flex items-center justify-center shrink-0 border ${post.lightBg} ${post.darkBg} group-hover:scale-105 transition-transform shadow-xs`}
+                    >
                       <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
                     </div>
 
-                    {/* Middle: Title & Subtitle */}
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-black text-[#064E3B] dark:text-emerald-400 font-hind leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors truncate">
-                        {sub.name}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
-                        {sub.description}
+                    {/* Title, Badge & Subtitle */}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      
+                      {/* Badge Pill */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 inline-flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          <span>{post.badge}</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hidden sm:inline-block">
+                          • {post.tagline}
+                        </span>
+                      </div>
+
+                      {/* Main Title */}
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind leading-snug group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
+                        {post.name}
+                      </h2>
+
+                      {/* Subtitle / Topics Overview */}
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                        {post.subtitle}
                       </p>
+
+                      {/* Micro Topic Chips */}
+                      <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+                        {post.topics.slice(0, 3).map((t, idx) => (
+                          <span 
+                            key={idx}
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                        {post.topics.length > 3 && (
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                            +{toBengaliNumeral(post.topics.length - 3)}টি টপিক
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right: Green Practice Button / Locked Button / Pending Button */}
-                  <div className="shrink-0">
+                  {/* Right Action Button (Neumorphic) */}
+                  <div className="shrink-0 flex items-center justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/60">
                     {isPremium ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSubjectClick(sub.name);
+                          handlePostClick(post);
                         }}
-                        className="neu-pill !rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-[#046A38] dark:text-emerald-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-emerald-300/80 dark:border-emerald-700/60 bg-white/90 dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                        className="neu-pill !rounded-2xl w-full sm:w-auto px-4 sm:px-5 py-2.5 text-[#046A38] dark:text-emerald-300 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer border border-emerald-300/80 dark:border-emerald-700/60 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs"
                       >
+                        <Zap className="w-4 h-4 fill-emerald-600 dark:fill-emerald-400 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <span>অনুশীলন শুরু</span>
-                        <ChevronRight className="w-4 h-4 text-[#046A38] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                        <ChevronRight className="w-4 h-4 text-[#046A38] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                       </button>
                     ) : isPending ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSubjectClick(sub.name);
+                          handlePostClick(post);
                         }}
-                        className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-800 dark:text-amber-300 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-400/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/50 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                        className="neu-pill !rounded-2xl w-full sm:w-auto px-4 sm:px-4.5 py-2.5 text-amber-800 dark:text-amber-300 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer border border-amber-400/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/50 hover:scale-105 active:scale-95 transition-all shadow-xs"
                       >
-                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                         <span>যাচাইাধীন</span>
                       </button>
                     ) : (
@@ -450,12 +465,12 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSubjectClick(sub.name);
+                          handlePostClick(post);
                         }}
-                        className="neu-pill !rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-amber-700 dark:text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                        className="neu-pill !rounded-2xl w-full sm:w-auto px-4 sm:px-4.5 py-2.5 text-amber-800 dark:text-amber-400 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/40 hover:scale-105 active:scale-95 transition-all shadow-xs"
                       >
-                        <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>লক করা</span>
+                        <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>লক করা (আনলক করুন)</span>
                       </button>
                     )}
                   </div>
@@ -466,118 +481,102 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject, onO
         </>
       )}
 
-      {/* 4. QUESTION COUNT & TIME LIMIT CONFIG MODAL (Unlocked State) */}
-      {selectedSubject && (
+      {/* 5. QUESTION COUNT & TIME LIMIT CONFIG MODAL (Unlocked State) */}
+      {selectedPost && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="neu-card max-w-md w-full p-6 relative shadow-2xl space-y-5 bg-white dark:bg-[#121E36] border border-emerald-200/80 dark:border-emerald-800/60">
+            
             {/* Header with Top-Left Back Button and Right Close Button */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
               <button
-                onClick={() => setSelectedSubject(null)}
+                onClick={() => setSelectedPost(null)}
                 className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1.5 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>পিছনে</span>
               </button>
               <button
-                onClick={() => setSelectedSubject(null)}
+                onClick={() => setSelectedPost(null)}
                 className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center cursor-pointer transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Subject Title */}
+            {/* Subject Post Title */}
             <div>
               <span className="text-[11px] font-bold text-[#064E3B] dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 inline-flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-emerald-600" />
-                নির্বাচিত বিষয়
+                {selectedPost.badge}
               </span>
-              <h3 className="text-xl font-black text-[#064E3B] dark:text-emerald-400 mt-1 font-hind">
-                {selectedSubject}
+              <h3 className="text-xl font-black text-[#064E3B] dark:text-emerald-400 mt-1.5 font-hind">
+                {selectedPost.name}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">
-                অনুশীলন শুরু করার আগে আপনার পছন্দমতো সময় ও প্রশ্ন নির্ধারণ করুন
+              <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5 leading-relaxed">
+                {selectedPost.subtitle}
               </p>
             </div>
 
-            {/* Option 1: Question Count */}
+            {/* Questions Count Config */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                <ListOrdered className="w-4 h-4 text-[#064E3B] dark:text-emerald-400" />
-                <span>প্রশ্ন সংখ্যা নির্ধারণ করুন:</span>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <ListOrdered className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>কতটি প্রশ্ন প্র্যাকটিস করতে চান?</span>
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {[10, 25, 50, 100].map((num) => {
-                  const isCountSelected = questionCount === num;
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setQuestionCount(num)}
-                      className={`py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                        isCountSelected
-                          ? 'bg-[#046A38] border-[#046A38] text-white shadow-xs'
-                          : 'neu-btn text-slate-800 dark:text-slate-200'
-                      }`}
-                    >
-                      {toBengaliNumeral(num)}টি
-                    </button>
-                  );
-                })}
+                {[10, 25, 50, 100].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setQuestionCount(num)}
+                    className={`py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${
+                      questionCount === num
+                        ? 'bg-[#046A38] text-white border-[#046A38] shadow-md scale-102'
+                        : 'neu-pill text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:border-emerald-400'
+                    }`}
+                  >
+                    {toBengaliNumeral(num)}টি
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Option 2: Time Limit */}
+            {/* Time Limit Config */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-[#064E3B] dark:text-emerald-400" />
-                <span>সময় সীমা নির্ধারণ করুন (মিনিট):</span>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>সময়সীমা (মিনিট)</span>
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {[10, 15, 20, 30].map((mins) => {
-                  const isTimeSelected = timeMinutes === mins;
-                  return (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => setTimeMinutes(mins)}
-                      className={`py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                        isTimeSelected
-                          ? 'bg-[#046A38] border-[#046A38] text-white shadow-xs'
-                          : 'neu-btn text-slate-800 dark:text-slate-200'
-                      }`}
-                    >
-                      {toBengaliNumeral(mins)}মি.
-                    </button>
-                  );
-                })}
+                {[10, 15, 20, 30].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => setTimeMinutes(mins)}
+                    className={`py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${
+                      timeMinutes === mins
+                        ? 'bg-[#046A38] text-white border-[#046A38] shadow-md scale-102'
+                        : 'neu-pill text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:border-emerald-400'
+                    }`}
+                  >
+                    {toBengaliNumeral(mins)} মিনিট
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Launch Exam Button in Green */}
-            <div className="pt-2 flex gap-3">
-              <button
-                onClick={handleStartExamFromModal}
-                className="w-full py-3.5 bg-gradient-to-r from-[#046A38] to-[#064E3B] hover:from-[#057A42] hover:to-[#046A38] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98 transition-all"
-              >
-                <Play className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span>পরীক্ষা শুরু করুন ({toBengaliNumeral(questionCount)}টি প্রশ্ন, {toBengaliNumeral(timeMinutes)} মিনিট)</span>
-              </button>
-            </div>
+            {/* Start Button */}
+            <button
+              type="button"
+              onClick={handleStartExamFromModal}
+              className="w-full py-3.5 rounded-2xl bg-[#046A38] hover:bg-[#03532B] text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98 transition-all cursor-pointer"
+            >
+              <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
+              <span>অনুশীলন শুরু করুন ({toBengaliNumeral(questionCount)} প্রশ্ন • {toBengaliNumeral(timeMinutes)} মিনিট)</span>
+            </button>
           </div>
         </div>
       )}
-
-      {/* 5. MULTI-STEP PAYMENT ENROLLMENT MODAL */}
-      {showPaymentModal && (
-        <PremiumEnrollmentModal
-          onClose={() => setShowPaymentModal(false)}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
-
     </div>
   );
 };
-

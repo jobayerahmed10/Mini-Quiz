@@ -1,5 +1,99 @@
 import { SubjectCategory, Question } from '../types';
 
+export interface MainSubjectPost {
+  id: string;
+  name: string;
+  code: string;
+  tagline: string;
+  subtitle: string;
+  badge: string;
+  iconName: string;
+  themeColor: string;
+  accentGradient: string;
+  lightBg: string;
+  darkBg: string;
+  topics: string[];
+  description: string;
+}
+
+export const MAIN_SUBJECT_POSTS: MainSubjectPost[] = [
+  {
+    id: 'arabic_lecturer',
+    name: 'আরবি প্রভাষক',
+    code: '৩০০',
+    tagline: 'মাদ্রাসা ও কলেজ পর্যায় (প্রভাষক পদ)',
+    badge: 'প্রভাষক আরবি • কোড: ৩০০',
+    subtitle: 'আরবি সাহিত্য, বালাগাত, মানতিক, নাহু-সরফ, তাফসির ও উচ্চতর আরবি বিষয়',
+    iconName: 'GraduationCap',
+    themeColor: '#046A38',
+    accentGradient: 'from-emerald-600 to-teal-800',
+    lightBg: 'bg-emerald-500/10 text-emerald-700 border-emerald-300',
+    darkBg: 'dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-700',
+    topics: ['আরবি সাহিত্য ও ইতিহাস', 'ইলমুল বালাগাত ও মানতিক', 'উচ্চতর নাহু ও সরফ', 'তাফসির ও উসুলুত তাফসির', 'হাদিস ও উসুলুল হাদিস', 'ফিকহ ও উসুলুল ফিকহ'],
+    description: 'NTRCA কলেজ ও মাদ্রাসা শিক্ষক নিবন্ধন: প্রভাষক আরবি (পদ কোড: ৩০০) এর পূর্ণাঙ্গ বিষয়ভিত্তিক প্রশ্নব্যাংক ও প্রস্তুতি।',
+  },
+  {
+    id: 'assistant_moulvi',
+    name: 'সহকারী মৌলভী',
+    code: '৩১১',
+    tagline: 'মাদ্রাসা আলিম ও দাখিল পর্যায়',
+    badge: 'সহকারী শিক্ষক • কোড: ৩১১',
+    subtitle: 'আল কুরআন ও তাফসির, আল হাদিস, ফিকহ ও ফাতওয়া, আরবি ব্যাকরণ ও ইসলামী শিক্ষা',
+    iconName: 'BookOpen',
+    themeColor: '#0284C7',
+    accentGradient: 'from-sky-600 to-blue-800',
+    lightBg: 'bg-sky-500/10 text-sky-700 border-sky-300',
+    darkBg: 'dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-700',
+    topics: ['আল কুরআন ও তাফসির', 'আল হাদিস শরিফ', 'আল ফিকহ ও ফাতওয়া', 'আরবি ব্যাকরণ (নাহু-সরফ)', 'আকিদা ও কালামশাস্ত্র', 'ইসলামের ইতিহাস ও সংস্কৃতি'],
+    description: 'NTRCA মাদ্রাসা নিবন্ধন: সহকারী মৌলভী (পদ কোড: ৩১১) এর পূর্ণাঙ্গ বিষয়ভিত্তিক প্রশ্নব্যাংক ও স্পেশাল মডেল টেস্ট।',
+  },
+  {
+    id: 'ebtedayee_moulvi',
+    name: 'ইবতেদায়ি মৌলভী',
+    code: '৩১২',
+    tagline: 'ইবতেদায়ি মাদ্রাসা পর্যায়',
+    badge: 'ইবতেদায়ি প্রধান/মৌলভী • কোড: ৩১২',
+    subtitle: 'প্রাথমিক দ্বীনিয়্যাত, কুরআন মজিদ, তাজবীদ, আকাইদ ও ফিকহের মৌলিক বিধানাবলী',
+    iconName: 'Users',
+    themeColor: '#D97706',
+    accentGradient: 'from-amber-500 to-orange-700',
+    lightBg: 'bg-amber-500/10 text-amber-700 border-amber-300',
+    darkBg: 'dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700',
+    topics: ['কুরআন মাজিদ ও তাজবীদ', 'হাদিস শরিফ ও সুন্নাহ', 'মৌলিক ফিকহ ও মাসআলা', 'আকাইদ ও দ্বীনিয়্যাত', 'সহজ আরবি ব্যাকরণ'],
+    description: 'NTRCA ইবতেদায়ি মাদ্রাসা শিক্ষক নিবন্ধন: ইবতেদায়ি মৌলভী (পদ কোড: ৩১২) এর সিলেবাসভিত্তিক অনুশীলন।',
+  },
+  {
+    id: 'ebtedayee_qari',
+    name: 'ইবতেদায়ি কারী',
+    code: '৩১৩',
+    tagline: 'ইবতেদায়ি কারী ও তাজবীদ শিক্ষক',
+    badge: 'ইবতেদায়ি কারী • কোড: ৩১৩',
+    subtitle: 'ইলমুত তাজবীদ, মাখরাজ ও সিফাত, ক্বিরাআত উসুল, হিফজুল কুরআন ও প্রয়োজনীয় মাসআলা',
+    iconName: 'Volume2',
+    themeColor: '#7C3AED',
+    accentGradient: 'from-purple-600 to-indigo-800',
+    lightBg: 'bg-purple-500/10 text-purple-700 border-purple-300',
+    darkBg: 'dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-700',
+    topics: ['ইলমুত তাজবীদ (মাখরাজ-সিফাত)', 'ক্বিরাআত ও তিলাওয়াত উসুল', 'কুরআন হিফজ ও নাজেরা', 'প্রাথমিক ফিকহ ও মাসআলা', 'ইসলামী আদব ও শিষ্টাচার'],
+    description: 'NTRCA ইবতেদায়ি মাদ্রাসা শিক্ষক নিবন্ধন: ইবতেদায়ি কারী (পদ কোড: ৩১৩) এর পূর্ণাঙ্গ তাজবীদ ও প্রশ্নব্যাংক অনুশীলন।',
+  },
+  {
+    id: 'general_subjects',
+    name: 'জেনারেল বিষয়',
+    code: 'আবশ্যিক',
+    tagline: 'স্কুল, কলেজ ও মাদ্রাসা সকল পর্যায়',
+    badge: 'আবশ্যিক জেনারেল বিষয় • ১০০ নম্বর',
+    subtitle: 'বাংলা ভাষা ও সাহিত্য, ইংরেজি ভাষা, সাধারণ গণিত ও মানসিক দক্ষতা, সাধারণ জ্ঞান ও আইসিটি',
+    iconName: 'Layers',
+    themeColor: '#E11D48',
+    accentGradient: 'from-rose-600 to-red-800',
+    lightBg: 'bg-rose-500/10 text-rose-700 border-rose-300',
+    darkBg: 'dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-700',
+    topics: ['বাংলা ভাষা ও সাহিত্য', 'ইংরেজি ভাষা ও গ্রামার', 'সাধারণ গণিত ও মানসিক দক্ষতা', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি', 'তথ্য ও যোগাযোগ প্রযুক্তি (ICT)'],
+    description: 'NTRCA স্কুল, কলেজ ও মাদ্রাসা প্রিলিমিনারি আবশ্যিক বিষয়: বাংলা, ইংরেজি, গণিত ও সাধারণ জ্ঞানের পূর্ণাঙ্গ প্রশ্নব্যাংক।',
+  },
+];
+
 export const SUBJECT_CATEGORIES: SubjectCategory[] = [
   {
     id: 'all',

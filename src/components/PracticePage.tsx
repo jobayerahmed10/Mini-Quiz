@@ -48,6 +48,51 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
     }
 
+    // Stream-based matching for the 5 primary post buttons
+    const sLower = subj.toLowerCase();
+    let streamMatches: Question[] = [];
+
+    if (sLower.includes('আরবি প্রভাষক') || (sLower.includes('প্রভাষক') && sLower.includes('আরবি'))) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('আরবি') || text.includes('নাহু') || text.includes('সরফ') || 
+               text.includes('বালাগাত') || text.includes('সাহিত্য') || text.includes('তাফসির') || 
+               text.includes('হাদিস') || text.includes('ফিকহ') || text.includes('উসুল');
+      });
+    } else if (sLower.includes('সহকারী মৌলভী')) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('কুরআন') || text.includes('তাফসির') || text.includes('হাদিস') || 
+               text.includes('ফিকহ') || text.includes('আরবি') || text.includes('নাহু') || 
+               text.includes('আকিদা') || text.includes('ইতিহাস');
+      });
+    } else if (sLower.includes('ইবতেদায়ি মৌলভী')) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('কুরআন') || text.includes('হাদিস') || text.includes('ফিকহ') || 
+               text.includes('আকিদা') || text.includes('আরবি') || text.includes('দ্বীনিয়্যাত');
+      });
+    } else if (sLower.includes('ইবতেদায়ি কারী') || sLower.includes('কারী')) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('তাজবীদ') || text.includes('ক্বিরাআত') || text.includes('কুরআন') || 
+               text.includes('মাখরাজ') || text.includes('সিফাত') || text.includes('হাদিস') || 
+               text.includes('ফিকহ');
+      });
+    } else if (sLower.includes('জেনারেল') || sLower.includes('সাধারণ')) {
+      streamMatches = rawPool.filter((q) => {
+        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+        return text.includes('বাংলা') || text.includes('ইংরেজি') || text.includes('english') || 
+               text.includes('গণিত') || text.includes('মানসিক') || text.includes('বাংলাদেশ') || 
+               text.includes('আন্তর্জাতিক') || text.includes('আইসিটি') || text.includes('কম্পিউটার') || 
+               text.includes('বিজ্ঞান');
+      });
+    }
+
+    if (streamMatches.length > 0) {
+      return count && count > 0 && streamMatches.length > count ? streamMatches.slice(0, count) : streamMatches;
+    }
+
     // Tier 1: Direct subject match
     const directMatches = rawPool.filter((q) => {
       if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
