@@ -541,14 +541,6 @@ export default function App() {
   };
 
   const handleTabChange = (tab: TabRoute) => {
-    // Check if user is registered for protected features / tabs
-    const registered = isUserRegistered();
-    if (!registered && tab !== 'home' && tab !== 'exam') {
-      setPendingTabAfterAuth(tab);
-      setShowRegPromptModal(true);
-      return;
-    }
-
     navigateWithHistory('home', tab);
   };
 

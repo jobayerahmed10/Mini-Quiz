@@ -1303,24 +1303,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 💡 ভুলগুলোই আপনার সাফল্যের চাবিকাঠি! নিচের প্রশ্নগুলো আবার ঝালিয়ে নিন:
               </div>
 
-              {wrongQuestions.map((q, idx) => (
-                <div key={q.id || idx} className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-2">
-                  <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">
-                    ভুল প্রশ্ন #{toBengaliNumeral(idx + 1)} • {q.subject}
-                  </span>
-                  <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">{q.question}</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold">
-                      ✓ সঠিক: {q[q.correct_answer as keyof Question] || q.option_a}
-                    </div>
-                    {q.explanation && (
-                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 col-span-2 text-[11px]">
-                        ব্যাখ্যা: {q.explanation}
+              {savedWrongQuestions.length > 0 ? (
+                savedWrongQuestions.map((q, idx) => (
+                  <div key={q.questionId || idx} className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-2">
+                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">
+                      ভুল প্রশ্ন #{toBengaliNumeral(idx + 1)} • {q.subject || 'সাধারণ'}
+                    </span>
+                    <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">{q.questionText}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                      <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold">
+                        ✓ সঠিক: {q.correctOption}
                       </div>
-                    )}
+                      {q.explanation && (
+                        <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 col-span-2 text-[11px]">
+                          ব্যাখ্যা: {q.explanation}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                  এখনো কোনো ভুলের রেকর্ড নেই। পরীক্ষায় ভুল উত্তর দিলে তা এখানে অনুশীলনের জন্য সংরক্ষিত হবে।
                 </div>
-              ))}
+              )}
             </div>
 
             <button
@@ -1432,11 +1438,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="space-y-2.5 max-h-64 overflow-y-auto">
               {savedExamHistory.length > 0 ? (
                 savedExamHistory.map((item, idx) => (
-                  <div key={item.id || idx} className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
+                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
                     <div className="min-w-0 flex-1 pr-2">
-                      <h5 className="text-xs font-black text-slate-800 dark:text-white truncate">{item.examTitle || 'মডেল টেস্ট'}</h5>
+                      <h5 className="text-xs font-black text-slate-800 dark:text-white truncate">{item.examTitle || item.selectedSubject || 'মডেল টেস্ট'}</h5>
                       <p className="text-[10px] text-slate-400 mt-0.5">
-                        {item.date ? new Date(item.date).toLocaleDateString('bn-BD') : 'সম্প্রতি'} • {toBengaliNumeral(item.totalQuestions || 0)}টি প্রশ্ন
+                        {item.completedAt ? new Date(item.completedAt).toLocaleDateString('bn-BD') : 'সম্প্রতি'} • {toBengaliNumeral(item.totalQuestions || 0)}টি প্রশ্ন
                       </p>
                     </div>
                     <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black text-xs rounded-xl shrink-0">

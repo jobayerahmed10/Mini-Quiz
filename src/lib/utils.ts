@@ -769,10 +769,12 @@ export function calculateRealUserMetrics(): {
   totalCorrect: number;
   overallAccuracy: number;
   bestExamsCount: number;
+  subjectStats: Record<string, { total: number; correct: number }>;
 } {
   const history = getSavedExamHistory();
   const completedIds = getCompletedExamIds();
   const studentStats = getStudentStats();
+  const subjectStats: Record<string, { total: number; correct: number }> = {};
 
   if (history.length === 0 && (studentStats.totalQuestionsAnswered || 0) === 0) {
     return {
@@ -781,6 +783,7 @@ export function calculateRealUserMetrics(): {
       totalCorrect: 0,
       overallAccuracy: 0,
       bestExamsCount: 0,
+      subjectStats: {},
     };
   }
 
@@ -794,6 +797,18 @@ export function calculateRealUserMetrics(): {
       totalCorrect += h.correctCount || 0;
       if (h.percentage >= 80) {
         bestExams += 1;
+      }
+      if (h.userAnswers && Array.isArray(h.userAnswers)) {
+        h.userAnswers.forEach((ans) => {
+          const subj = ans.subject || h.selectedSubject || 'অন্যান্য';
+          if (!subjectStats[subj]) {
+            subjectStats[subj] = { total: 0, correct: 0 };
+          }
+          subjectStats[subj].total += 1;
+          if (ans.isCorrect) {
+            subjectStats[subj].correct += 1;
+          }
+        });
       }
     });
   } else if (studentStats.totalQuestionsAnswered > 0) {
@@ -809,6 +824,7 @@ export function calculateRealUserMetrics(): {
     totalCorrect,
     overallAccuracy: accuracy,
     bestExamsCount: bestExams,
+    subjectStats,
   };
 }
 
