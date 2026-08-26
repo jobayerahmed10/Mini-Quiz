@@ -1711,11 +1711,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       />
 
       {/* Premium Package Enrollment Modal */}
-      <PremiumEnrollmentModal
-        isOpen={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
-        initialPackageId="quarterly"
-      />
+      {showPremiumModal && (
+        <PremiumEnrollmentModal
+          isOpen={showPremiumModal}
+          onClose={() => setShowPremiumModal(false)}
+          initialPackageId="quarterly"
+          onSuccess={() => {
+            setShowPremiumModal(false);
+            setSuccessMsg('আপনার প্রিমিয়াম মেম্বারশিপ আবেদন সফল হয়েছে!');
+            setTimeout(() => setSuccessMsg(''), 3000);
+          }}
+        />
+      )}
 
     </div>
   );

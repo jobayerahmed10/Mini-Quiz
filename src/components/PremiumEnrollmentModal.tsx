@@ -87,20 +87,30 @@ export const PREMIUM_PLANS: PremiumPackagePlan[] = [
 ];
 
 interface PremiumEnrollmentModalProps {
+  isOpen?: boolean;
   onClose: () => void;
-  onSuccess: (record: CourseEnrollmentRecord) => void;
+  onSuccess?: (record: CourseEnrollmentRecord) => void;
   initialPlanId?: 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
+  initialPackageId?: string;
 }
 
 export const PremiumEnrollmentModal: React.FC<PremiumEnrollmentModalProps> = ({
+  isOpen = true,
   onClose,
   onSuccess,
-  initialPlanId = 'yearly'
+  initialPlanId,
+  initialPackageId
 }) => {
+  if (isOpen === false) return null;
+
   const currentProfile = getUserProfile();
 
+  // Resolve initial selected plan
+  const defaultPlanId: 'monthly' | 'quarterly' | 'half_yearly' | 'yearly' = 
+    (initialPlanId || (initialPackageId as any) || 'yearly');
+
   // Selected Plan
-  const [selectedPlanId, setSelectedPlanId] = useState<'monthly' | 'quarterly' | 'half_yearly' | 'yearly'>(initialPlanId);
+  const [selectedPlanId, setSelectedPlanId] = useState<'monthly' | 'quarterly' | 'half_yearly' | 'yearly'>(defaultPlanId);
   const selectedPlan = PREMIUM_PLANS.find((p) => p.id === selectedPlanId) || PREMIUM_PLANS[3];
 
   // Steps: 1 (Package Selection), 2 (User Info), 3 (Payment Method), 4 (Payment TrxID), 5 (Success/Pending)
