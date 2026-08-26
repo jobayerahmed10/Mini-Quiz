@@ -49,6 +49,7 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
     fullName: string;
     phone: string;
     email: string;
+    rollNumber?: string;
     createdAt: string;
     avatarUrl?: string;
     role?: string;
@@ -582,55 +583,81 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                 <p className="text-xs font-bold">কোনো নিবন্ধিত শিক্ষার্থী পাওয়া যায়নি।</p>
               </div>
             ) : (
-              registeredUsers.map((user, idx) => (
-                <div
-                  key={user.id || idx}
-                  className="rounded-2xl p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between gap-3 hover:border-emerald-500/40 transition-all"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 text-[#046A38] dark:text-emerald-400 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-200 dark:border-emerald-800">
-                      {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <User className="w-5 h-5" />
-                      )}
-                    </div>
-
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                          {user.fullName || 'শিক্ষার্থী'}
-                        </h4>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {user.role === 'admin' ? 'এডমিন' : 'শিক্ষার্থী'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
-                        {user.phone && (
-                          <span className="flex items-center gap-1 font-mono font-bold text-slate-700 dark:text-slate-300">
-                            <Phone className="w-3 h-3 text-emerald-600" />
-                            {user.phone}
-                          </span>
-                        )}
-                        {user.email && (
-                          <span className="flex items-center gap-1 truncate text-slate-600 dark:text-slate-400">
-                            <Mail className="w-3 h-3 text-emerald-600" />
-                            {user.email}
-                          </span>
+              registeredUsers
+                .filter((user) => {
+                  if (!searchQuery.trim()) return true;
+                  const q = searchQuery.toLowerCase();
+                  return (
+                    (user.fullName && user.fullName.toLowerCase().includes(q)) ||
+                    (user.phone && user.phone.includes(q)) ||
+                    (user.email && user.email.toLowerCase().includes(q)) ||
+                    (user.rollNumber && user.rollNumber.toLowerCase().includes(q)) ||
+                    (user.id && user.id.toLowerCase().includes(q))
+                  );
+                })
+                .map((user, idx) => (
+                  <div
+                    key={user.id || idx}
+                    className="rounded-2xl p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between gap-3 hover:border-emerald-500/40 transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 text-[#046A38] dark:text-emerald-400 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-200 dark:border-emerald-800">
+                        {user.avatarUrl ? (
+                          <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <User className="w-5 h-5" />
                         )}
                       </div>
+
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                            {user.fullName || 'শিক্ষার্থী'}
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                            {user.role === 'admin' ? 'এডমিন' : 'শিক্ষার্থী'}
+                          </span>
+                          {/* Student Roll Number Badge */}
+                          {user.rollNumber && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 text-[10px] font-mono font-bold">
+                              <span>রোল: {user.rollNumber}</span>
+                              <button
+                                onClick={() => handleCopy(user.rollNumber!, `roll_${user.id}`)}
+                                className="hover:text-amber-600 dark:hover:text-amber-200 p-0.5 cursor-pointer"
+                                title="রোল কপি করুন"
+                                type="button"
+                              >
+                                {copiedId === `roll_${user.id}` ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
+                          {user.phone && (
+                            <span className="flex items-center gap-1 font-mono font-bold text-slate-700 dark:text-slate-300">
+                              <Phone className="w-3 h-3 text-emerald-600" />
+                              {user.phone}
+                            </span>
+                          )}
+                          {user.email && (
+                            <span className="flex items-center gap-1 truncate text-slate-600 dark:text-slate-400">
+                              <Mail className="w-3 h-3 text-emerald-600" />
+                              {user.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] text-slate-400 font-mono block">ID: {user.id.slice(0, 8)}...</span>
+                      <span className="text-[10px] text-slate-400 font-medium block">
+                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString('bn-BD') : 'আজ'}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-400 font-mono block">ID: {user.id.slice(0, 10)}...</span>
-                    <span className="text-[10px] text-slate-400 font-medium block">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString('bn-BD') : 'আজ'}
-                    </span>
-                  </div>
-                </div>
-              ))
+                ))
             )}
           </div>
         )}

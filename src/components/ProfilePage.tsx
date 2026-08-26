@@ -11,7 +11,9 @@ import {
   saveUserProfile, getUserProfile, getStudentStats, 
   toBengaliNumeral, getUserGoal, saveUserGoal, getUserStreakDays, 
   getBookmarkedIds, toggleBookmarkId, isUserRegistered, clearUserProfile, UserProfile,
-  compressAndResizeAvatar, getCompletedExamIds, getExamResult
+  compressAndResizeAvatar, getCompletedExamIds, getExamResult,
+  getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
+  removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -79,9 +81,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [isRegistered, setIsRegistered] = useState<boolean>(() => isUserRegistered());
 
   // Form State for editing
-  const [name, setName] = useState(userProfile?.name || 'Jobayer Ahmed');
-  const [phone, setPhone] = useState(userProfile?.phone || userProfile?.email || '01779834999');
-  const [avatar, setAvatar] = useState(userProfile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250');
+  const [name, setName] = useState(userProfile?.name || 'শিক্ষার্থী');
+  const [phone, setPhone] = useState(userProfile?.phone || userProfile?.email || '');
+  const [avatar, setAvatar] = useState(userProfile?.avatar || '');
   const [goalText, setGoalText] = useState(getUserGoal());
 
   // Modals and Drawer States
@@ -103,6 +105,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   // Message notifications
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [copiedRoll, setCopiedRoll] = useState(false);
 
   // Supabase Auth State
   const [authSession, setAuthSession] = useState<any>(null);
@@ -115,9 +118,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const bookmarkedIds = getBookmarkedIds();
   const completedExamIds = getCompletedExamIds();
 
-  // Load questions for bookmarks and wrong answer bank
+  // Real Real-time metrics
+  const realMetrics = calculateRealUserMetrics();
+  const totalExamsGiven = completedExamIds.length;
+  const correctSolvedCount = studentStats.totalQuestionsAnswered || 0;
+  const bestExamsCount = realMetrics.bestExamsCount;
+  const averageAccuracy = realMetrics.totalQuestions > 0 ? `${toBengaliNumeral(realMetrics.overallAccuracy)}%` : '০০%';
+  const userRollNumber = userProfile?.roll_number || userProfile?.student_id || getUserRollNumber(userProfile?.phone);
+
+  // Load real saved questions
   const bookmarkedQuestions = SAMPLE_QUESTIONS.filter(q => bookmarkedIds.includes(String(q.id)));
-  const wrongQuestions = SAMPLE_QUESTIONS.slice(2, 6); // curated sample wrong items for review
+  const savedWrongQuestions = getSavedWrongQuestions();
+  const savedExamHistory = getSavedExamHistory();
 
   useEffect(() => {
     supabaseGetSession().then((session) => {
@@ -130,8 +142,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       if (prof) {
         setUserProfile(prof);
         setIsRegistered(true);
-        setName(prof.name || 'Jobayer Ahmed');
-        setPhone(prof.phone || prof.email || '01779834999');
+        setName(prof.name || 'শিক্ষার্থী');
+        setPhone(prof.phone || prof.email || '');
         if (prof.avatar) setAvatar(prof.avatar);
       }
     });
@@ -142,8 +154,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       const reg = isUserRegistered();
       setIsRegistered(reg);
       if (p) {
-        setName(p.name || 'Jobayer Ahmed');
-        setPhone(p.phone || p.email || '01779834999');
+        setName(p.name || 'শিক্ষার্থী');
+        setPhone(p.phone || p.email || '');
         if (p.avatar) setAvatar(p.avatar);
       }
     };
@@ -157,6 +169,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       window.removeEventListener('tamreen_auth_status_changed', handleProfileSync);
     };
   }, []);
+
+  const handleCopyRoll = () => {
+    if (userRollNumber) {
+      navigator.clipboard.writeText(userRollNumber);
+      setCopiedRoll(true);
+      setSuccessMsg(`রোল নম্বর ${userRollNumber} কপি হয়েছে!`);
+      setTimeout(() => {
+        setCopiedRoll(false);
+        setSuccessMsg('');
+      }, 2000);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabaseSignOut();
@@ -218,12 +242,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     setSuccessMsg('লক্ষ্য সফলভাবে সেট করা হয়েছে!');
     setTimeout(() => setSuccessMsg(''), 1500);
   };
-
-  // Dynamic Calculated Metrics matching image
-  const totalExamsGiven = Math.max(265, completedExamIds.length > 0 ? completedExamIds.length + 260 : 265);
-  const correctSolvedCount = Math.max(254, studentStats.totalQuestionsAnswered || 254);
-  const bestExamsCount = 120;
-  const averageAccuracy = '৮৭%';
 
   return (
     <div className="min-h-screen bg-slate-100/80 dark:bg-[#070D1E] pb-32 animate-fade-in font-bengali text-slate-800 dark:text-slate-100">
@@ -287,7 +305,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       <main className="max-w-xl mx-auto px-4 pt-4 space-y-4">
         
         {/* ========================================================================= */}
-        {/* SMART MAIN PROFILE CARD (Exactly styled like the reference photo) */}
+        {/* SMART MAIN PROFILE CARD */}
         {/* ========================================================================= */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#064E3B] via-[#043E30] to-[#022C22] text-white p-5 sm:p-6 shadow-xl border border-emerald-800/40">
           
@@ -329,38 +347,58 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
 
                 {/* User Info Details */}
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
                   {/* Premium Member Pill */}
                   <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold shadow-xs">
                     <Crown className="w-3.5 h-3.5 fill-amber-300" />
-                    <span>{isRegistered ? 'প্রিমিয়াম মেম্বার' : 'গেস্ট অ্যাকাউন্ট'}</span>
+                    <span>{isRegistered ? 'রেজিস্টার্ড মেম্বার' : 'গেস্ট শিক্ষার্থী'}</span>
                   </div>
 
                   {/* Name */}
                   <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide truncate leading-tight drop-shadow-xs font-tiro">
-                    {name || 'Jobayer Ahmed'}
+                    {name || 'শিক্ষার্থী'}
                   </h2>
+
+                  {/* Student Roll Number Badge with Copy Action */}
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/70 border border-emerald-400/30 text-emerald-200 text-xs font-bold shadow-2xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="tracking-wide">রোল: <span className="font-mono text-amber-300">{userRollNumber}</span></span>
+                    <button
+                      onClick={handleCopyRoll}
+                      className="p-0.5 hover:text-white text-emerald-300 transition-colors cursor-pointer active:scale-90"
+                      title="রোল নম্বর কপি করুন"
+                      type="button"
+                    >
+                      {copiedRoll ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
 
                   {/* Phone and Domain */}
                   <div className="flex items-center gap-2 text-xs font-medium text-emerald-100/90 truncate">
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-emerald-300" />
-                      <span>{phone || '01779834999'}</span>
-                    </span>
-                    <span>•</span>
+                    {phone && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-emerald-300" />
+                          <span>{phone}</span>
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
                     <span className="flex items-center gap-1">
                       <span>🌐 tamreen.app</span>
                     </span>
                   </div>
 
                   {/* Update Profile Pill Button */}
-                  <button
-                    onClick={() => setShowEditProfileModal(true)}
-                    className="mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-700/60 hover:bg-emerald-700 text-white text-[11px] font-bold border border-emerald-500/40 transition-all active:scale-95 cursor-pointer shadow-xs"
-                  >
-                    <span>প্রোফাইল আপডেট করুন</span>
-                    <Edit3 className="w-3 h-3 text-emerald-200" />
-                  </button>
+                  <div>
+                    <button
+                      onClick={() => setShowEditProfileModal(true)}
+                      className="mt-0.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-700/60 hover:bg-emerald-700 text-white text-[11px] font-bold border border-emerald-500/40 transition-all active:scale-95 cursor-pointer shadow-xs"
+                    >
+                      <span>প্রোফাইল আপডেট করুন</span>
+                      <Edit3 className="w-3 h-3 text-emerald-200" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -382,7 +420,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             </div>
 
-            {/* Floating 5 Smart Metrics Row (White/Light Card Container as shown in picture) */}
+            {/* Floating 5 Smart Metrics Row */}
             <div className="bg-white dark:bg-[#0D172A] text-slate-800 dark:text-slate-100 rounded-2xl p-3 sm:p-4 shadow-lg border border-slate-100 dark:border-slate-800">
               <div className="grid grid-cols-5 divide-x divide-slate-200/80 dark:divide-slate-800 text-center">
                 
@@ -493,16 +531,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             {/* My Profile Expanded Info Content */}
             {showMyProfileSection && (
               <div className="px-5 pb-5 pt-1 border-t border-slate-100 dark:border-slate-800 space-y-3.5 animate-fade-in">
-                <div className="grid grid-cols-2 gap-2.5 pt-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 text-xs">
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
                     <span className="text-slate-400 font-bold block text-[10px]">নাম</span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{name}</span>
+                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block truncate">{name || 'যুক্ত নেই'}</span>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-                    <span className="text-slate-400 font-bold block text-[10px]">মোবাইল</span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{phone}</span>
+                    <span className="text-slate-400 font-bold block text-[10px]">স্টুডেন্ট রোল নং</span>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm block font-mono">{userRollNumber}</span>
+                      <button 
+                        onClick={handleCopyRoll} 
+                        className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 p-0.5 transition-colors cursor-pointer" 
+                        title="রোল কপি করুন"
+                        type="button"
+                      >
+                        {copiedRoll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl col-span-2 flex items-center justify-between">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl col-span-2 sm:col-span-1">
+                    <span className="text-slate-400 font-bold block text-[10px]">মোবাইল / ইমেইল</span>
+                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block truncate">{phone || 'যুক্ত নেই'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl col-span-2 sm:col-span-3 flex items-center justify-between">
                     <div>
                       <span className="text-slate-400 font-bold block text-[10px]">টার্গেট পরীক্ষা ও লক্ষ্য</span>
                       <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm mt-0.5 block">{goalText}</span>
@@ -1290,7 +1342,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 flex items-center justify-center">
                   <BarChart3 className="w-4 h-4" />
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
@@ -1299,7 +1351,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               <button
                 onClick={() => setShowPerformanceModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1307,51 +1359,48 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl text-center">
-                <span className="text-xs font-bold text-slate-500 block">গড় নির্ভুলতা</span>
-                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">৮৭%</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">গড় নির্ভুলতা</span>
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">
+                  {realMetrics.totalQuestions > 0 ? `${toBengaliNumeral(realMetrics.overallAccuracy)}%` : '০০%'}
+                </span>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl text-center">
-                <span className="text-xs font-bold text-slate-500 block">সমাধানকৃত প্রশ্ন</span>
-                <span className="text-2xl font-black text-amber-500 mt-1 block">{toBengaliNumeral(correctSolvedCount)}টি</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block">সমাধানকৃত প্রশ্ন</span>
+                <span className="text-2xl font-black text-amber-500 mt-1 block">
+                  {toBengaliNumeral(correctSolvedCount)}টি
+                </span>
               </div>
             </div>
 
             <div className="space-y-2">
               <h4 className="text-xs font-black text-slate-700 dark:text-slate-300">বিষয়ভিত্তিক পারদর্শিতা</h4>
-              <div className="space-y-1.5 text-xs font-bold">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span>আরবি ব্যাকরণ (নাহু ও সরফ)</span>
-                    <span className="text-emerald-600">৯২%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                    <div className="bg-[#0b705c] h-full rounded-full" style={{ width: '92%' }}></div>
-                  </div>
+              {realMetrics.subjectStats && Object.keys(realMetrics.subjectStats).length > 0 ? (
+                <div className="space-y-2 text-xs font-bold max-h-48 overflow-y-auto pr-1">
+                  {Object.entries(realMetrics.subjectStats).map(([subj, stats]: [string, any]) => {
+                    const acc = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+                    return (
+                      <div key={subj}>
+                        <div className="flex justify-between mb-1 text-slate-800 dark:text-slate-200">
+                          <span>{subj}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">{toBengaliNumeral(acc)}% ({toBengaliNumeral(stats.correct)}/{toBengaliNumeral(stats.total)})</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                          <div className="bg-[#0b705c] h-full rounded-full transition-all" style={{ width: `${acc}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span>বাংলা ভাষা ও সাহিত্য</span>
-                    <span className="text-emerald-600">৮৮%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                    <div className="bg-[#0b705c] h-full rounded-full" style={{ width: '88%' }}></div>
-                  </div>
+              ) : (
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                  এখনো কোনো পরীক্ষা দেওয়া হয়নি। মডেল টেস্ট ও অনুশীলন সম্পন্ন করলে বিষয়ভিত্তিক গ্রাফ এখানে দেখা যাবে।
                 </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span>সাধারণ জ্ঞান ও সাম্প্রতিক</span>
-                    <span className="text-amber-600">৭৮%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                    <div className="bg-amber-500 h-full rounded-full" style={{ width: '78%' }}></div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             <button
               onClick={() => setShowPerformanceModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
             >
               বন্ধ করুন
             </button>
@@ -1365,7 +1414,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 flex items-center justify-center">
                   <Clock className="w-4 h-4" />
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
@@ -1374,47 +1423,37 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               <button
                 onClick={() => setShowHistoryModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-2.5 max-h-64 overflow-y-auto">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h5 className="text-xs font-black text-slate-800 dark:text-white">১৮তম নিবন্ধন আরবি বিশেষ মডেল টেস্ট</h5>
-                  <p className="text-[10px] text-slate-400 mt-0.5">গতকাল বিকাল ৫:৩০ • ২০টি প্রশ্ন</p>
+              {savedExamHistory.length > 0 ? (
+                savedExamHistory.map((item, idx) => (
+                  <div key={item.id || idx} className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <h5 className="text-xs font-black text-slate-800 dark:text-white truncate">{item.examTitle || 'মডেল টেস্ট'}</h5>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {item.date ? new Date(item.date).toLocaleDateString('bn-BD') : 'সম্প্রতি'} • {toBengaliNumeral(item.totalQuestions || 0)}টি প্রশ্ন
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black text-xs rounded-xl shrink-0">
+                      {toBengaliNumeral(item.score || 0)}/{toBengaliNumeral(item.totalQuestions || 0)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                  এখনো কোনো পরীক্ষা সম্পন্ন হয়নি। যেকোনো মডেল টেস্ট সম্পন্ন করলে পরীক্ষার ইতিহাস এখানে যুক্ত হবে।
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black text-xs rounded-xl">
-                  ১৯/২০
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h5 className="text-xs font-black text-slate-800 dark:text-white">বাংলা ব্যাকরণ ও সাহিত্য অনুশীলন</h5>
-                  <p className="text-[10px] text-slate-400 mt-0.5">২ দিন আগে • ২৫টি প্রশ্ন</p>
-                </div>
-                <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black text-xs rounded-xl">
-                  ২৩/২৫
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h5 className="text-xs font-black text-slate-800 dark:text-white">সাধারণ জ্ঞান বাংলাদেশ বিষয়াবলী</h5>
-                  <p className="text-[10px] text-slate-400 mt-0.5">৪ দিন আগে • ২০টি প্রশ্ন</p>
-                </div>
-                <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-black text-xs rounded-xl">
-                  ১৮/২০
-                </span>
-              </div>
+              )}
             </div>
 
             <button
               onClick={() => setShowHistoryModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
             >
               বন্ধ করুন
             </button>
@@ -1428,7 +1467,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
                   <Trophy className="w-4 h-4" />
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
@@ -1437,49 +1476,49 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               <button
                 onClick={() => setShowAchievementsModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto">
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center mx-auto">
-                  <Flame className="w-5 h-5 fill-amber-950" />
+              <div className={`p-3 rounded-2xl text-center space-y-1 border ${streakDays >= 1 ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${streakDays >= 1 ? 'bg-amber-400 text-amber-950' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                  <Flame className="w-5 h-5" />
                 </div>
-                <h5 className="text-xs font-black text-amber-900 dark:text-amber-300">ধারাবাহিক শিক্ষার্থী</h5>
-                <p className="text-[10px] text-amber-700 dark:text-amber-400">টানা ১৪ দিন অনুশীলনের ব্যাজ</p>
+                <h5 className="text-xs font-black text-slate-900 dark:text-white">ধারাবাহিক শিক্ষার্থী</h5>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">{streakDays >= 1 ? `টানা ${toBengaliNumeral(streakDays)} দিন স্ট্রিক` : 'অনুশীলন শুরু করুন'}</p>
               </div>
 
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
+              <div className={`p-3 rounded-2xl text-center space-y-1 border ${totalExamsGiven >= 1 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${totalExamsGiven >= 1 ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
                   <Award className="w-5 h-5" />
                 </div>
-                <h5 className="text-xs font-black text-emerald-900 dark:text-emerald-300">মডেল টেস্ট মাস্টার</h5>
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">১২০টি পরীক্ষায় সেরা পারফরম্যান্স</p>
+                <h5 className="text-xs font-black text-slate-900 dark:text-white">মডেল টেস্ট মাস্টার</h5>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">{totalExamsGiven >= 1 ? `${toBengaliNumeral(totalExamsGiven)}টি পরীক্ষা সম্পন্ন` : '১ম পরীক্ষা দিন'}</p>
               </div>
 
-              <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl text-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center mx-auto">
+              <div className={`p-3 rounded-2xl text-center space-y-1 border ${realMetrics.overallAccuracy >= 80 && realMetrics.totalQuestions >= 10 ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${realMetrics.overallAccuracy >= 80 && realMetrics.totalQuestions >= 10 ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
                   <Target className="w-5 h-5" />
                 </div>
-                <h5 className="text-xs font-black text-purple-900 dark:text-purple-300">শতভাগ নির্ভুলতা</h5>
-                <p className="text-[10px] text-purple-700 dark:text-purple-400">ফুল মার্কস অর্জনের বিশেষ পদক</p>
+                <h5 className="text-xs font-black text-slate-900 dark:text-white">নির্ভুল সমাধানকারী</h5>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">{realMetrics.overallAccuracy >= 80 ? `${toBengaliNumeral(realMetrics.overallAccuracy)}% একুরেসি` : '৮০% নির্ভুলতা অর্জন করুন'}</p>
               </div>
 
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl text-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mx-auto">
+              <div className={`p-3 rounded-2xl text-center space-y-1 border ${isRegistered ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${isRegistered ? 'bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
                   <Crown className="w-5 h-5" />
                 </div>
-                <h5 className="text-xs font-black text-blue-900 dark:text-blue-300">গোল্ডেন মেম্বার</h5>
-                <p className="text-[10px] text-blue-700 dark:text-blue-400">প্রিমিয়াম স্টাডি অ্যাক্সেস</p>
+                <h5 className="text-xs font-black text-slate-900 dark:text-white">নিবন্ধিত শিক্ষার্থী</h5>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">{isRegistered ? 'অ্যাকাউন্ট ভেরিফাইড' : 'নিবন্ধন সম্পন্ন করুন'}</p>
               </div>
             </div>
 
             <button
               onClick={() => setShowAchievementsModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
             >
               বন্ধ করুন
             </button>

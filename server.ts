@@ -21,6 +21,7 @@ const USER_PROGRESS_FILE_PATH = path.join(process.cwd(), 'user_progress_store.js
 export interface ServerUserAccount {
   id: string;
   student_id: string;
+  roll_number?: string;
   full_name: string;
   phone: string;
   email: string;
@@ -183,7 +184,7 @@ function normalizePhoneNumber(rawPhone: string): string {
  */
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { id, student_id, fullName, full_name, phone, email, password, avatarUrl, avatar_url, role } = req.body;
+    const { id, student_id, roll_number, rollNumber, fullName, full_name, phone, email, password, avatarUrl, avatar_url, role } = req.body;
     const cleanName = String(fullName || full_name || '').trim();
     const cleanPhone = String(phone || '').trim();
     const cleanPhoneNorm = normalizePhoneNumber(cleanPhone);
@@ -197,15 +198,16 @@ app.post('/api/auth/register', (req, res) => {
       return res.status(400).json({ success: false, error: 'মোবাইল নম্বর অথবা ইমেইল প্রদান করুন।' });
     }
     if (!cleanPassword || cleanPassword.length < 6) {
-      return res.status(400).json({ success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' });
+      return res.status(400).json({ success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে باشد।' });
     }
 
     if (!cleanEmail && cleanPhoneNorm) {
       cleanEmail = `${cleanPhoneNorm}@attamreen.academy`;
     }
 
-    // Generate or use existing Student ID (e.g. STD-782910)
-    const finalStudentId = student_id || `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Generate or use existing Student ID / Roll Number (e.g. STD-782910)
+    const phoneRoll = cleanPhoneNorm ? `STD-${cleanPhoneNorm.slice(-6)}` : '';
+    const finalStudentId = roll_number || rollNumber || student_id || phoneRoll || `STD-${Math.floor(100000 + Math.random() * 900000)}`;
     const finalUserId = id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     // Find existing account by phone or email
@@ -225,6 +227,7 @@ app.post('/api/auth/register', (req, res) => {
     const newAccount: ServerUserAccount = {
       id: existingIndex >= 0 ? serverRegisteredUsersStore[existingIndex].id : finalUserId,
       student_id: existingIndex >= 0 ? (serverRegisteredUsersStore[existingIndex].student_id || finalStudentId) : finalStudentId,
+      roll_number: existingIndex >= 0 ? (serverRegisteredUsersStore[existingIndex].roll_number || serverRegisteredUsersStore[existingIndex].student_id || finalStudentId) : finalStudentId,
       full_name: cleanName,
       phone: cleanPhone,
       email: cleanEmail,
@@ -246,6 +249,7 @@ app.post('/api/auth/register', (req, res) => {
     const sanitized = {
       id: newAccount.id,
       student_id: newAccount.student_id,
+      roll_number: newAccount.roll_number || newAccount.student_id,
       full_name: newAccount.full_name,
       phone: newAccount.phone,
       email: newAccount.email,
@@ -258,6 +262,7 @@ app.post('/api/auth/register', (req, res) => {
       success: true,
       user: sanitized,
       studentId: newAccount.student_id,
+      rollNumber: newAccount.roll_number || newAccount.student_id,
       message: 'রেজিস্ট্রেশন সফল হয়েছে!',
     });
   } catch (err: any) {
@@ -394,6 +399,8 @@ app.get('/api/auth/users', (req, res) => {
     const list = serverRegisteredUsersStore.map((u) => ({
       id: u.id,
       student_id: u.student_id,
+      roll_number: u.roll_number || u.student_id,
+      rollNumber: u.roll_number || u.student_id,
       fullName: u.full_name,
       phone: u.phone,
       email: u.email,

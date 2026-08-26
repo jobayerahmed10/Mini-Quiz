@@ -115,7 +115,7 @@ export function getStudentStats(): StudentStats {
     if (!data) {
       return {
         todayPracticeCount: 0,
-        lastPracticeDate: new Date().toISOString().split('T')[0],
+        lastPracticeDate: '',
         totalQuestionsAnswered: 0,
         lastQuizScore: null,
       };
@@ -124,7 +124,7 @@ export function getStudentStats(): StudentStats {
     const todayStr = new Date().toISOString().split('T')[0];
     
     // Reset today's count if date changed
-    if (parsed.lastPracticeDate !== todayStr) {
+    if (parsed.lastPracticeDate && parsed.lastPracticeDate !== todayStr) {
       parsed.todayPracticeCount = 0;
       parsed.lastPracticeDate = todayStr;
     }
@@ -132,7 +132,7 @@ export function getStudentStats(): StudentStats {
   } catch {
     return {
       todayPracticeCount: 0,
-      lastPracticeDate: new Date().toISOString().split('T')[0],
+      lastPracticeDate: '',
       totalQuestionsAnswered: 0,
       lastQuizScore: null,
     };
@@ -162,6 +162,8 @@ export function saveQuizResultToStats(correctCount: number, totalQuestions: numb
 
   try {
     localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(updated));
+    // Update streak if practicing today
+    incrementUserStreak();
   } catch {
     // ignore localstorage errors
   }
@@ -190,6 +192,7 @@ export function saveQuizResultToStats(correctCount: number, totalQuestions: numb
  * User Profile interface & Storage Key
  */
 const PROFILE_STORAGE_KEY = 'tamreen_user_profile';
+const USER_ROLL_KEY = 'tamreen_user_roll_number';
 
 export interface UserProfile {
   name: string;
@@ -197,6 +200,35 @@ export interface UserProfile {
   avatar?: string;
   email?: string;
   isRegistered?: boolean;
+  student_id?: string;
+  roll_number?: string;
+}
+
+export function getUserRollNumber(phone?: string): string {
+  try {
+    const cachedRoll = localStorage.getItem(USER_ROLL_KEY);
+    if (cachedRoll && cachedRoll.trim().length > 0) {
+      return cachedRoll.trim();
+    }
+    const prof = getUserProfile();
+    if (prof?.roll_number) {
+      localStorage.setItem(USER_ROLL_KEY, prof.roll_number);
+      return prof.roll_number;
+    }
+    if (prof?.student_id) {
+      localStorage.setItem(USER_ROLL_KEY, prof.student_id);
+      return prof.student_id;
+    }
+
+    // Generate clean unique 6-digit roll
+    const cleanDigits = (phone || '').replace(/[^0-9]/g, '');
+    const suffix = cleanDigits.length >= 6 ? cleanDigits.slice(-6) : Math.floor(100000 + Math.random() * 900000);
+    const newRoll = `STD-${suffix}`;
+    localStorage.setItem(USER_ROLL_KEY, newRoll);
+    return newRoll;
+  } catch {
+    return `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+  }
 }
 
 export function isUserRegistered(): boolean {
@@ -289,12 +321,15 @@ export function getUserProfile(): UserProfile | null {
     if (!data) return null;
     const parsed = JSON.parse(data);
     if (parsed && typeof parsed.name === 'string' && parsed.name.trim().length > 0) {
+      const roll = parsed.roll_number || parsed.student_id || getUserRollNumber(parsed.phone);
       return {
         name: parsed.name.trim(),
         phone: parsed.phone ? parsed.phone.trim() : '',
         avatar: parsed.avatar || '',
         email: parsed.email || '',
         isRegistered: Boolean(parsed.isRegistered || (parsed.phone && parsed.phone.length >= 6)),
+        student_id: roll,
+        roll_number: roll,
       };
     }
     return null;
@@ -308,13 +343,15 @@ export function saveUserProfile(
   phone: string = '', 
   avatar?: string, 
   isRegistered: boolean = true, 
-  email?: string
+  email?: string,
+  rollNumber?: string
 ): UserProfile {
   const previousProfile = getUserProfile();
   const oldName = previousProfile?.name?.trim()?.toLowerCase();
 
   // If avatar is provided as a non-empty string, use it; otherwise preserve existing avatar
   const finalAvatar = (avatar && avatar.trim().length > 0) ? avatar.trim() : (previousProfile?.avatar || '');
+  const finalRoll = rollNumber || previousProfile?.roll_number || previousProfile?.student_id || getUserRollNumber(phone);
 
   const profile: UserProfile = {
     name: name.trim(),
@@ -322,9 +359,12 @@ export function saveUserProfile(
     avatar: finalAvatar,
     email: email !== undefined ? email : (previousProfile?.email || ''),
     isRegistered: isRegistered,
+    student_id: finalRoll,
+    roll_number: finalRoll,
   };
   try {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    localStorage.setItem(USER_ROLL_KEY, finalRoll);
     if (isRegistered) {
       localStorage.setItem('tamreen_user_auth_status', 'registered');
     }
@@ -574,15 +614,202 @@ export function saveUserGoal(goal: string): void {
  * User Practice Streak
  */
 const STREAK_KEY = 'tamreen_user_streak';
+const LAST_STREAK_DATE_KEY = 'tamreen_last_streak_date';
 
 export function getUserStreakDays(): number {
   try {
     const data = localStorage.getItem(STREAK_KEY);
-    if (!data) return 14; // Default baseline streak for demo
-    return parseInt(data, 10) || 14;
+    if (!data) return 0; // 0 days for new accounts
+    return parseInt(data, 10) || 0;
   } catch {
-    return 14;
+    return 0;
   }
+}
+
+export function incrementUserStreak(): number {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lastDate = localStorage.getItem(LAST_STREAK_DATE_KEY);
+    const currentStreak = getUserStreakDays();
+
+    if (lastDate === todayStr) {
+      return currentStreak; // Already counted today
+    }
+
+    let newStreak = 1;
+    if (lastDate) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      if (lastDate === yesterdayStr) {
+        newStreak = currentStreak + 1;
+      } else {
+        newStreak = 1; // Broken streak reset
+      }
+    }
+
+    localStorage.setItem(STREAK_KEY, newStreak.toString());
+    localStorage.setItem(LAST_STREAK_DATE_KEY, todayStr);
+    return newStreak;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Full Exam History Persistence
+ */
+const EXAM_HISTORY_KEY = 'tamreen_exam_history_list';
+
+export function getSavedExamHistory(): QuizResult[] {
+  try {
+    const raw = localStorage.getItem(EXAM_HISTORY_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveExamToHistory(result: QuizResult): void {
+  try {
+    const history = getSavedExamHistory();
+    // Prepend latest exam at the top, keep last 50
+    const updated = [result, ...history].slice(0, 50);
+    localStorage.setItem(EXAM_HISTORY_KEY, JSON.stringify(updated));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Real Wrong Answers Persistence (ভুল উত্তরের ব্যাংক)
+ */
+const WRONG_ANSWERS_KEY = 'tamreen_wrong_answers_bank';
+
+export interface SavedWrongQuestion {
+  questionId: string | number;
+  questionText: string;
+  subject?: string | null;
+  options: {
+    option_a: string;
+    option_b: string;
+    option_c: string;
+    option_d: string;
+  };
+  selectedOption: string | null;
+  correctOption: string;
+  explanation?: string | null;
+  examTitle?: string | null;
+  savedAt: string;
+}
+
+export function getSavedWrongQuestions(): SavedWrongQuestion[] {
+  try {
+    const raw = localStorage.getItem(WRONG_ANSWERS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveWrongAnswersFromQuiz(quizResult: QuizResult): void {
+  try {
+    if (!quizResult.userAnswers || quizResult.userAnswers.length === 0) return;
+    const existing = getSavedWrongQuestions();
+    const existingIds = new Set(existing.map((q) => String(q.questionId)));
+
+    const newWrong: SavedWrongQuestion[] = [];
+    quizResult.userAnswers.forEach((ans) => {
+      if (!ans.isCorrect && !existingIds.has(String(ans.questionId))) {
+        newWrong.push({
+          questionId: ans.questionId,
+          questionText: ans.questionText,
+          subject: ans.subject || quizResult.selectedSubject || null,
+          options: ans.options,
+          selectedOption: ans.selectedOption,
+          correctOption: ans.correctOption,
+          explanation: ans.explanation,
+          examTitle: quizResult.examTitle,
+          savedAt: new Date().toISOString(),
+        });
+        existingIds.add(String(ans.questionId));
+      }
+    });
+
+    if (newWrong.length > 0) {
+      const combined = [...newWrong, ...existing].slice(0, 100);
+      localStorage.setItem(WRONG_ANSWERS_KEY, JSON.stringify(combined));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function removeSavedWrongQuestion(questionId: string | number): void {
+  try {
+    const existing = getSavedWrongQuestions();
+    const filtered = existing.filter((q) => String(q.questionId) !== String(questionId));
+    localStorage.setItem(WRONG_ANSWERS_KEY, JSON.stringify(filtered));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Overall Accuracy and Best Exam Metrics
+ */
+export function calculateRealUserMetrics(): {
+  totalExams: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  overallAccuracy: number;
+  bestExamsCount: number;
+} {
+  const history = getSavedExamHistory();
+  const completedIds = getCompletedExamIds();
+  const studentStats = getStudentStats();
+
+  if (history.length === 0 && (studentStats.totalQuestionsAnswered || 0) === 0) {
+    return {
+      totalExams: completedIds.length,
+      totalQuestions: 0,
+      totalCorrect: 0,
+      overallAccuracy: 0,
+      bestExamsCount: 0,
+    };
+  }
+
+  let totalQuestions = 0;
+  let totalCorrect = 0;
+  let bestExams = 0;
+
+  if (history.length > 0) {
+    history.forEach((h) => {
+      totalQuestions += h.totalQuestions || 0;
+      totalCorrect += h.correctCount || 0;
+      if (h.percentage >= 80) {
+        bestExams += 1;
+      }
+    });
+  } else if (studentStats.totalQuestionsAnswered > 0) {
+    totalQuestions = studentStats.totalQuestionsAnswered;
+    totalCorrect = studentStats.lastQuizScore ? studentStats.lastQuizScore.correct : 0;
+  }
+
+  const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+
+  return {
+    totalExams: Math.max(completedIds.length, history.length),
+    totalQuestions: Math.max(totalQuestions, studentStats.totalQuestionsAnswered || 0),
+    totalCorrect,
+    overallAccuracy: accuracy,
+    bestExamsCount: bestExams,
+  };
 }
 
 /**

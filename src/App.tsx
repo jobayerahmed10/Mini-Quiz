@@ -29,7 +29,22 @@ import {
   supabaseOnAuthStateChange,
   syncUserProfileFromSupabase
 } from './lib/supabase';
-import { getStudentStats, saveQuizResultToStats, StudentStats, addCompletedExamId, saveExamResult, getExamResult, getUserProfile, getUserUniqueId, UserProfile, isUserRegistered, saveUserProfile, clearUserProfile } from './lib/utils';
+import { 
+  getStudentStats, 
+  saveQuizResultToStats, 
+  StudentStats, 
+  addCompletedExamId, 
+  saveExamResult, 
+  getExamResult, 
+  getUserProfile, 
+  getUserUniqueId, 
+  UserProfile, 
+  isUserRegistered, 
+  saveUserProfile, 
+  clearUserProfile,
+  saveExamToHistory,
+  saveWrongAnswersFromQuiz
+} from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
@@ -447,6 +462,10 @@ export default function App() {
     }
     saveExamResult('latest_exam_result', result);
 
+    // Save to real full exam history and wrong answers bank
+    saveExamToHistory(result);
+    saveWrongAnswersFromQuiz(result);
+
     const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
     setStudentStats(updatedStats);
     navigateWithHistory('result');
@@ -573,7 +592,7 @@ export default function App() {
         onChangeFontFamily={setFontFamily}
         showHarakat={showHarakat}
         onChangeShowHarakat={setShowHarakat}
-        onOpenProfile={() => setCurrentPage('profile')}
+        onOpenProfile={() => navigateWithHistory('profile')}
         onOpenLogin={() => setShowAuthModal(true)}
         onOpenLeaderboard={handleOpenLeaderboard}
         searchQuery={searchQuery}

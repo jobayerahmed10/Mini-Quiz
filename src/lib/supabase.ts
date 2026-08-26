@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { detectQuestionSubject, MAIN_SUBJECT_POSTS, MainSubjectPost } from './subjects';
 import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
+import { getUserRollNumber } from './utils';
 
 /**
  * Safely retrieve Supabase configuration.
@@ -2284,7 +2285,7 @@ export async function supabaseSignUp(
     return { success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
   }
 
-  const studentId = `STD-${cleanPhoneDigits.slice(-6) || Math.floor(100000 + Math.random() * 900000)}`;
+  const studentRollNumber = getUserRollNumber(cleanPhone || targetEmail);
 
   try {
     // 1. Create real Supabase Auth user (auth.users)
@@ -2296,7 +2297,8 @@ export async function supabaseSignUp(
           full_name: cleanName,
           phone: cleanPhone || cleanPhoneDigits,
           role: 'student', // Strictly enforced: new signups are always 'student'
-          student_id: studentId,
+          student_id: studentRollNumber,
+          roll_number: studentRollNumber,
           avatar_url: avatarUrl || '',
         },
       },
@@ -2327,6 +2329,8 @@ export async function supabaseSignUp(
           phone: cleanPhone || cleanPhoneDigits,
           email: targetEmail,
           role: 'student',
+          student_id: studentRollNumber,
+          roll_number: studentRollNumber,
           avatar_url: avatarUrl || '',
           updated_at: new Date().toISOString(),
         }, { onConflict: 'id' });
@@ -2340,7 +2344,9 @@ export async function supabaseSignUp(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: authUser.id,
-        student_id: studentId,
+        student_id: studentRollNumber,
+        roll_number: studentRollNumber,
+        rollNumber: studentRollNumber,
         fullName: cleanName,
         phone: cleanPhone || cleanPhoneDigits,
         email: targetEmail,
@@ -2350,13 +2356,20 @@ export async function supabaseSignUp(
       }),
     }).catch(() => {});
 
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('tamreen_user_roll_number', studentRollNumber);
+      } catch {}
+    }
+
     const profileData = {
       id: authUser.id,
       full_name: cleanName,
       phone: cleanPhone || cleanPhoneDigits,
       email: targetEmail,
       role: 'student',
-      student_id: studentId,
+      student_id: studentRollNumber,
+      roll_number: studentRollNumber,
       avatar_url: avatarUrl || '',
     };
 
@@ -2728,13 +2741,16 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
     }).catch(() => {});
   }
 
+  const rollNumber = userProfile?.roll_number || userProfile?.student_id || userMeta.roll_number || userMeta.student_id || getUserRollNumber(finalPhone || user.id);
+
   const profile = {
     id: user.id,
     full_name: finalFullName,
     phone: finalPhone,
     email: finalEmail,
     role: userProfile?.role || userMeta.role || 'student',
-    student_id: userMeta.student_id || `STD-${finalPhone.replace(/[^0-9]/g, '').slice(-6) || 'STUDENT'}`,
+    student_id: userMeta.student_id || rollNumber,
+    roll_number: rollNumber,
     avatar_url: finalAvatar,
   };
 
@@ -2745,6 +2761,7 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
     try {
       localStorage.setItem('tamreen_user_id', user.id);
       localStorage.setItem('tamreen_user_auth_status', 'registered');
+      localStorage.setItem('tamreen_user_roll_number', rollNumber);
     } catch {}
   }
 
@@ -2823,6 +2840,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
     fullName: string;
     phone: string;
     email: string;
+    rollNumber: string;
     createdAt: string;
     avatarUrl?: string;
     role?: string;
@@ -2834,6 +2852,7 @@ export async function fetchAllRegisteredUsers(): Promise<{
     fullName: string;
     phone: string;
     email: string;
+    rollNumber: string;
     createdAt: string;
     avatarUrl?: string;
     role?: string;
@@ -2849,11 +2868,13 @@ export async function fetchAllRegisteredUsers(): Promise<{
 
       if (!error && Array.isArray(data)) {
         data.forEach((p) => {
+          const roll = p.roll_number || p.student_id || getUserRollNumber(p.phone || p.id);
           resultMap.set(p.id, {
             id: p.id,
             fullName: p.full_name || 'শিক্ষার্থী',
             phone: p.phone || '',
             email: p.email || '',
+            rollNumber: roll,
             createdAt: p.updated_at || p.created_at || new Date().toISOString(),
             avatarUrl: p.avatar_url || '',
             role: p.role || 'student',
@@ -2873,11 +2894,13 @@ export async function fetchAllRegisteredUsers(): Promise<{
       if (srvData?.success && Array.isArray(srvData.users)) {
         srvData.users.forEach((u: any) => {
           if (!resultMap.has(u.id)) {
+            const roll = u.rollNumber || u.roll_number || u.student_id || getUserRollNumber(u.phone || u.id);
             resultMap.set(u.id || u.student_id, {
               id: u.id || u.student_id,
               fullName: u.fullName || u.full_name || 'শিক্ষার্থী',
               phone: u.phone || '',
               email: u.email || '',
+              rollNumber: roll,
               createdAt: u.createdAt || u.created_at || new Date().toISOString(),
               avatarUrl: u.avatarUrl || u.avatar_url || '',
               role: u.role || 'student',
