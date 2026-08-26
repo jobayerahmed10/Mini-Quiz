@@ -5,7 +5,7 @@ import {
   LayoutGrid, Settings, Upload, ArrowLeft, BarChart3, HelpCircle, 
   CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck,
   LogIn, LogOut, Bell, Edit3, Target, Award, Headset, MessageSquare, 
-  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone
+  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone, Users, MessageCircle
 } from 'lucide-react';
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
@@ -856,13 +856,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             {/* Social Icons matching reference image */}
             <div className="flex items-center gap-2.5">
-              {/* Facebook */}
+              {/* Facebook Page */}
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/MadrasahNTRCA"
                 target="_blank"
                 rel="noreferrer"
                 className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="Facebook"
+                title="ফেসবুক পেজ - Madrasah NTRCA"
               >
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -871,37 +871,48 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
               {/* YouTube */}
               <a
-                href="https://youtube.com"
+                href="https://youtube.com/@madrashntrcapreparation?si=NAPblR31mH9nBbnq"
                 target="_blank"
                 rel="noreferrer"
                 className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="YouTube"
+                title="ইউটিউব চ্যানেল"
               >
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                 </svg>
               </a>
 
-              {/* Telegram */}
+              {/* Telegram Channel */}
               <a
-                href="https://t.me/attamreen"
+                href="https://t.me/mntrcap"
                 target="_blank"
                 rel="noreferrer"
                 className="w-10 h-10 rounded-full bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-500 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="Telegram"
+                title="টেলিগ্রাম চ্যানেল"
               >
                 <Send className="w-5 h-5" />
               </a>
 
-              {/* WhatsApp */}
+              {/* WhatsApp Group */}
               <a
-                href="https://wa.me/8801779834999"
+                href="https://chat.whatsapp.com/DdQxbgyCbhWGgHcSrxeDi6"
                 target="_blank"
                 rel="noreferrer"
                 className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="WhatsApp"
+                title="হোয়াটসঅ্যাপ গ্রুপ"
               >
                 <MessageSquare className="w-5 h-5" />
+              </a>
+
+              {/* WhatsApp Direct */}
+              <a
+                href="https://wa.me/8801540072250"
+                target="_blank"
+                rel="noreferrer"
+                className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/60 hover:bg-green-100 text-green-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
+                title="হোয়াটসঅ্যাপ চ্যাট (01540-072250)"
+              >
+                <MessageCircle className="w-5 h-5" />
               </a>
             </div>
           </div>
@@ -1502,59 +1513,103 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </p>
 
             <div className="space-y-2.5">
-              {/* WhatsApp Direct */}
+              {/* 1. WhatsApp Support (01540-072250) */}
               <a
-                href="https://wa.me/8801779834999?text=Hello%20Tamreen%20Support"
+                href="https://wa.me/8801540072250?text=Hello%20Support"
                 target="_blank"
                 rel="noreferrer"
-                className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center justify-between transition-colors"
+                className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center justify-between transition-colors shadow-2xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
                     <MessageSquare className="w-5 h-5" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-black text-slate-900 dark:text-white">হোয়াটসঅ্যাপ লাইভ চ্যাট</h5>
-                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">01779834999 (তাৎক্ষণিক সাপোর্ট)</p>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">হোয়াটসঅ্যাপ সাপোর্ট</h5>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">01540-072250 (মেসেজ বা ভয়েস পাঠান)</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-emerald-600" />
               </a>
 
-              {/* Direct Phone Call */}
+              {/* 2. WhatsApp Group */}
               <a
-                href="tel:01779834999"
-                className="p-3.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center justify-between transition-colors"
+                href="https://chat.whatsapp.com/DdQxbgyCbhWGgHcSrxeDi6"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 border border-green-200 dark:border-green-800 rounded-2xl flex items-center justify-between transition-colors shadow-2xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
-                    <Phone className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-xl bg-green-600 text-white flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-black text-slate-900 dark:text-white">হেল্পলাইন কল করুন</h5>
-                    <p className="text-[11px] text-blue-700 dark:text-blue-400 font-bold">সকাল ১০টা - রাত ১০টা</p>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">অফিসিয়াল হোয়াটসঅ্যাপ গ্রুপ</h5>
+                    <p className="text-[11px] text-green-700 dark:text-green-400 font-bold">ব্যাচ ডিসকাশন ও ফ্রি প্রস্তুতি</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-green-600" />
+              </a>
+
+              {/* 3. Telegram Channel */}
+              <a
+                href="https://t.me/mntrcap"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 border border-sky-200 dark:border-sky-800 rounded-2xl flex items-center justify-between transition-colors shadow-2xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center shrink-0">
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">টেলিগ্রাম চ্যানেল</h5>
+                    <p className="text-[11px] text-sky-700 dark:text-sky-400 font-bold">@mntrcap (পিডিএফ, রুটিন ও নোটিশ)</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-sky-500" />
+              </a>
+
+              {/* 4. Facebook Official Page */}
+              <a
+                href="https://www.facebook.com/MadrasahNTRCA"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center justify-between transition-colors shadow-2xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">ফেসবুক পেজ</h5>
+                    <p className="text-[11px] text-blue-700 dark:text-blue-400 font-bold">Madrasah NTRCA</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-blue-600" />
               </a>
 
-              {/* Telegram Channel */}
+              {/* 5. YouTube Channel */}
               <a
-                href="https://t.me/attamreen"
+                href="https://youtube.com/@madrashntrcapreparation?si=NAPblR31mH9nBbnq"
                 target="_blank"
                 rel="noreferrer"
-                className="p-3.5 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 border border-sky-200 dark:border-sky-800 rounded-2xl flex items-center justify-between transition-colors"
+                className="p-3.5 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 border border-red-200 dark:border-red-800 rounded-2xl flex items-center justify-between transition-colors shadow-2xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center">
-                    <Send className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
                   </div>
                   <div>
-                    <h5 className="text-xs font-black text-slate-900 dark:text-white">টেলিগ্রাম গ্রুপ ও চ্যানেল</h5>
-                    <p className="text-[11px] text-sky-700 dark:text-sky-400 font-bold">@attamreen (পিডিএফ ও আপডেট)</p>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">ইউটিউব চ্যানেল</h5>
+                    <p className="text-[11px] text-red-700 dark:text-red-400 font-bold">ভিডিও ক্লাস ও দিকনির্দেশনা</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-sky-500" />
+                <ChevronRight className="w-4 h-4 text-red-600" />
               </a>
             </div>
 
