@@ -17,6 +17,7 @@ import { AuthModal } from './components/AuthModal';
 import { SharedExamEntranceCard } from './components/SharedExamEntranceCard';
 import { RegistrationPromptModal } from './components/RegistrationPromptModal';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
+import { SAMPLE_QUESTIONS } from './data/sampleQuestions';
 import { 
   fetchPublishedQuestions, 
   fetchExamsFromSupabase, 
@@ -42,15 +43,9 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return [];
+    return SAMPLE_QUESTIONS;
   });
-  const [isLoading, setIsLoading] = useState<boolean>(() => {
-    try {
-      return !localStorage.getItem('miniquiz_questions_cache');
-    } catch {
-      return true;
-    }
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFromSupabase, setIsFromSupabase] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   
@@ -125,14 +120,72 @@ export default function App() {
     localStorage.setItem('miniquiz_darkmode', String(isDarkMode));
   }, [isDarkMode]);
 
-  // Persist Font & Harakat settings
+  // Persist and apply Font & Harakat settings globally across the entire DOM
   useEffect(() => {
-    localStorage.setItem('miniquiz_fontsize', fontSize);
-  }, [fontSize]);
+    const fontMap: Record<FontFamilyType, { family: string; arabicFamily: string; className: string }> = {
+      hind: {
+        family: "'Hind Siliguri', system-ui, -apple-system, sans-serif",
+        arabicFamily: "'Amiri', 'Hind Siliguri', serif",
+        className: 'font-hind',
+      },
+      noto: {
+        family: "'Noto Serif Bengali', serif",
+        arabicFamily: "'Amiri', 'Noto Serif Bengali', serif",
+        className: 'font-noto',
+      },
+      tiro: {
+        family: "'Tiro Bangla', serif",
+        arabicFamily: "'Amiri', 'Tiro Bangla', serif",
+        className: 'font-tiro',
+      },
+      anek: {
+        family: "'Anek Bangla', system-ui, sans-serif",
+        arabicFamily: "'Amiri', 'Anek Bangla', serif",
+        className: 'font-anek',
+      },
+      amiri: {
+        family: "'Amiri', 'Hind Siliguri', serif",
+        arabicFamily: "'Amiri', serif",
+        className: 'font-amiri',
+      },
+      scheherazade: {
+        family: "'Scheherazade New', 'Hind Siliguri', serif",
+        arabicFamily: "'Scheherazade New', serif",
+        className: 'font-scheherazade',
+      },
+      cairo: {
+        family: "'Cairo', 'Hind Siliguri', sans-serif",
+        arabicFamily: "'Cairo', sans-serif",
+        className: 'font-cairo',
+      },
+    };
 
-  useEffect(() => {
+    const selected = fontMap[fontFamily] || fontMap.hind;
+    
+    // Set root CSS variables for dynamic CSS inheritance
+    document.documentElement.style.setProperty('--app-font-family', selected.family);
+    document.documentElement.style.setProperty('--app-arabic-font', selected.arabicFamily);
+    document.body.style.fontFamily = selected.family;
+
+    // Remove old font classes and add the active one to body & root
+    const allFontClasses = ['font-hind', 'font-noto', 'font-tiro', 'font-anek', 'font-amiri', 'font-scheherazade', 'font-cairo'];
+    document.documentElement.classList.remove(...allFontClasses);
+    document.body.classList.remove(...allFontClasses);
+    document.documentElement.classList.add(selected.className);
+    document.body.classList.add(selected.className);
+
     localStorage.setItem('miniquiz_fontfamily', fontFamily);
   }, [fontFamily]);
+
+  useEffect(() => {
+    const sizeMap = {
+      normal: '100%',
+      medium: '108%',
+      large: '116%',
+    };
+    document.documentElement.style.fontSize = sizeMap[fontSize] || '100%';
+    localStorage.setItem('miniquiz_fontsize', fontSize);
+  }, [fontSize]);
 
   useEffect(() => {
     localStorage.setItem('miniquiz_showharakat', String(showHarakat));

@@ -113,11 +113,11 @@ export interface FetchQuestionsResult {
   error?: string | null;
 }
 
-async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs = 6000, fallbackVal: T): Promise<T> {
+export async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs = 3500, fallbackVal: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<T>((resolve) => {
     timer = setTimeout(() => {
-      console.warn(`Supabase network request timed out after ${timeoutMs}ms`);
+      console.warn(`Supabase network request timed out after ${timeoutMs}ms (Mobile Data Resiliency Mode active)`);
       resolve(fallbackVal);
     }, timeoutMs);
   });
@@ -165,7 +165,7 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
       .order('created_at', { ascending: false }));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
-    const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+    const { data, error } = await fetchWithTimeout(queryPromise, 3500, timeoutFallback as any);
 
     if (error) {
       console.warn('Supabase fetch notice (using cache/presets):', error.message || error);
@@ -1175,10 +1175,12 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
   }
 
   try {
-    // Select all courses directly from Supabase
-    const { data, error } = await supabaseInstance
+    // Select all courses directly from Supabase with timeout protection
+    const queryPromise = Promise.resolve(supabaseInstance
       .from('courses')
-      .select('*');
+      .select('*'));
+
+    const { data, error } = await fetchWithTimeout(queryPromise, 3500, { data: null, error: { message: 'Network Timeout' } } as any);
 
     if (error) {
       console.warn('Supabase courses query notice:', error.message);
@@ -2902,12 +2904,24 @@ export async function fetchAllRegisteredUsers(): Promise<{
 export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]> {
   const fallback = MAIN_SUBJECT_POSTS;
   
+  // 1. Immediately read local cache if available so UI doesn't delay
+  let cached: MainSubjectPost[] | null = null;
+  try {
+    const raw = localStorage.getItem('tamreen_custom_subject_posts');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) cached = parsed;
+    }
+  } catch {}
+
   if (supabaseInstance) {
     try {
-      const { data, error } = await supabaseInstance
+      const queryPromise = Promise.resolve(supabaseInstance
         .from('subject_posts')
         .select('*')
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true }));
+
+      const { data, error } = await fetchWithTimeout(queryPromise, 3500, { data: null, error: { message: 'Timeout' } } as any);
 
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
@@ -2946,7 +2960,7 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
 
           return dynamicPosts;
         } else {
-          // Table exists but empty, seed the initial 6 posts automatically
+          // Table exists but empty, seed the initial 6 posts automatically in background
           try {
             const seedPayload = MAIN_SUBJECT_POSTS.map(post => ({
               id: post.id,
@@ -2963,7 +2977,7 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
               description: post.description
             }));
 
-            await supabaseInstance.from('subject_posts').upsert(seedPayload, { onConflict: 'id' });
+            supabaseInstance.from('subject_posts').upsert(seedPayload, { onConflict: 'id' }).then(() => {});
           } catch (seedErr) {
             console.warn('Auto-seeding default posts to Supabase failed:', seedErr);
           }
@@ -2974,14 +2988,5 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
     }
   }
 
-  // Check local cache if offline or table not present
-  try {
-    const cached = localStorage.getItem('tamreen_custom_subject_posts');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-
-  return fallback;
+  return cached || fallback;
 }

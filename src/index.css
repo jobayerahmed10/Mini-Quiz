@@ -9,12 +9,38 @@
   --color-navy-border: #233558;
 }
 
+:root {
+  --app-font-family: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, sans-serif;
+  --app-arabic-font: 'Amiri', 'Scheherazade New', 'Cairo', serif;
+}
+
 body {
-  font-family: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--app-font-family), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: #EEF2F6;
   color: #0F172A;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Global Universal Font Application for questions, options, tabs, headings, buttons, modals */
+html,
+body,
+#root,
+button,
+input,
+select,
+textarea,
+h1, h2, h3, h4, h5, h6,
+p, span, a, label, li,
+div {
+  font-family: var(--app-font-family), 'Hind Siliguri', system-ui, sans-serif;
+}
+
+/* Specific Arabic Text elements */
+.font-arabic,
+[lang="ar"],
+.arabic-text {
+  font-family: var(--app-arabic-font), 'Amiri', 'Scheherazade New', serif !important;
 }
 
 /* Dark Mode Body */
@@ -76,25 +102,32 @@ body.dark input, body.dark select, body.dark textarea {
 }
 
 /* Font Family Utility Classes */
-.font-hind {
-  font-family: 'Hind Siliguri', sans-serif !important;
+.font-hind,
+.font-hind * {
+  font-family: 'Hind Siliguri', system-ui, sans-serif !important;
 }
-.font-noto {
+.font-noto,
+.font-noto * {
   font-family: 'Noto Serif Bengali', serif !important;
 }
-.font-tiro {
+.font-tiro,
+.font-tiro * {
   font-family: 'Tiro Bangla', serif !important;
 }
-.font-anek {
-  font-family: 'Anek Bangla', sans-serif !important;
+.font-anek,
+.font-anek * {
+  font-family: 'Anek Bangla', system-ui, sans-serif !important;
 }
-.font-amiri {
+.font-amiri,
+.font-amiri * {
   font-family: 'Amiri', 'Hind Siliguri', serif !important;
 }
-.font-scheherazade {
+.font-scheherazade,
+.font-scheherazade * {
   font-family: 'Scheherazade New', 'Hind Siliguri', serif !important;
 }
-.font-cairo {
+.font-cairo,
+.font-cairo * {
   font-family: 'Cairo', 'Hind Siliguri', sans-serif !important;
 }
 
