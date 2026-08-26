@@ -590,6 +590,19 @@ export default function App() {
               setCurrentPage('home');
               setActiveTab('courses');
             }}
+            onStartPractice={(subject?: string, topic?: string) => {
+              if (subject) setSelectedSubject(subject);
+              if (topic) setSelectedTopic(topic);
+              setCurrentPage('practice');
+            }}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+            fontSize={fontSize}
+            onChangeFontSize={setFontSize}
+            fontFamily={fontFamily}
+            onChangeFontFamily={setFontFamily}
+            showHarakat={showHarakat}
+            onChangeShowHarakat={setShowHarakat}
           />
         )}
 
