@@ -359,56 +359,35 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* User Profile OR Login Button */}
+          {/* User Profile Avatar Button */}
           <div className="relative">
-            {isRegistered ? (
-              /* Registered / Logged In: Show Circular Avatar with Gold Ring */
-              <button
-                onClick={() => {
-                  if (onOpenProfile) {
-                    onOpenProfile();
-                  } else {
-                    setShowUserMenu(!showUserMenu);
-                  }
-                  setShowFontMenu(false);
-                }}
-                className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
-                title="ব্যবহারকারীর প্রোফাইল ও মেনু"
-              >
-                {userProfile?.avatar ? (
-                  <img
-                    src={userProfile.avatar}
-                    alt={userProfile.name || 'User'}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
-                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
-                  </div>
-                )}
-              </button>
-            ) : (
-              /* Unregistered Guest: Show Exact Screenshot Matching "লগইন" Pill Button */
-              <button
-                onClick={() => {
-                  if (onOpenLogin) {
-                    onOpenLogin();
-                  } else if (onOpenProfile) {
-                    onOpenProfile();
-                  } else {
-                    setShowUserMenu(!showUserMenu);
-                  }
-                  setShowFontMenu(false);
-                }}
-                className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-[#046A38] hover:bg-[#03542c] text-[#FACC15] font-hind font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(4,106,56,0.3)] hover:brightness-110 active:scale-95 transition-all border border-emerald-500/50 cursor-pointer shrink-0"
-                title="লগইন বা অ্যাকাউন্ট তৈরি করুন"
-              >
-                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FACC15]" strokeWidth={2.4} />
-                <span className="whitespace-nowrap font-bold text-[#FACC15]">লগইন</span>
-              </button>
-            )}
+            <button
+              id="header-profile-avatar-btn"
+              onClick={() => {
+                if (onOpenProfile) {
+                  onOpenProfile();
+                } else {
+                  setShowUserMenu(!showUserMenu);
+                }
+                setShowFontMenu(false);
+              }}
+              className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
+              title="আমার প্রোফাইল ও ড্যাশবোর্ড"
+            >
+              {userProfile?.avatar ? (
+                <img
+                  src={userProfile.avatar}
+                  alt={userProfile.name || 'User'}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
+                  <User className="w-4 h-4 text-amber-300" />
+                </div>
+              )}
+            </button>
 
-            {/* Top Right User Menu Dropdown Popover */}
+            {/* Top Right User Menu Dropdown Popover (Fallback/Secondary) */}
             {showUserMenu && (
               <div className={`absolute right-0 mt-3 w-72 sm:w-80 rounded-3xl p-4 shadow-2xl z-50 border transition-all animate-fade-in ${
                 isDarkMode ? 'bg-[#121E36] border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
