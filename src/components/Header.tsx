@@ -359,33 +359,54 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* User Profile Avatar Button */}
+          {/* User Profile Avatar / Login Button */}
           <div className="relative">
-            <button
-              id="header-profile-avatar-btn"
-              onClick={() => {
-                if (onOpenProfile) {
-                  onOpenProfile();
-                } else {
-                  setShowUserMenu(!showUserMenu);
-                }
-                setShowFontMenu(false);
-              }}
-              className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
-              title="আমার প্রোফাইল ও ড্যাশবোর্ড"
-            >
-              {userProfile?.avatar ? (
-                <img
-                  src={userProfile.avatar}
-                  alt={userProfile.name || 'User'}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
-                  <User className="w-4 h-4 text-amber-300" />
-                </div>
-              )}
-            </button>
+            {isRegistered ? (
+              <button
+                id="header-profile-avatar-btn"
+                onClick={() => {
+                  if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    setShowUserMenu(!showUserMenu);
+                  }
+                  setShowFontMenu(false);
+                }}
+                className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-full ring-2 ring-[#EAB308] p-[1.5px] bg-[#EEF2F6] dark:bg-slate-800 shrink-0 cursor-pointer overflow-hidden flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                title="আমার প্রোফাইল ও ড্যাশবোর্ড"
+              >
+                {userProfile?.avatar ? (
+                  <img
+                    src={userProfile.avatar}
+                    alt={userProfile.name || 'User'}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-[#046A38] text-amber-300 flex items-center justify-center font-black text-xs">
+                    <User className="w-4 h-4 text-amber-300" />
+                  </div>
+                )}
+              </button>
+            ) : (
+              <button
+                id="header-login-btn"
+                onClick={() => {
+                  if (onOpenLogin) {
+                    onOpenLogin();
+                  } else if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    setShowUserMenu(!showUserMenu);
+                  }
+                  setShowFontMenu(false);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl sm:rounded-2xl bg-[#046A38] hover:bg-[#03542c] dark:bg-[#064E3B] dark:hover:bg-[#043E30] text-white font-black text-xs sm:text-sm shadow-xs border border-emerald-500/50 hover:border-amber-400/60 transition-all active:scale-95 cursor-pointer shrink-0"
+                title="লগইন বা একাউন্ট তৈরি করুন"
+              >
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FACC15] shrink-0" strokeWidth={2.4} />
+                <span className="leading-none text-white tracking-wide font-bengali">লগইন</span>
+              </button>
+            )}
 
             {/* Top Right User Menu Dropdown Popover (Fallback/Secondary) */}
             {showUserMenu && (
