@@ -199,6 +199,7 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
         status: item.status || 'published',
         subject: item.subject ? String(item.subject) : null,
         topic: item.topic ? String(item.topic) : null,
+        exam_id: item.exam_id ? String(item.exam_id) : null,
         created_at: item.created_at || new Date().toISOString(),
       };
 
@@ -240,6 +241,7 @@ export interface ExamItem {
   examinee_tag?: string;
   is_premium?: boolean;
   status?: string;
+  question_ids?: string[] | number[];
   created_at?: string;
 }
 
@@ -317,6 +319,7 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
       examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
       is_premium: Boolean(item.is_premium),
       status: item.status || 'active',
+      question_ids: item.question_ids || undefined,
       created_at: item.created_at,
     }));
 

@@ -10,6 +10,7 @@ export interface Question {
   status?: 'published' | 'draft' | string;
   subject?: string | null;
   topic?: string | null;
+  exam_id?: string | null;
   created_at?: string;
 }
 

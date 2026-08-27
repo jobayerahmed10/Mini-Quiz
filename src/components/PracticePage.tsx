@@ -16,6 +16,7 @@ interface PracticePageProps {
   initialTopic?: string;
   targetQuestionCount?: number;
   timeMinutes?: number;
+  examId?: string;
   onFinishQuiz: (userAnswers: UserAnswer[], timeTakenSeconds?: number) => void;
   onNavigateHome: () => void;
   showHarakat?: boolean;
@@ -27,6 +28,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   initialTopic,
   targetQuestionCount,
   timeMinutes = 30,
+  examId,
   onFinishQuiz,
   onNavigateHome,
   showHarakat = true,
@@ -47,6 +49,32 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   // Robust multi-tier question matching so exam never collapses to 0
   const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number): Question[] => {
     const rawPool = pool || [];
+    
+    // Tier -1: Explicit exam_id matching (highest priority)
+    if (examId && examId !== 'general') {
+      // First, check if the exam itself defined an explicit list of question_ids
+      try {
+        const rawExams = localStorage.getItem('miniquiz_exams_cache');
+        if (rawExams) {
+          const examsCache = JSON.parse(rawExams);
+          const thisExam = examsCache.find((e: any) => e.id === examId);
+          if (thisExam && thisExam.question_ids && Array.isArray(thisExam.question_ids) && thisExam.question_ids.length > 0) {
+            // Find questions that match these IDs
+            const exactMatches = rawPool.filter(q => thisExam.question_ids.includes(q.id) || thisExam.question_ids.includes(String(q.id)) || thisExam.question_ids.includes(Number(q.id)));
+            if (exactMatches.length > 0) {
+              return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Fallback: check if questions themselves have the exam_id attached
+      const explicitMatches = rawPool.filter(q => q.exam_id && (q.exam_id === examId || String(q.exam_id).includes(examId)));
+      if (explicitMatches.length > 0) {
+        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
+      }
+    }
+
     if ((!subj || subj === 'all' || subj === 'সকল বিষয়') && !topic) {
       return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
     }

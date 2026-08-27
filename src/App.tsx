@@ -653,6 +653,7 @@ export default function App() {
             initialTopic={selectedTopic}
             targetQuestionCount={examQuestionCount}
             timeMinutes={examTimeMinutes}
+            examId={activeExamId}
             onFinishQuiz={handleFinishQuiz}
             onNavigateHome={handleNavigateHome}
             showHarakat={showHarakat}
