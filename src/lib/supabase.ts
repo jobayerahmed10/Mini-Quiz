@@ -553,6 +553,7 @@ export interface LeaderboardEntry {
   wrong_count: number;
   accuracy: number;
   time_taken_seconds?: number;
+  is_guest?: boolean;
   created_at: string;
 }
 
@@ -566,6 +567,7 @@ export interface ExamLeaderboardItem {
   correct_answers: number;
   wrong_answers: number;
   time_taken_seconds: number;
+  is_guest?: boolean;
 }
 
 export interface FreeOverallLeaderboardItem {
@@ -576,6 +578,7 @@ export interface FreeOverallLeaderboardItem {
   total_points: number;
   free_exam_count: number;
   average_percentage: number;
+  is_guest?: boolean;
 }
 
 const LOCAL_LEADERBOARD_KEY = 'tamreen_leaderboard_entries';
@@ -924,10 +927,19 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
           const correctAnswers = Number(row.correct_answers ?? row.score ?? 0);
           const wrongAnswers = Number(row.wrong_answers ?? 0);
           const timeTaken = Number(row.time_taken_seconds || 0);
+          const uId = String(row.user_id || '');
+          const isGuest = Boolean(
+            row.is_guest === true ||
+            !uId ||
+            uId.startsWith('guest_') ||
+            uId.startsWith('anon_') ||
+            fullName.includes('গেস্ট') ||
+            fullName.includes('Guest')
+          );
 
           return {
             rank: idx + 1,
-            user_id: String(row.user_id || ''),
+            user_id: uId,
             full_name: fullName,
             avatar_url: avatarUrl,
             score,
@@ -935,6 +947,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             correct_answers: correctAnswers,
             wrong_answers: wrongAnswers,
             time_taken_seconds: timeTaken,
+            is_guest: isGuest,
           };
         });
       }
@@ -1114,14 +1127,25 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
             }
           }
 
-          const userList = Array.from(userAggMap.values()).map((u) => ({
-            user_id: u.user_id,
-            full_name: u.full_name,
-            avatar_url: u.avatar_url,
-            total_points: u.total_points,
-            free_exam_count: u.free_exam_count,
-            average_percentage: u.free_exam_count > 0 ? Math.round(u.percentageSum / u.free_exam_count) : 0,
-          }));
+          const userList = Array.from(userAggMap.values()).map((u) => {
+            const uId = String(u.user_id || '');
+            const isGuest = Boolean(
+              !uId ||
+              uId.startsWith('guest_') ||
+              uId.startsWith('anon_') ||
+              u.full_name.includes('গেস্ট') ||
+              u.full_name.includes('Guest')
+            );
+            return {
+              user_id: u.user_id,
+              full_name: u.full_name,
+              avatar_url: u.avatar_url,
+              total_points: u.total_points,
+              free_exam_count: u.free_exam_count,
+              average_percentage: u.free_exam_count > 0 ? Math.round(u.percentageSum / u.free_exam_count) : 0,
+              is_guest: isGuest,
+            };
+          });
 
           // Sort by total_points DESC, then average_percentage DESC
           userList.sort((a, b) => {
@@ -1349,6 +1373,15 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
           const correctCount = Number(item.correct_answers ?? item.score ?? 0);
           const wrongCount = Number(item.wrong_answers ?? 0);
           const accuracy = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 100;
+          const uId = String(item.user_id || '');
+          const isGuest = Boolean(
+            item.is_guest === true ||
+            !uId ||
+            uId.startsWith('guest_') ||
+            uId.startsWith('anon_') ||
+            name.includes('গেস্ট') ||
+            name.includes('Guest')
+          );
 
           return {
             id: String(item.id || `er_${Math.random()}`),
@@ -1362,6 +1395,7 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
             correct_count: correctCount,
             wrong_count: wrongCount,
             accuracy,
+            is_guest: isGuest,
             time_taken_seconds: Number(item.time_taken_seconds || 0),
             created_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
           };

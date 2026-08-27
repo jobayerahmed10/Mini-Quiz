@@ -699,9 +699,16 @@ app.post('/api/exam_results', (req, res) => {
       submitted_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
     };
 
-    // Upsert by ID or (user_id, exam_id)
+    // Upsert by ID or (user_id, exam_id) for registered users
+    const hasRegisteredUserId = Boolean(
+      newRecord.user_id &&
+      newRecord.user_id.trim() &&
+      !newRecord.user_id.startsWith('guest_') &&
+      !newRecord.user_id.startsWith('anon_')
+    );
+
     const existingIdx = serverExamResultsStore.findIndex(
-      (e) => e.id === newRecord.id || (e.user_id === newRecord.user_id && e.exam_id === newRecord.exam_id)
+      (e) => e.id === newRecord.id || (hasRegisteredUserId && e.user_id === newRecord.user_id && e.exam_id === newRecord.exam_id)
     );
 
     if (existingIdx >= 0) {
@@ -713,7 +720,7 @@ app.post('/api/exam_results', (req, res) => {
 
     // Also sync to serverLeaderboardStore for compatibility
     const lbIdx = serverLeaderboardStore.findIndex(
-      (e) => (e.user_id === newRecord.user_id && e.exam_id === newRecord.exam_id) || e.id === newRecord.id
+      (e) => e.id === newRecord.id || (hasRegisteredUserId && e.user_id === newRecord.user_id && e.exam_id === newRecord.exam_id)
     );
     const lbRecord: ServerLeaderboardEntry = {
       id: newRecord.id,
@@ -994,18 +1001,22 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     const cleanNewLower = cleanNew.toLowerCase();
     const cleanAvatar = newAvatar ? String(newAvatar) : '';
 
-    let updatedCount = 0;
-    serverLeaderboardStore.forEach((e) => {
-      const eNameLower = (e.user_name || '').trim().toLowerCase();
-      if ((cleanOld && eNameLower === cleanOld) || eNameLower === cleanNewLower) {
-        e.user_name = cleanNew;
-        if (cleanAvatar) e.user_avatar = cleanAvatar;
-        updatedCount++;
-      }
-    });
+    const isGenericOld = !cleanOld || cleanOld === 'পরীক্ষার্থী' || cleanOld === 'গেস্ট পরীক্ষার্থী' || cleanOld === 'guest' || cleanOld === 'anonymous';
 
-    if (updatedCount > 0) {
-      saveLeaderboardStoreToDisk();
+    let updatedCount = 0;
+    if (!isGenericOld) {
+      serverLeaderboardStore.forEach((e) => {
+        const eNameLower = (e.user_name || '').trim().toLowerCase();
+        if (cleanOld && eNameLower === cleanOld) {
+          e.user_name = cleanNew;
+          if (cleanAvatar) e.user_avatar = cleanAvatar;
+          updatedCount++;
+        }
+      });
+
+      if (updatedCount > 0) {
+        saveLeaderboardStoreToDisk();
+      }
     }
 
     return res.json({ success: true, updatedCount });

@@ -398,13 +398,18 @@ export function saveUserProfile(
       let updated = false;
       const newNameClean = name.trim();
       const newAvatarClean = avatar || '';
+      const currentUId = getUserUniqueId();
 
       entries.forEach((entry) => {
-        const eName = (entry.user_name || '').trim().toLowerCase();
-        // Match old profile name or current name
-        if (!oldName || eName === oldName || eName === newNameClean.toLowerCase()) {
+        // ONLY update entries that specifically belong to the current user's ID
+        const isMatchingUser = Boolean(
+          (currentUId && entry.user_id && entry.user_id === currentUId) ||
+          (oldName && oldName.trim() && (entry.user_name || '').trim().toLowerCase() === oldName.trim().toLowerCase())
+        );
+
+        if (isMatchingUser && newNameClean) {
           entry.user_name = newNameClean;
-          entry.user_avatar = newAvatarClean;
+          if (newAvatarClean) entry.user_avatar = newAvatarClean;
           updated = true;
         }
       });
