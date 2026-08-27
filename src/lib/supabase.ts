@@ -159,10 +159,10 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   }
 
   try {
+    // Select all questions (not restricting strictly to status='published' so admin created questions show up)
     const queryPromise = Promise.resolve(supabaseInstance
       .from('questions')
       .select('*')
-      .eq('status', 'published')
       .order('created_at', { ascending: false }));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
@@ -186,7 +186,9 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     }
 
     // Cast & format fetched items from public.questions with subject auto-detection fallback
-    const questionsList: Question[] = data.map((item: any) => {
+    const questionsList: Question[] = data
+      .filter((item: any) => item && item.status !== 'draft')
+      .map((item: any) => {
       const qObj: Question = {
         id: String(item.id),
         question: String(item.question || ''),
@@ -281,7 +283,6 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
     const queryPromise = Promise.resolve(supabaseInstance
       .from('exams')
       .select('*')
-      .eq('status', 'active')
       .order('created_at', { ascending: false }));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
@@ -304,7 +305,32 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
       };
     }
 
-    const fetchedExams: ExamItem[] = data.map((item: any) => ({
+    const parseIds = (val: any): string[] | undefined => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) {
+        const list = val.map((v: any) => String(v).trim()).filter(Boolean);
+        return list.length > 0 ? list : undefined;
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              const list = parsed.map((v: any) => String(v).trim()).filter(Boolean);
+              return list.length > 0 ? list : undefined;
+            }
+          } catch {}
+        }
+        const list = trimmed.split(',').map((s: string) => s.trim()).filter(Boolean);
+        return list.length > 0 ? list : undefined;
+      }
+      return [String(val)];
+    };
+
+    const fetchedExams: ExamItem[] = data
+      .filter((item: any) => item && item.status !== 'inactive' && item.status !== 'draft')
+      .map((item: any) => ({
       id: String(item.id),
       title: String(item.title || 'পরীক্ষা'),
       badge: String(item.badge || 'ফ্রি পরীক্ষা'),
@@ -319,7 +345,7 @@ export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
       examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
       is_premium: Boolean(item.is_premium),
       status: item.status || 'active',
-      question_ids: item.question_ids || undefined,
+      question_ids: parseIds(item.question_ids),
       created_at: item.created_at,
     }));
 

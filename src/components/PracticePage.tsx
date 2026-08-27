@@ -46,30 +46,56 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     setTimeLeft(safeTimeMinutes * 60);
   }, [safeTimeMinutes]);
 
-  // Robust multi-tier question matching so exam never collapses to 0
-  const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number): Question[] => {
+  // Robust multi-tier question matching so exam never collapses to 0 and admin selections are respected
+  const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number, activeExamId?: string): Question[] => {
     const rawPool = pool || [];
+    const targetExamId = activeExamId || examId;
     
-    // Tier -1: Explicit exam_id matching (highest priority)
-    if (examId && examId !== 'general') {
-      // First, check if the exam itself defined an explicit list of question_ids
+    // Tier -1: Explicit exam matching by examId or admin question_ids (highest priority)
+    if (targetExamId && targetExamId !== 'general') {
+      // First, check if the exam itself defined an explicit list of question_ids in local storage cache
       try {
         const rawExams = localStorage.getItem('miniquiz_exams_cache');
         if (rawExams) {
           const examsCache = JSON.parse(rawExams);
-          const thisExam = examsCache.find((e: any) => e.id === examId);
-          if (thisExam && thisExam.question_ids && Array.isArray(thisExam.question_ids) && thisExam.question_ids.length > 0) {
-            // Find questions that match these IDs
-            const exactMatches = rawPool.filter(q => thisExam.question_ids.includes(q.id) || thisExam.question_ids.includes(String(q.id)) || thisExam.question_ids.includes(Number(q.id)));
-            if (exactMatches.length > 0) {
-              return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+          const thisExam = examsCache.find((e: any) => 
+            String(e.id).trim() === String(targetExamId).trim() || 
+            (e.title && String(e.title).trim().toLowerCase() === String(targetExamId).trim().toLowerCase())
+          );
+          if (thisExam && thisExam.question_ids) {
+            let qIds: string[] = [];
+            if (Array.isArray(thisExam.question_ids)) {
+              qIds = thisExam.question_ids.map((v: any) => String(v).trim());
+            } else if (typeof thisExam.question_ids === 'string') {
+              const trimmed = thisExam.question_ids.trim();
+              if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try {
+                  const parsed = JSON.parse(trimmed);
+                  if (Array.isArray(parsed)) qIds = parsed.map((v: any) => String(v).trim());
+                } catch {}
+              }
+              if (qIds.length === 0) {
+                qIds = trimmed.split(',').map((s: string) => s.trim());
+              }
+            }
+            if (qIds.length > 0) {
+              const exactMatches = rawPool.filter(q => qIds.includes(String(q.id).trim()));
+              if (exactMatches.length > 0) {
+                return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+              }
             }
           }
         }
       } catch (e) {}
 
-      // Fallback: check if questions themselves have the exam_id attached
-      const explicitMatches = rawPool.filter(q => q.exam_id && (q.exam_id === examId || String(q.exam_id).includes(examId)));
+      // Check if questions themselves have the exam_id attached
+      const explicitMatches = rawPool.filter(q => 
+        q.exam_id && (
+          String(q.exam_id).trim() === String(targetExamId).trim() ||
+          String(q.exam_id).toLowerCase().includes(String(targetExamId).toLowerCase()) ||
+          String(targetExamId).toLowerCase().includes(String(q.exam_id).toLowerCase())
+        )
+      );
       if (explicitMatches.length > 0) {
         return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
       }
@@ -189,19 +215,18 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   // Lock exam questions on session mount so background Supabase updates don't wipe active exam
   const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
-    return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount);
+    return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount, examId);
   });
 
-  // If questions was completely empty on mount and now arrived, populate once
-  const isInitializedRef = useRef(false);
+  // Re-sync exam questions if questions or examId changes
   useEffect(() => {
-    if (!isInitializedRef.current && (!examQuestions || examQuestions.length === 0) && questions && questions.length > 0) {
-      isInitializedRef.current = true;
-      setExamQuestions(getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount));
+    if (questions && questions.length > 0) {
+      const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+      setExamQuestions(resolved);
     }
-  }, [questions, activeSubject, activeTopic, targetQuestionCount, examQuestions]);
+  }, [questions, activeSubject, activeTopic, targetQuestionCount, examId]);
 
-  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount);
+  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;
   const unansweredCount = totalQuestions - answeredCount;
