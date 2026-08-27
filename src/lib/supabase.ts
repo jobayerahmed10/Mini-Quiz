@@ -546,6 +546,8 @@ export interface LeaderboardEntry {
   exam_title: string;
   user_id?: string;
   user_name: string;
+  guest_name?: string;
+  full_name?: string;
   user_avatar?: string;
   score: number;
   total_questions: number;
@@ -561,6 +563,7 @@ export interface ExamLeaderboardItem {
   rank: number;
   user_id: string;
   full_name: string;
+  guest_name?: string;
   avatar_url?: string;
   score: number;
   total_marks: number;
@@ -574,6 +577,7 @@ export interface FreeOverallLeaderboardItem {
   rank: number;
   user_id: string;
   full_name: string;
+  guest_name?: string;
   avatar_url?: string;
   total_points: number;
   free_exam_count: number;
@@ -661,6 +665,8 @@ export async function submitExamResultToSupabase(params: {
   is_free?: boolean;
   user_id: string;
   full_name: string;
+  guest_name?: string;
+  is_guest?: boolean;
   avatar_url?: string;
   score: number;
   total_marks: number;
@@ -671,6 +677,12 @@ export async function submitExamResultToSupabase(params: {
 }): Promise<{ success: boolean; error?: string }> {
   const submittedAt = params.submitted_at || new Date().toISOString();
   const timeTaken = Number(params.time_taken_seconds || 0);
+  const isGuest = Boolean(
+    params.is_guest !== undefined
+      ? params.is_guest
+      : (Boolean(params.guest_name) || !params.user_id || params.user_id.startsWith('guest_') || params.user_id.startsWith('anon_'))
+  );
+  const effectiveName = params.guest_name || params.full_name;
 
   // 1. Post to Express Server API for real-time multi-device sync
   try {
@@ -679,6 +691,9 @@ export async function submitExamResultToSupabase(params: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...params,
+        full_name: effectiveName,
+        guest_name: isGuest ? effectiveName : params.guest_name,
+        is_guest: isGuest,
         time_taken_seconds: timeTaken,
         submitted_at: submittedAt,
       }),
@@ -693,7 +708,10 @@ export async function submitExamResultToSupabase(params: {
     exam_id: params.exam_id,
     exam_title: params.exam_title || 'মডেল টেস্ট',
     user_id: params.user_id,
-    user_name: params.full_name,
+    user_name: effectiveName,
+    guest_name: isGuest ? effectiveName : params.guest_name,
+    full_name: effectiveName,
+    is_guest: isGuest,
     user_avatar: params.avatar_url,
     score: params.score,
     total_questions: params.total_marks,
@@ -711,14 +729,14 @@ export async function submitExamResultToSupabase(params: {
   }
 
   try {
-    // 3A. Upsert Profile so full_name and avatar_url can be joined/looked up
+    // 3A. Upsert Profile ONLY for registered users (avoid overwriting profiles with guest names)
     try {
-      if (params.user_id) {
+      if (params.user_id && !isGuest) {
         await supabaseInstance
           .from('profiles')
           .upsert({
             id: params.user_id,
-            full_name: params.full_name,
+            full_name: effectiveName,
             avatar_url: params.avatar_url || null,
             updated_at: submittedAt,
           }, { onConflict: 'id' });
@@ -743,9 +761,10 @@ export async function submitExamResultToSupabase(params: {
             wrong_answers: params.wrong_answers,
             time_taken_seconds: timeTaken,
             submitted_at: submittedAt,
-            full_name: params.full_name,
-            user_name: params.full_name,
-            guest_name: params.full_name,
+            full_name: effectiveName,
+            user_name: effectiveName,
+            guest_name: isGuest ? effectiveName : params.guest_name,
+            is_guest: isGuest,
             exam_title: params.exam_title,
             is_free: params.is_free ?? true,
           },
@@ -920,7 +939,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
         return sortedRows.map((row: any, idx: number) => {
           const prof = profilesMap.get(row.user_id);
-          const fullName = row.full_name || row.user_name || row.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+          const fullName = row.guest_name || row.full_name || row.user_name || prof?.full_name || 'পরীক্ষার্থী';
           const avatarUrl = row.avatar_url || prof?.avatar_url;
           const score = Number(row.score ?? row.correct_answers ?? 0);
           const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers || 0) + Number(row.wrong_answers || 0)) ?? 0);
@@ -930,6 +949,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
           const uId = String(row.user_id || '');
           const isGuest = Boolean(
             row.is_guest === true ||
+            Boolean(row.guest_name) ||
             !uId ||
             uId.startsWith('guest_') ||
             uId.startsWith('anon_') ||
@@ -941,6 +961,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             rank: idx + 1,
             user_id: uId,
             full_name: fullName,
+            guest_name: row.guest_name || (isGuest ? fullName : undefined),
             avatar_url: avatarUrl,
             score,
             total_marks: totalMarks,
@@ -1102,16 +1123,26 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
 
           for (const r of filtered) {
             const uId = String(r.user_id || '');
+            const isGuest = Boolean(
+              r.is_guest === true ||
+              Boolean(r.guest_name) ||
+              !uId ||
+              uId.startsWith('guest_') ||
+              uId.startsWith('anon_') ||
+              (r.full_name || '').includes('গেস্ট') ||
+              (r.full_name || '').includes('Guest')
+            );
             const prof = profilesMap.get(uId);
-            const name = r.full_name || r.user_name || r.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+            const name = r.guest_name || r.full_name || r.user_name || prof?.full_name || 'পরীক্ষার্থী';
             const avatar = r.avatar_url || prof?.avatar_url;
             const points = Number(r.correct_answers ?? r.score ?? 0);
             const totalQ = Number(r.total_marks ?? (Number(r.correct_answers || 0) + Number(r.wrong_answers || 0)) ?? 0);
             const percentage = totalQ > 0 ? (points / totalQ) * 100 : 100;
 
-            const existing = userAggMap.get(uId || name);
+            const aggKey = (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')) ? uId : (r.guest_name || name);
+            const existing = userAggMap.get(aggKey);
             if (!existing) {
-              userAggMap.set(uId || name, {
+              userAggMap.set(aggKey, {
                 user_id: uId,
                 full_name: name,
                 avatar_url: avatar,
@@ -1366,22 +1397,24 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
         dbEntries = data.map((item: any) => {
           const prof = profilesMap.get(item.user_id);
-          const name = item.full_name || item.user_name || item.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+          const rawGuest = item.guest_name;
+          const uId = String(item.user_id || '');
+          const isGuest = Boolean(
+            item.is_guest === true ||
+            Boolean(rawGuest) ||
+            !uId ||
+            uId.startsWith('guest_') ||
+            uId.startsWith('anon_') ||
+            (item.full_name || item.user_name || '').includes('গেস্ট') ||
+            (item.full_name || item.user_name || '').includes('Guest')
+          );
+          const name = rawGuest || item.full_name || item.user_name || prof?.full_name || 'পরীক্ষার্থী';
           const avatar = item.avatar_url || prof?.avatar_url;
           const score = Number(item.score ?? item.correct_answers ?? 0);
           const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers || 0) + Number(item.wrong_answers || 0)) ?? 0);
           const correctCount = Number(item.correct_answers ?? item.score ?? 0);
           const wrongCount = Number(item.wrong_answers ?? 0);
           const accuracy = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 100;
-          const uId = String(item.user_id || '');
-          const isGuest = Boolean(
-            item.is_guest === true ||
-            !uId ||
-            uId.startsWith('guest_') ||
-            uId.startsWith('anon_') ||
-            name.includes('গেস্ট') ||
-            name.includes('Guest')
-          );
 
           return {
             id: String(item.id || `er_${Math.random()}`),
@@ -1389,6 +1422,8 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
             exam_title: String(item.exam_title || 'মডেল টেস্ট'),
             user_id: item.user_id ? String(item.user_id) : undefined,
             user_name: name,
+            guest_name: rawGuest || (isGuest ? name : undefined),
+            full_name: item.full_name || name,
             user_avatar: avatar,
             score,
             total_questions: totalQuestions,

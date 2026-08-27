@@ -16,7 +16,7 @@ import {
   Award
 } from 'lucide-react';
 import { QuizResult, UserAnswer } from '../types';
-import { toBengaliNumeral, getUserProfile, getUserUniqueId, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
 import { 
   fetchLeaderboardEntriesFromSupabase, 
   LeaderboardEntry,
@@ -39,6 +39,7 @@ interface ParticipantLeaderboardItem {
   userName: string;
   userAvatar?: string;
   isCurrentUser: boolean;
+  isGuest?: boolean;
   correctCount: number;
   wrongCount: number;
   score: number;
@@ -173,11 +174,12 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           fetchLeaderboardEntriesFromSupabase(examIdToFetch),
         ]);
 
-        // Map real participants by unique user ID or name
+        // Map real participants by unique user ID or distinct guest key
         const candidatesMap = new Map<string, {
           name: string;
           avatar?: string;
           isUser: boolean;
+          isGuest?: boolean;
           correct: number;
           wrong: number;
           score: number;
@@ -186,17 +188,33 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
         // Add from RPC
         for (const item of rpcEntries) {
-          const rawName = (item.full_name || '').trim();
+          const rawName = (item.guest_name || item.full_name || '').trim();
           if (!rawName) continue;
           const isUser = Boolean(
-            (item.user_id && currentUserId && item.user_id === currentUserId) ||
-            (rawName.toLowerCase() === currentUserName.toLowerCase())
+            currentUserId &&
+            item.user_id &&
+            item.user_id === currentUserId &&
+            !item.user_id.startsWith('guest_') &&
+            !item.user_id.startsWith('anon_') &&
+            !item.is_guest
           );
-          const key = (item.user_id && item.user_id.trim()) ? item.user_id.trim() : rawName.toLowerCase();
+          const isGuest = Boolean(
+            item.is_guest ||
+            !item.user_id ||
+            item.user_id.startsWith('guest_') ||
+            item.user_id.startsWith('anon_') ||
+            Boolean(item.guest_name) ||
+            rawName.includes('গেস্ট')
+          );
+          const key = (isUser && item.user_id)
+            ? item.user_id.trim()
+            : (item.guest_name || rawName || item.user_id || '').toLowerCase();
+
           candidatesMap.set(key, {
-            name: isUser ? currentUserName : rawName,
+            name: rawName,
             avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
             isUser,
+            isGuest,
             correct: Number(item.correct_answers ?? item.score ?? 0),
             wrong: Number(item.wrong_answers ?? 0),
             score: Number(item.score ?? 0),
@@ -216,19 +234,35 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             (eTitle && (eTitle.includes(target) || target.includes(eTitle)));
 
           if (isMatch) {
-            const rawName = (entry.user_name || '').trim();
+            const rawName = (entry.guest_name || entry.full_name || entry.user_name || '').trim();
             if (!rawName) continue;
             const isUser = Boolean(
-              (entry.user_id && currentUserId && entry.user_id === currentUserId) ||
-              (rawName.toLowerCase() === currentUserName.toLowerCase())
+              currentUserId &&
+              entry.user_id &&
+              entry.user_id === currentUserId &&
+              !entry.user_id.startsWith('guest_') &&
+              !entry.user_id.startsWith('anon_') &&
+              !entry.is_guest
             );
-            const key = (entry.user_id && entry.user_id.trim()) ? entry.user_id.trim() : rawName.toLowerCase();
+            const isGuest = Boolean(
+              entry.is_guest ||
+              !entry.user_id ||
+              entry.user_id.startsWith('guest_') ||
+              entry.user_id.startsWith('anon_') ||
+              Boolean(entry.guest_name) ||
+              rawName.includes('গেস্ট')
+            );
+            const key = (isUser && entry.user_id)
+              ? entry.user_id.trim()
+              : (entry.guest_name || rawName || entry.user_id || entry.id).toLowerCase();
+
             const existing = candidatesMap.get(key);
             if (!existing || entry.score > existing.score) {
               candidatesMap.set(key, {
-                name: isUser ? currentUserName : rawName,
+                name: rawName,
                 avatar: isUser ? (currentUserAvatar || entry.user_avatar) : entry.user_avatar,
                 isUser,
+                isGuest,
                 correct: Number(entry.correct_count ?? entry.score ?? 0),
                 wrong: Number(entry.wrong_count ?? 0),
                 score: Number(entry.score ?? 0),
@@ -238,14 +272,20 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           }
         }
 
-        // Always ensure current user's latest result is included
-        const userKey = currentUserId || currentUserName.toLowerCase();
+        // Always ensure current user's latest submission is included
+        const isCurrentSubmissionGuest = !isUserRegistered();
+        const effectiveCurrentUserName = currentUserName || (isCurrentSubmissionGuest ? 'গেস্ট পরীক্ষার্থী' : 'শিক্ষার্থী');
+        const userKey = !isCurrentSubmissionGuest && currentUserId
+          ? currentUserId
+          : effectiveCurrentUserName.toLowerCase();
+
         const existingUser = candidatesMap.get(userKey);
         if (!existingUser || obtainedMarksVal >= existingUser.score) {
           candidatesMap.set(userKey, {
-            name: currentUserName,
+            name: effectiveCurrentUserName,
             avatar: currentUserAvatar,
             isUser: true,
+            isGuest: isCurrentSubmissionGuest,
             correct: result.correctCount,
             wrong: result.wrongCount,
             score: obtainedMarksVal,
@@ -333,6 +373,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             userName: c.name,
             userAvatar: c.avatar,
             isCurrentUser: c.isUser,
+            isGuest: c.isGuest,
             correctCount: c.correct,
             wrongCount: c.wrong,
             score: c.score,
@@ -638,8 +679,20 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                       {/* Name & Subtitle Details */}
                       <div className="min-w-0 space-y-1">
                         {/* Name Capsule Badge or text */}
-                        <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[220px]">
-                          {item.userName}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[220px]">
+                            {item.userName}
+                          </div>
+                          {item.isCurrentUser && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300">
+                              আপনি
+                            </span>
+                          )}
+                          {item.isGuest && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                              গেস্ট
+                            </span>
+                          )}
                         </div>
 
                         {/* Rank Badge + Question & Accuracy */}

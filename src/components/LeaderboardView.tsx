@@ -162,12 +162,11 @@ export function computeLeaderboard(
     // Select best entry per distinct participant for this exam
     const userBestMap = new Map<string, LeaderboardEntry>();
     for (const item of filtered) {
-      // Differentiate participants by user_id or unique name key
-      const participantKey = item.user_id && item.user_id.trim()
-        ? item.user_id.trim()
-        : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
-            ? item.user_name.toLowerCase().trim()
-            : item.id);
+      // Differentiate participants by registered user_id or unique guest name/id
+      const isReg = Boolean(item.user_id && !item.user_id.startsWith('guest_') && !item.user_id.startsWith('anon_'));
+      const participantKey = isReg
+        ? item.user_id!.trim()
+        : (item.guest_name || item.user_name || item.id).trim().toLowerCase();
 
       const existing = userBestMap.get(participantKey);
       if (!existing) {
@@ -196,11 +195,12 @@ export function computeLeaderboard(
         !eUserId ||
         eUserId.startsWith('guest_') ||
         eUserId.startsWith('anon_') ||
+        Boolean(e.guest_name) ||
         (e.user_name || '').includes('গেস্ট') ||
         (e.user_name || '').includes('Guest')
       );
 
-      const rawClean = (e.user_name || '').trim();
+      const rawClean = (e.guest_name || e.full_name || e.user_name || '').trim();
       const displayName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
         ? rawClean
         : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
@@ -269,11 +269,10 @@ export function computeLeaderboard(
     // Group entries by distinct participant
     const userGroupMap = new Map<string, LeaderboardEntry[]>();
     for (const item of filtered) {
-      const participantKey = item.user_id && item.user_id.trim()
-        ? item.user_id.trim()
-        : (item.user_name && item.user_name.trim() !== 'পরীক্ষার্থী' && item.user_name.trim() !== 'আপনি (পরীক্ষার্থী)'
-            ? item.user_name.toLowerCase().trim()
-            : item.id);
+      const isReg = Boolean(item.user_id && !item.user_id.startsWith('guest_') && !item.user_id.startsWith('anon_'));
+      const participantKey = isReg
+        ? item.user_id!.trim()
+        : (item.guest_name || item.user_name || item.id).trim().toLowerCase();
 
       if (!userGroupMap.has(participantKey)) {
         userGroupMap.set(participantKey, []);
@@ -296,11 +295,12 @@ export function computeLeaderboard(
         !eUserId ||
         eUserId.startsWith('guest_') ||
         eUserId.startsWith('anon_') ||
+        Boolean(firstEntry.guest_name) ||
         (firstEntry.user_name || '').includes('গেস্ট') ||
         (firstEntry.user_name || '').includes('Guest')
       );
 
-      const rawClean = (firstEntry.user_name || '').trim();
+      const rawClean = (firstEntry.guest_name || firstEntry.full_name || firstEntry.user_name || '').trim();
       const displayName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
         ? rawClean
         : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
@@ -463,10 +463,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               !rowUserId ||
               rowUserId.startsWith('guest_') ||
               rowUserId.startsWith('anon_') ||
+              Boolean(row.guest_name) ||
               (row.full_name || '').includes('গেস্ট') ||
               (row.full_name || '').includes('Guest')
             );
-            const rawClean = (row.full_name || '').trim();
+            const rawClean = (row.guest_name || row.full_name || '').trim();
             const cleanName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
               ? rawClean
               : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
@@ -525,10 +526,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               !rowUserId ||
               rowUserId.startsWith('guest_') ||
               rowUserId.startsWith('anon_') ||
+              Boolean(row.guest_name) ||
               (row.full_name || '').includes('গেস্ট') ||
               (row.full_name || '').includes('Guest')
             );
-            const rawClean = (row.full_name || '').trim();
+            const rawClean = (row.guest_name || row.full_name || '').trim();
             const cleanName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
               ? rawClean
               : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');

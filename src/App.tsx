@@ -430,9 +430,13 @@ export default function App() {
     const userProfile = getUserProfile();
     const isRegistered = isUserRegistered();
     const rawName = userProfile?.name?.trim();
-    const userName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
+    const isGuest = !isRegistered;
+    const effectiveName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
+    const guestName = isGuest ? effectiveName : undefined;
     const userAvatar = userProfile?.avatar;
-    const userId = getUserUniqueId();
+    const userId = isRegistered 
+      ? getUserUniqueId() 
+      : `guest_${(rawName || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
     const isFreeExam = !String(activeExamId || '').toLowerCase().includes('paid');
 
     const entry: LeaderboardEntry = {
@@ -440,7 +444,10 @@ export default function App() {
       exam_id: examId,
       exam_title: examTitle,
       user_id: userId,
-      user_name: userName,
+      user_name: effectiveName,
+      guest_name: guestName,
+      full_name: effectiveName,
+      is_guest: isGuest,
       user_avatar: userAvatar,
       score: correctCount,
       total_questions: totalQuestions,
@@ -458,7 +465,9 @@ export default function App() {
       exam_title: examTitle,
       is_free: isFreeExam,
       user_id: userId,
-      full_name: userName,
+      full_name: effectiveName,
+      guest_name: guestName,
+      is_guest: isGuest,
       avatar_url: userAvatar,
       score: correctCount,
       total_marks: totalQuestions,

@@ -56,6 +56,9 @@ interface ServerLeaderboardEntry {
   exam_title: string;
   user_id?: string;
   user_name: string;
+  guest_name?: string;
+  full_name?: string;
+  is_guest?: boolean;
   user_avatar?: string;
   score: number;
   total_questions: number;
@@ -72,6 +75,8 @@ interface ServerExamResult {
   is_free?: boolean;
   user_id: string;
   full_name: string;
+  guest_name?: string;
+  is_guest?: boolean;
   avatar_url?: string;
   score: number;
   total_marks: number;
@@ -683,13 +688,23 @@ app.post('/api/exam_results', (req, res) => {
     }
 
     const examResultId = item.id || `er_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const effectiveGuestName = item.guest_name || (item.is_guest ? (item.full_name || item.userName || item.name) : undefined);
+    const isGuest = Boolean(
+      item.is_guest !== undefined
+        ? item.is_guest
+        : (Boolean(effectiveGuestName) || !item.user_id || String(item.user_id).startsWith('guest_') || String(item.user_id).startsWith('anon_'))
+    );
+    const effectiveFullName = effectiveGuestName || String(item.full_name || item.userName || item.name || 'পরীক্ষার্থী');
+
     const newRecord: ServerExamResult = {
       id: examResultId,
       exam_id: String(item.exam_id || item.examId || 'general'),
       exam_title: item.exam_title || item.examTitle || 'মডেল টেস্ট',
       is_free: item.is_free !== undefined ? Boolean(item.is_free) : true,
-      user_id: String(item.user_id || item.userId || `user_${Date.now()}`),
-      full_name: String(item.full_name || item.userName || item.name || 'পরীক্ষার্থী'),
+      user_id: String(item.user_id || item.userId || (isGuest ? `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}` : `user_${Date.now()}`)),
+      full_name: effectiveFullName,
+      guest_name: effectiveGuestName,
+      is_guest: isGuest,
       avatar_url: item.avatar_url || item.avatar || item.user_avatar || '',
       score: Number(item.score ?? item.correct_answers ?? item.correctCount ?? 0),
       total_marks: Number(item.total_marks ?? item.total_questions ?? item.totalQuestions ?? 0),
@@ -699,8 +714,9 @@ app.post('/api/exam_results', (req, res) => {
       submitted_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
     };
 
-    // Upsert by ID or (user_id, exam_id) for registered users
+    // Upsert by ID or (user_id, exam_id) only for registered users
     const hasRegisteredUserId = Boolean(
+      !isGuest &&
       newRecord.user_id &&
       newRecord.user_id.trim() &&
       !newRecord.user_id.startsWith('guest_') &&
@@ -728,6 +744,9 @@ app.post('/api/exam_results', (req, res) => {
       exam_title: newRecord.exam_title || 'মডেল টেস্ট',
       user_id: newRecord.user_id,
       user_name: newRecord.full_name,
+      guest_name: newRecord.guest_name,
+      full_name: newRecord.full_name,
+      is_guest: newRecord.is_guest,
       user_avatar: newRecord.avatar_url,
       score: newRecord.score,
       total_questions: newRecord.total_marks,
@@ -769,10 +788,11 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
       );
     });
 
-    // Keep best result per distinct user_id or full_name
+    // Keep best result per distinct participant (registered user_id OR distinct guest)
     const userBestMap = new Map<string, ServerExamResult>();
     for (const r of matching) {
-      const uKey = (r.user_id && r.user_id.trim()) ? r.user_id.trim() : (r.full_name || '').toLowerCase().trim();
+      const isReg = r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_');
+      const uKey = isReg ? r.user_id.trim() : (r.guest_name || r.full_name || r.id).trim().toLowerCase();
       const existing = userBestMap.get(uKey);
       if (!existing) {
         userBestMap.set(uKey, r);
@@ -800,7 +820,9 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
     const formatted = list.map((r, idx) => ({
       rank: idx + 1,
       user_id: r.user_id,
-      full_name: r.full_name,
+      full_name: r.guest_name || r.full_name,
+      guest_name: r.guest_name,
+      is_guest: r.is_guest,
       avatar_url: r.avatar_url || '',
       score: r.score,
       total_marks: r.total_marks,
@@ -841,10 +863,12 @@ app.get('/api/rpc/get_free_overall_leaderboard', (req, res) => {
       return true;
     });
 
-    // Group by user_id
+    // Group by registered user_id or guest
     const userMap = new Map<string, {
       user_id: string;
       full_name: string;
+      guest_name?: string;
+      is_guest?: boolean;
       avatar_url: string;
       total_points: number;
       free_exam_count: number;
@@ -853,15 +877,19 @@ app.get('/api/rpc/get_free_overall_leaderboard', (req, res) => {
     }>();
 
     for (const r of filteredResults) {
-      const uKey = r.user_id || r.full_name;
+      const isReg = r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_');
+      const uKey = isReg ? r.user_id.trim() : (r.guest_name || r.full_name || r.id).trim().toLowerCase();
       const existing = userMap.get(uKey);
       const points = Number(r.correct_answers || r.score || 0);
       const percentage = r.total_marks > 0 ? (r.score / r.total_marks) * 100 : (points > 0 ? 100 : 0);
+      const name = r.guest_name || r.full_name;
 
       if (!existing) {
         userMap.set(uKey, {
           user_id: r.user_id,
-          full_name: r.full_name,
+          full_name: name,
+          guest_name: r.guest_name,
+          is_guest: r.is_guest,
           avatar_url: r.avatar_url || '',
           total_points: points,
           free_exam_count: 1,
@@ -882,6 +910,8 @@ app.get('/api/rpc/get_free_overall_leaderboard', (req, res) => {
     const userList = Array.from(userMap.values()).map((u) => ({
       user_id: u.user_id,
       full_name: u.full_name,
+      guest_name: u.guest_name,
+      is_guest: u.is_guest,
       avatar_url: u.avatar_url,
       total_points: u.total_points,
       free_exam_count: u.free_exam_count,
@@ -901,6 +931,8 @@ app.get('/api/rpc/get_free_overall_leaderboard', (req, res) => {
       rank: idx + 1,
       user_id: u.user_id,
       full_name: u.full_name,
+      guest_name: u.guest_name,
+      is_guest: u.is_guest,
       avatar_url: u.avatar_url,
       total_points: u.total_points,
       free_exam_count: u.free_exam_count,
@@ -965,12 +997,16 @@ app.post('/api/leaderboard', (req, res) => {
           ...item,
         };
       } else {
+        const rawName = item.guest_name || item.full_name || item.user_name || 'পরীক্ষার্থী';
         serverLeaderboardStore.push({
           id: String(item.id),
           exam_id: String(item.exam_id || 'general'),
           exam_title: String(item.exam_title || 'পরীক্ষা'),
           user_id: item.user_id ? String(item.user_id) : undefined,
-          user_name: String(item.user_name || 'পরীক্ষার্থী'),
+          user_name: rawName,
+          guest_name: item.guest_name,
+          full_name: item.full_name || rawName,
+          is_guest: item.is_guest,
           user_avatar: item.user_avatar ? String(item.user_avatar) : '',
           score: Number(item.score || 0),
           total_questions: Number(item.total_questions || 0),
@@ -991,31 +1027,35 @@ app.post('/api/leaderboard', (req, res) => {
 
 app.post('/api/leaderboard/update-profile', (req, res) => {
   try {
-    const { oldName, newName, newAvatar } = req.body;
-    if (!newName) {
-      return res.status(400).json({ error: 'newName is required' });
+    const { userId, newName, newAvatar } = req.body;
+    if (!userId || !newName) {
+      return res.json({ success: true, updatedCount: 0 });
     }
 
-    const cleanOld = oldName ? String(oldName).trim().toLowerCase() : '';
     const cleanNew = String(newName).trim();
-    const cleanNewLower = cleanNew.toLowerCase();
     const cleanAvatar = newAvatar ? String(newAvatar) : '';
 
-    const isGenericOld = !cleanOld || cleanOld === 'পরীক্ষার্থী' || cleanOld === 'গেস্ট পরীক্ষার্থী' || cleanOld === 'guest' || cleanOld === 'anonymous';
-
     let updatedCount = 0;
-    if (!isGenericOld) {
+    // Only update entries with matching registered userId (NEVER overwrite guests)
+    if (!userId.startsWith('guest_') && !userId.startsWith('anon_')) {
       serverLeaderboardStore.forEach((e) => {
-        const eNameLower = (e.user_name || '').trim().toLowerCase();
-        if (cleanOld && eNameLower === cleanOld) {
+        if (e.user_id === userId && !e.is_guest) {
           e.user_name = cleanNew;
+          e.full_name = cleanNew;
           if (cleanAvatar) e.user_avatar = cleanAvatar;
           updatedCount++;
+        }
+      });
+      serverExamResultsStore.forEach((er) => {
+        if (er.user_id === userId && !er.is_guest) {
+          er.full_name = cleanNew;
+          if (cleanAvatar) er.avatar_url = cleanAvatar;
         }
       });
 
       if (updatedCount > 0) {
         saveLeaderboardStoreToDisk();
+        saveExamResultsStoreToDisk();
       }
     }
 

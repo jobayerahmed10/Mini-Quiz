@@ -390,47 +390,20 @@ export function saveUserProfile(
     // ignore localstorage errors
   }
 
-  // Also update existing local leaderboard entries for this user
+  // Update registered user's avatar or profile on shared server leaderboard
   try {
-    const rawLb = localStorage.getItem('tamreen_leaderboard_entries');
-    if (rawLb) {
-      const entries: any[] = JSON.parse(rawLb);
-      let updated = false;
-      const newNameClean = name.trim();
-      const newAvatarClean = avatar || '';
-      const currentUId = getUserUniqueId();
-
-      entries.forEach((entry) => {
-        // ONLY update entries that specifically belong to the current user's ID
-        const isMatchingUser = Boolean(
-          (currentUId && entry.user_id && entry.user_id === currentUId) ||
-          (oldName && oldName.trim() && (entry.user_name || '').trim().toLowerCase() === oldName.trim().toLowerCase())
-        );
-
-        if (isMatchingUser && newNameClean) {
-          entry.user_name = newNameClean;
-          if (newAvatarClean) entry.user_avatar = newAvatarClean;
-          updated = true;
-        }
-      });
-
-      if (updated) {
-        localStorage.setItem('tamreen_leaderboard_entries', JSON.stringify(entries));
-      }
+    const currentUId = getUserUniqueId();
+    if (isRegistered && currentUId && !currentUId.startsWith('guest_') && !currentUId.startsWith('anon_')) {
+      fetch('/api/leaderboard/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUId,
+          newName: name.trim(),
+          newAvatar: avatar || '',
+        }),
+      }).catch(() => {});
     }
-  } catch {}
-
-  // Update profile on shared server leaderboard as well
-  try {
-    fetch('/api/leaderboard/update-profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        oldName: previousProfile?.name?.trim() || '',
-        newName: name.trim(),
-        newAvatar: avatar || '',
-      }),
-    }).catch(() => {});
   } catch {}
 
   // Sync profile to cloud server progress store
