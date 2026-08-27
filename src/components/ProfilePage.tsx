@@ -157,6 +157,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         setName(p.name || 'শিক্ষার্থী');
         setPhone(p.phone || p.email || '');
         if (p.avatar) setAvatar(p.avatar);
+      } else {
+        setName('');
+        setPhone('');
+        setAvatar('');
       }
     };
 
@@ -189,10 +193,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     setIsRegistered(false);
     setUserProfile(null);
     setShowLogoutConfirm(false);
-    setSuccessMsg('সফলভাবে লগআউট হয়েছে');
-    setTimeout(() => {
-      setSuccessMsg('');
-    }, 1500);
+    onNavigateHome();
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1800,8 +1801,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         onClose={() => setShowAuthModal(false)}
         initialMode={authInitialMode}
         onAuthSuccess={(profile) => {
-          setName(profile.name || 'Jobayer Ahmed');
-          setPhone(profile.phone || '01779834999');
+          setName(profile.name || 'শিক্ষার্থী');
+          setPhone(profile.phone || profile.email || '');
           if (profile.avatar) setAvatar(profile.avatar);
           setIsRegistered(true);
           setShowAuthModal(false);

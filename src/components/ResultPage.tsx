@@ -69,7 +69,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
   // User Profile
   const userProfile = getUserProfile();
-  const currentUserName = userProfile?.name?.trim() || 'জুবায়ের আহমদ';
+  const currentUserName = userProfile?.name?.trim() || (result as any)?.userName || 'গেস্ট পরীক্ষার্থী';
   const currentUserAvatar = userProfile?.avatar;
   const examTitle = result.examTitle || result.selectedSubject || 'বাংলা মডেল টেস্ট';
 

@@ -565,6 +565,9 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowUserMenu(false);
                         await supabaseSignOut();
                         clearUserProfile();
+                        if (onNavigateHome) {
+                          onNavigateHome();
+                        }
                       }}
                       className="w-full text-left p-2.5 rounded-xl text-xs font-black flex items-center gap-3 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-1"
                     >

@@ -255,12 +255,29 @@ export default function App() {
         }
       } else if (event === 'SIGNED_OUT') {
         clearUserProfile();
+        setQuizResult(null);
+        setCurrentPage('home');
+        setActiveTab('home');
+        setShowProfileModal(false);
       }
     });
+
+    // 3. Listen to auth changes and broadcast logout
+    const handleAuthChange = () => {
+      const isReg = isUserRegistered();
+      if (!isReg) {
+        setQuizResult(null);
+        setShowProfileModal(false);
+        setCurrentPage((prev) => (prev === 'profile' ? 'home' : prev));
+        setActiveTab((prev) => (prev === 'profile' ? 'home' : prev));
+      }
+    };
+    window.addEventListener('tamreen_auth_status_changed', handleAuthChange);
 
     return () => {
       isMounted = false;
       unsubscribe();
+      window.removeEventListener('tamreen_auth_status_changed', handleAuthChange);
     };
   }, []);
 

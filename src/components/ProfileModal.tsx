@@ -46,9 +46,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const currentProfile = getUserProfile();
   const [activeTab, setActiveTab] = useState<'menu' | 'edit_profile' | 'dashboard' | 'courses' | 'bookmarks' | 'wrong_bank' | 'archive' | 'vip_membership' | 'settings'>('menu');
   
-  const [name, setName] = useState(currentProfile?.name || 'জোবায়ের আহমদ');
-  const [phone, setPhone] = useState(currentProfile?.phone || '01700000000');
-  const [avatar, setAvatar] = useState(currentProfile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250');
+  const [name, setName] = useState(currentProfile?.name || '');
+  const [phone, setPhone] = useState(currentProfile?.phone || '');
+  const [avatar, setAvatar] = useState(currentProfile?.avatar || '');
   const [goalText, setGoalText] = useState(getUserGoal());
   const [isEditingGoal, setIsEditingGoal] = useState(false);
 
@@ -84,8 +84,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     await supabaseSignOut();
     clearUserProfile();
     setAuthSession(null);
-    setSuccessMsg('সফলভাবে লগআউট হয়েছে');
-    setTimeout(() => setSuccessMsg(''), 2000);
+    onClose();
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -195,10 +194,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 শিক্ষক নিবন্ধন পরীক্ষার্থী
               </span>
               <h3 className="text-xl sm:text-2xl font-black font-tiro text-amber-300 tracking-wide truncate leading-tight drop-shadow-md">
-                {name || 'জোবায়ের আহমদ'}
+                {name || 'শিক্ষার্থী'}
               </h3>
               <p className="text-xs font-semibold text-emerald-100/90 truncate">
-                {phone ? `${phone} • tamreen.app` : 'jobayer.tamreen@gmail.com'}
+                {phone ? `${phone} • tamreen.app` : 'শিক্ষার্থী অ্যাকাউন্ট'}
               </p>
               <button
                 onClick={() => setActiveTab('edit_profile')}

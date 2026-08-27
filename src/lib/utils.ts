@@ -462,15 +462,30 @@ export function saveUserProfile(
 export function clearUserProfile(): void {
   try {
     localStorage.removeItem(PROFILE_STORAGE_KEY);
+    localStorage.removeItem(USER_ROLL_KEY);
     localStorage.removeItem('tamreen_user_auth_status');
     localStorage.removeItem('tamreen_auth_token');
     localStorage.removeItem('supabase_auth_session');
+    localStorage.removeItem('tamreen_completed_exams');
+    localStorage.removeItem('tamreen_saved_exam_results');
+    localStorage.removeItem('tamreen_exam_history_list');
+    localStorage.removeItem('tamreen_wrong_answers_bank');
+    localStorage.removeItem('tamreen_user_exam_goal');
+    localStorage.removeItem('tamreen_user_id');
+    localStorage.removeItem('miniquiz_student_stats');
+    localStorage.removeItem('tamreen_user_streak');
+    localStorage.removeItem('tamreen_last_streak_date');
+    localStorage.removeItem('tamreen_enrollments');
+    localStorage.removeItem('tamreen_user_enrollments');
+    localStorage.removeItem('tamreen_bookmarked_ids');
+    localStorage.removeItem('tamreen_bookmarked_questions');
   } catch {
     // ignore
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('tamreen_profile_updated'));
     window.dispatchEvent(new Event('tamreen_auth_status_changed'));
+    window.dispatchEvent(new CustomEvent('tamreen_exam_completed', { detail: {} }));
     if ('BroadcastChannel' in window) {
       try {
         const bc = new BroadcastChannel('tamreen_leaderboard_channel');
