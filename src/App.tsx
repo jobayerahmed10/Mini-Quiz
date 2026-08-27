@@ -411,9 +411,12 @@ export default function App() {
 
     // Create & save Leaderboard Entry & Exam Result
     const userProfile = getUserProfile();
-    const userName = userProfile?.name?.trim() || 'জুবায়ের আহমদ';
+    const isRegistered = isUserRegistered();
+    const rawName = userProfile?.name?.trim();
+    const userName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
     const userAvatar = userProfile?.avatar;
     const userId = getUserUniqueId();
+    const isFreeExam = !String(activeExamId || '').toLowerCase().includes('paid');
 
     const entry: LeaderboardEntry = {
       id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -436,7 +439,7 @@ export default function App() {
     submitExamResultToSupabase({
       exam_id: examId,
       exam_title: examTitle,
-      is_free: true,
+      is_free: isFreeExam,
       user_id: userId,
       full_name: userName,
       avatar_url: userAvatar,

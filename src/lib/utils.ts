@@ -252,12 +252,30 @@ export function getUserUniqueId(): string {
   try {
     let uId = localStorage.getItem('tamreen_user_id');
     if (!uId) {
-      uId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // Check if user has student_id or id in profile
+      const prof = getUserProfile();
+      if (prof?.student_id) {
+        uId = prof.student_id;
+      } else {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          uId = crypto.randomUUID();
+        } else {
+          uId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = (Math.random() * 16) | 0,
+              v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        }
+      }
       localStorage.setItem('tamreen_user_id', uId);
     }
     return uId;
   } catch {
-    return `usr_temp_${Math.random().toString(36).substring(2, 9)}`;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0,
+        v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   }
 }
 

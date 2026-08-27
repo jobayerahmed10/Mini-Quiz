@@ -708,7 +708,7 @@ export async function submitExamResultToSupabase(params: {
   }
 
   try {
-    // 3A. Upsert Profile so full_name and avatar_url can be joined by RPC
+    // 3A. Upsert Profile so full_name and avatar_url can be joined/looked up
     try {
       if (params.user_id) {
         await supabaseInstance
@@ -724,27 +724,78 @@ export async function submitExamResultToSupabase(params: {
       console.warn('Profiles upsert warning:', profErr);
     }
 
-    // 3B. Insert into exam_results (protected by RLS)
-    const { error: erError } = await supabaseInstance
-      .from('exam_results')
-      .insert([
-        {
-          user_id: params.user_id,
-          exam_id: params.exam_id,
-          score: params.score,
-          total_marks: params.total_marks,
-          correct_answers: params.correct_answers,
-          wrong_answers: params.wrong_answers,
-          time_taken_seconds: timeTaken,
-          submitted_at: submittedAt,
-        },
-      ]);
+    // 3B. Multi-tier resilient insert into exam_results
+    let inserted = false;
+    // Attempt 1: Full payload with name and title metadata
+    try {
+      const { error: fullErr } = await supabaseInstance
+        .from('exam_results')
+        .insert([
+          {
+            user_id: params.user_id,
+            exam_id: params.exam_id,
+            score: params.score,
+            total_marks: params.total_marks,
+            correct_answers: params.correct_answers,
+            wrong_answers: params.wrong_answers,
+            time_taken_seconds: timeTaken,
+            submitted_at: submittedAt,
+            full_name: params.full_name,
+            user_name: params.full_name,
+            guest_name: params.full_name,
+            exam_title: params.exam_title,
+            is_free: params.is_free ?? true,
+          },
+        ]);
+      if (!fullErr) {
+        inserted = true;
+      }
+    } catch {}
 
-    if (erError) {
-      console.warn('Supabase exam_results insert warning:', erError.message);
+    // Attempt 2: Standard schema columns
+    if (!inserted) {
+      try {
+        const { error: stdErr } = await supabaseInstance
+          .from('exam_results')
+          .insert([
+            {
+              user_id: params.user_id,
+              exam_id: params.exam_id,
+              score: params.score,
+              total_marks: params.total_marks,
+              correct_answers: params.correct_answers,
+              wrong_answers: params.wrong_answers,
+              time_taken_seconds: timeTaken,
+              submitted_at: submittedAt,
+            },
+          ]);
+        if (!stdErr) {
+          inserted = true;
+        } else {
+          console.warn('Standard exam_results insert warning:', stdErr.message);
+        }
+      } catch {}
     }
 
-    // 3C. Also insert into leaderboard_entries for dual-write compatibility
+    // Attempt 3: Core minimal columns (user_id, exam_id, score)
+    if (!inserted) {
+      try {
+        const { error: minErr } = await supabaseInstance
+          .from('exam_results')
+          .insert([
+            {
+              user_id: params.user_id,
+              exam_id: params.exam_id,
+              score: params.score,
+            },
+          ]);
+        if (minErr) {
+          console.warn('Minimal exam_results insert error:', minErr.message);
+        }
+      } catch {}
+    }
+
+    // 3C. Also insert into leaderboard_entries for dual-write compatibility if table exists
     try {
       await supabaseInstance
         .from('leaderboard_entries')
@@ -774,20 +825,20 @@ export async function submitExamResultToSupabase(params: {
 }
 
 /**
- * Fetch exam-specific leaderboard via secure Supabase RPC get_exam_leaderboard.
+ * Fetch exam-specific leaderboard via Supabase `exam_results` table (Sort by score DESC)
+ * or via secure RPC `get_exam_leaderboard`.
  * Falls back gracefully to server RPC API and local store.
  */
 export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboardItem[]> {
   if (!examId || examId === 'all') return [];
 
-  // 1. Try Supabase RPC first
+  // 1. Try Supabase RPC first if available
   if (supabaseInstance) {
     try {
       let rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
         p_exam_id: examId,
       });
 
-      // Try alternate param name if first attempt failed
       if (rpcRes.error) {
         rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
           exam_id: examId,
@@ -810,9 +861,89 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     } catch (rpcErr) {
       console.warn('Supabase get_exam_leaderboard RPC error:', rpcErr);
     }
+
+    // 2. Direct Supabase Query from `exam_results` table sorted by score DESC
+    try {
+      let query = supabaseInstance
+        .from('exam_results')
+        .select('*')
+        .order('score', { ascending: false });
+
+      if (examId && examId !== 'all') {
+        const cleanExamId = examId.trim();
+        query = query.or(`exam_id.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%`);
+      }
+
+      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        // Fetch profiles to map names and avatars
+        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+        if (userIds.length > 0) {
+          try {
+            const { data: profs } = await supabaseInstance
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .in('id', userIds);
+            if (profs && Array.isArray(profs)) {
+              profs.forEach((p: any) => {
+                if (p.id) profilesMap.set(p.id, p);
+              });
+            }
+          } catch {}
+        }
+
+        // Deduplicate best result per distinct participant
+        const bestMap = new Map<string, any>();
+        for (const row of data) {
+          const uKey = String(row.user_id || row.full_name || row.user_name || row.id || '');
+          const existing = bestMap.get(uKey);
+          const scoreVal = Number(row.score ?? row.correct_answers ?? 0);
+          if (!existing || scoreVal > Number(existing.score ?? existing.correct_answers ?? 0)) {
+            bestMap.set(uKey, row);
+          }
+        }
+
+        // Sort: 1. Score DESC, 2. Time Taken ASC, 3. Submitted At ASC
+        const sortedRows = Array.from(bestMap.values()).sort((a, b) => {
+          const scoreA = Number(a.score ?? a.correct_answers ?? 0);
+          const scoreB = Number(b.score ?? b.correct_answers ?? 0);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          const timeA = Number(a.time_taken_seconds || 999999);
+          const timeB = Number(b.time_taken_seconds || 999999);
+          if (timeA !== timeB) return timeA - timeB;
+          return new Date(a.submitted_at || 0).getTime() - new Date(b.submitted_at || 0).getTime();
+        });
+
+        return sortedRows.map((row: any, idx: number) => {
+          const prof = profilesMap.get(row.user_id);
+          const fullName = row.full_name || row.user_name || row.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+          const avatarUrl = row.avatar_url || prof?.avatar_url;
+          const score = Number(row.score ?? row.correct_answers ?? 0);
+          const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers || 0) + Number(row.wrong_answers || 0)) ?? 0);
+          const correctAnswers = Number(row.correct_answers ?? row.score ?? 0);
+          const wrongAnswers = Number(row.wrong_answers ?? 0);
+          const timeTaken = Number(row.time_taken_seconds || 0);
+
+          return {
+            rank: idx + 1,
+            user_id: String(row.user_id || ''),
+            full_name: fullName,
+            avatar_url: avatarUrl,
+            score,
+            total_marks: totalMarks,
+            correct_answers: correctAnswers,
+            wrong_answers: wrongAnswers,
+            time_taken_seconds: timeTaken,
+          };
+        });
+      }
+    } catch (directErr) {
+      console.warn('Direct exam_results query error:', directErr);
+    }
   }
 
-  // 2. Fetch from Express Server RPC endpoint
+  // 3. Fetch from Express Server RPC endpoint
   try {
     const res = await fetch(`/api/rpc/get_exam_leaderboard?p_exam_id=${encodeURIComponent(examId)}`);
     if (res.ok) {
@@ -825,7 +956,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     console.warn('Server get_exam_leaderboard error:', srvErr);
   }
 
-  // 3. Fallback to computing from local entries
+  // 4. Fallback to computing from local entries (sorted by score DESC)
   const local = getLocalLeaderboardEntries().filter((e) => {
     const eId = (e.exam_id || '').toLowerCase().trim();
     const eTitle = (e.exam_title || '').toLowerCase().trim();
@@ -860,7 +991,8 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 }
 
 /**
- * Fetch free overall leaderboard via secure Supabase RPC get_free_overall_leaderboard.
+ * Fetch free overall leaderboard via Supabase `exam_results` table (Sort by score/points DESC)
+ * or via secure RPC `get_free_overall_leaderboard`.
  * Supports period filter: 'today', 'week' | 'this_week', 'month' | 'this_month', 'all' | 'all_time'.
  */
 export async function getFreeOverallLeaderboard(period: string = 'all'): Promise<FreeOverallLeaderboardItem[]> {
@@ -876,7 +1008,6 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
         p_period: normalizedPeriod,
       });
 
-      // Try alternate param name if first attempt failed
       if (rpcRes.error) {
         rpcRes = await supabaseInstance.rpc('get_free_overall_leaderboard', {
           period: normalizedPeriod,
@@ -897,9 +1028,119 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
     } catch (rpcErr) {
       console.warn('Supabase get_free_overall_leaderboard RPC error:', rpcErr);
     }
+
+    // 2. Direct Supabase Query from `exam_results` table
+    try {
+      const now = Date.now();
+      let minTimestamp = 0;
+      if (normalizedPeriod === 'today') {
+        const d = new Date();
+        minTimestamp = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      } else if (normalizedPeriod === 'week') {
+        minTimestamp = now - 7 * 24 * 60 * 60 * 1000;
+      } else if (normalizedPeriod === 'month') {
+        minTimestamp = now - 30 * 24 * 60 * 60 * 1000;
+      }
+
+      let query = supabaseInstance
+        .from('exam_results')
+        .select('*')
+        .order('score', { ascending: false });
+
+      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        // Filter by date if needed
+        const filtered = data.filter((r: any) => {
+          if (r.is_free === false) return false;
+          if (minTimestamp > 0) {
+            const t = new Date(r.submitted_at || r.created_at || 0).getTime();
+            if (isNaN(t) || t < minTimestamp) return false;
+          }
+          return true;
+        });
+
+        if (filtered.length > 0) {
+          // Fetch profiles
+          const userIds = Array.from(new Set(filtered.map((r: any) => r.user_id).filter(Boolean)));
+          let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+          if (userIds.length > 0) {
+            try {
+              const { data: profs } = await supabaseInstance
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .in('id', userIds);
+              if (profs && Array.isArray(profs)) {
+                profs.forEach((p: any) => {
+                  if (p.id) profilesMap.set(p.id, p);
+                });
+              }
+            } catch {}
+          }
+
+          // Group by user_id
+          const userAggMap = new Map<string, {
+            user_id: string;
+            full_name: string;
+            avatar_url?: string;
+            total_points: number;
+            free_exam_count: number;
+            percentageSum: number;
+          }>();
+
+          for (const r of filtered) {
+            const uId = String(r.user_id || '');
+            const prof = profilesMap.get(uId);
+            const name = r.full_name || r.user_name || r.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+            const avatar = r.avatar_url || prof?.avatar_url;
+            const points = Number(r.correct_answers ?? r.score ?? 0);
+            const totalQ = Number(r.total_marks ?? (Number(r.correct_answers || 0) + Number(r.wrong_answers || 0)) ?? 0);
+            const percentage = totalQ > 0 ? (points / totalQ) * 100 : 100;
+
+            const existing = userAggMap.get(uId || name);
+            if (!existing) {
+              userAggMap.set(uId || name, {
+                user_id: uId,
+                full_name: name,
+                avatar_url: avatar,
+                total_points: points,
+                free_exam_count: 1,
+                percentageSum: percentage,
+              });
+            } else {
+              existing.total_points += points;
+              existing.free_exam_count += 1;
+              existing.percentageSum += percentage;
+              if (avatar) existing.avatar_url = avatar;
+            }
+          }
+
+          const userList = Array.from(userAggMap.values()).map((u) => ({
+            user_id: u.user_id,
+            full_name: u.full_name,
+            avatar_url: u.avatar_url,
+            total_points: u.total_points,
+            free_exam_count: u.free_exam_count,
+            average_percentage: u.free_exam_count > 0 ? Math.round(u.percentageSum / u.free_exam_count) : 0,
+          }));
+
+          // Sort by total_points DESC, then average_percentage DESC
+          userList.sort((a, b) => {
+            if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+            return b.average_percentage - a.average_percentage;
+          });
+
+          return userList.map((u, idx) => ({
+            rank: idx + 1,
+            ...u,
+          }));
+        }
+      }
+    } catch (directErr) {
+      console.warn('Direct free leaderboard query error:', directErr);
+    }
   }
 
-  // 2. Fetch from Express Server RPC endpoint
+  // 3. Fetch from Express Server RPC endpoint
   try {
     const res = await fetch(`/api/rpc/get_free_overall_leaderboard?p_period=${encodeURIComponent(normalizedPeriod)}`);
     if (res.ok) {
@@ -912,7 +1153,7 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
     console.warn('Server get_free_overall_leaderboard error:', srvErr);
   }
 
-  // 3. Fallback to computing from local entries
+  // 4. Fallback to computing from local entries
   const local = getLocalLeaderboardEntries();
   const now = Date.now();
   let minTime = 0;
@@ -1064,35 +1305,93 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   let dbEntries: LeaderboardEntry[] = [];
 
-  // 2. Fetch from Supabase if configured
+  // 2. Fetch directly from Supabase `exam_results` table (Sort by score DESC)
   if (supabaseInstance) {
     try {
       let query = supabaseInstance
-        .from('leaderboard_entries')
-        .select('id, exam_id, exam_title, user_id, user_name, user_avatar, score, total_questions, correct_count, wrong_count, accuracy, created_at')
+        .from('exam_results')
+        .select('*')
         .order('score', { ascending: false })
-        .order('created_at', { ascending: false })
         .limit(1000);
+
+      if (examId && examId !== 'all') {
+        query = query.or(`exam_id.eq.${examId},exam_id.ilike.%${examId}%`);
+      }
 
       const queryPromise = Promise.resolve(query);
       const timeoutFallback = { data: null, error: { message: 'Timeout' } };
       const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
 
-      if (data && !error && Array.isArray(data)) {
-        dbEntries = data.map((item: any) => ({
-          id: String(item.id || `db_${Math.random()}`),
-          exam_id: String(item.exam_id || 'general'),
-          exam_title: String(item.exam_title || 'পরীক্ষা'),
-          user_id: item.user_id ? String(item.user_id) : undefined,
-          user_name: String(item.user_name || 'পরীক্ষার্থী'),
-          user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
-          score: Number(item.score || 0),
-          total_questions: Number(item.total_questions || 0),
-          correct_count: Number(item.correct_count || 0),
-          wrong_count: Number(item.wrong_count || 0),
-          accuracy: Number(item.accuracy || 0),
-          created_at: String(item.created_at || new Date().toISOString()),
-        }));
+      if (data && !error && Array.isArray(data) && data.length > 0) {
+        // Fetch profiles
+        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+        if (userIds.length > 0) {
+          try {
+            const { data: profs } = await supabaseInstance
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .in('id', userIds);
+            if (profs && Array.isArray(profs)) {
+              profs.forEach((p: any) => {
+                if (p.id) profilesMap.set(p.id, p);
+              });
+            }
+          } catch {}
+        }
+
+        dbEntries = data.map((item: any) => {
+          const prof = profilesMap.get(item.user_id);
+          const name = item.full_name || item.user_name || item.guest_name || prof?.full_name || 'পরীক্ষার্থী';
+          const avatar = item.avatar_url || prof?.avatar_url;
+          const score = Number(item.score ?? item.correct_answers ?? 0);
+          const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers || 0) + Number(item.wrong_answers || 0)) ?? 0);
+          const correctCount = Number(item.correct_answers ?? item.score ?? 0);
+          const wrongCount = Number(item.wrong_answers ?? 0);
+          const accuracy = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 100;
+
+          return {
+            id: String(item.id || `er_${Math.random()}`),
+            exam_id: String(item.exam_id || 'general'),
+            exam_title: String(item.exam_title || 'মডেল টেস্ট'),
+            user_id: item.user_id ? String(item.user_id) : undefined,
+            user_name: name,
+            user_avatar: avatar,
+            score,
+            total_questions: totalQuestions,
+            correct_count: correctCount,
+            wrong_count: wrongCount,
+            accuracy,
+            time_taken_seconds: Number(item.time_taken_seconds || 0),
+            created_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
+          };
+        });
+      } else {
+        // Fallback: try `leaderboard_entries` table if exam_results is empty
+        try {
+          const lbQuery = supabaseInstance
+            .from('leaderboard_entries')
+            .select('*')
+            .order('score', { ascending: false })
+            .limit(1000);
+          const { data: lbData } = await fetchWithTimeout(Promise.resolve(lbQuery), 5000, { data: null } as any);
+          if (lbData && Array.isArray(lbData)) {
+            dbEntries = lbData.map((item: any) => ({
+              id: String(item.id || `lb_${Math.random()}`),
+              exam_id: String(item.exam_id || 'general'),
+              exam_title: String(item.exam_title || 'পরীক্ষা'),
+              user_id: item.user_id ? String(item.user_id) : undefined,
+              user_name: String(item.user_name || 'পরীক্ষার্থী'),
+              user_avatar: item.user_avatar ? String(item.user_avatar) : undefined,
+              score: Number(item.score || 0),
+              total_questions: Number(item.total_questions || 0),
+              correct_count: Number(item.correct_count || 0),
+              wrong_count: Number(item.wrong_count || 0),
+              accuracy: Number(item.accuracy || 0),
+              created_at: String(item.created_at || new Date().toISOString()),
+            }));
+          }
+        } catch {}
       }
     } catch (dbErr) {
       console.warn('Supabase fetch error:', dbErr);
@@ -1117,12 +1416,24 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   const mergedList = Array.from(mergedMap.values());
 
+  // Sort by score descending (Sort by score DESC)
+  mergedList.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
   try {
     localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(mergedList));
   } catch {}
 
   if (examId && examId !== 'all') {
-    return mergedList.filter((e) => e.exam_id === examId || e.exam_title === examId);
+    return mergedList.filter((e) => {
+      const eId = (e.exam_id || '').toLowerCase().trim();
+      const eTitle = (e.exam_title || '').toLowerCase().trim();
+      const target = examId.toLowerCase().trim();
+      return eId === target || eTitle === target || eId.includes(target) || eTitle.includes(target);
+    });
   }
 
   return mergedList;
