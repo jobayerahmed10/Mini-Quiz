@@ -16,6 +16,7 @@ import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { AuthModal } from './components/AuthModal';
 import { SharedExamEntranceCard } from './components/SharedExamEntranceCard';
 import { RegistrationPromptModal } from './components/RegistrationPromptModal';
+import { QuestionDetailPage } from './components/QuestionDetailPage';
 import { Question, PageRoute, QuizResult, UserAnswer, TabRoute } from './types';
 import { SAMPLE_QUESTIONS } from './data/sampleQuestions';
 import { 
@@ -49,6 +50,7 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
   const [currentPage, setCurrentPage] = useState<PageRoute>('home');
+  const [activeQuestionSlug, setActiveQuestionSlug] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
@@ -310,11 +312,24 @@ export default function App() {
     loadQuestions();
   }, [loadQuestions]);
 
-  // Deep Link support: Auto-detect ?exam=... or ?examId=... in URL and show Big Entrance Card
+  // Deep Link support: Auto-detect /q/:slug or ?q=... or ?exam=... in URL
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname;
+    const qParam = urlParams.get('q');
     const examQuery = urlParams.get('exam') || urlParams.get('examId') || urlParams.get('test');
+
+    if (pathname.startsWith('/q/')) {
+      const slug = pathname.replace('/q/', '').trim();
+      if (slug) {
+        setActiveQuestionSlug(slug);
+        setCurrentPage('question_detail');
+      }
+    } else if (qParam) {
+      setActiveQuestionSlug(qParam);
+      setCurrentPage('question_detail');
+    }
 
     if (examQuery) {
       fetchExamsFromSupabase().then((res) => {
@@ -622,6 +637,19 @@ export default function App() {
 
       {/* Main Content Router */}
       <main className="flex-1 pb-12">
+        {currentPage === 'question_detail' && activeQuestionSlug && (
+          <QuestionDetailPage
+            slugOrId={activeQuestionSlug}
+            onNavigateHome={handleNavigateHome}
+            onStartPractice={(subject, topic) => {
+              if (subject) setSelectedSubject(subject);
+              if (topic) setSelectedTopic(topic);
+              setCurrentPage('practice');
+            }}
+            showHarakat={showHarakat}
+          />
+        )}
+
         {currentPage === 'profile' && (
           <ProfilePage
             onNavigateHome={handleNavigateHome}

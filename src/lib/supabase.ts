@@ -604,6 +604,90 @@ export async function fetchQuestionsByExamId(examId: string): Promise<Question[]
 }
 
 /**
+ * Fetches a single question by its slug or ID from Supabase 'public.questions'
+ */
+export async function fetchQuestionBySlugOrId(slugOrId: string): Promise<Question | null> {
+  if (!slugOrId) return null;
+  const cleanVal = String(slugOrId).trim();
+
+  if (supabaseInstance) {
+    try {
+      // 1. Try querying by slug or id
+      const { data, error } = await supabaseInstance
+        .from('questions')
+        .select('*')
+        .or(`slug.eq.${cleanVal},id.eq.${cleanVal}`)
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const item = data[0];
+        return {
+          id: String(item.id),
+          slug: item.slug ? String(item.slug) : String(item.id),
+          question: String(item.question || ''),
+          option_a: String(item.option_a || ''),
+          option_b: String(item.option_b || ''),
+          option_c: String(item.option_c || ''),
+          option_d: String(item.option_d || ''),
+          correct_answer: (item.correct_answer || 'option_a') as any,
+          explanation: item.explanation ? String(item.explanation) : null,
+          subject: item.subject ? String(item.subject) : null,
+          topic: item.topic ? String(item.topic) : null,
+          status: item.status || 'published',
+          exam_id: item.exam_id ? String(item.exam_id) : null,
+          created_at: item.created_at || new Date().toISOString(),
+        };
+      }
+
+      // 2. Fallback try by ID only if or condition fails
+      const { data: idData } = await supabaseInstance
+        .from('questions')
+        .select('*')
+        .eq('id', cleanVal)
+        .limit(1);
+
+      if (idData && idData.length > 0) {
+        const item = idData[0];
+        return {
+          id: String(item.id),
+          slug: item.slug ? String(item.slug) : String(item.id),
+          question: String(item.question || ''),
+          option_a: String(item.option_a || ''),
+          option_b: String(item.option_b || ''),
+          option_c: String(item.option_c || ''),
+          option_d: String(item.option_d || ''),
+          correct_answer: (item.correct_answer || 'option_a') as any,
+          explanation: item.explanation ? String(item.explanation) : null,
+          subject: item.subject ? String(item.subject) : null,
+          topic: item.topic ? String(item.topic) : null,
+          status: item.status || 'published',
+          exam_id: item.exam_id ? String(item.exam_id) : null,
+          created_at: item.created_at || new Date().toISOString(),
+        };
+      }
+    } catch (err) {
+      console.warn('fetchQuestionBySlugOrId error:', err);
+    }
+  }
+
+  // Fallback to local cache
+  try {
+    const raw = localStorage.getItem('miniquiz_questions_cache');
+    if (raw) {
+      const parsed: Question[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const found = parsed.find(
+          (q) => String(q.id) === cleanVal || (q.slug && String(q.slug) === cleanVal)
+        );
+        if (found) return found;
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Inserts a new MCQ question into Supabase 'public.questions' table
  */
 export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ success: boolean; data?: Question; error?: string }> {

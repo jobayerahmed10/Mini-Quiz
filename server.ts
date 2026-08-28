@@ -1080,6 +1080,162 @@ app.post('/api/leaderboard/clear', (req, res) => {
   }
 });
 
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Dynamic XML Sitemap endpoint for Google SEO Indexing
+app.get(['/sitemap.xml', '/sitemap', '/app/sitemap.ts', '/sitemap.ts'], async (req, res) => {
+  try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://yedhwzcbpkrqixvpkgoc.supabase.co';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllZGh3emNicGtycWl4dnBrZ29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNjA1OTIsImV4cCI6MjEwMTczNjU5Mn0.-oOgefi5RERPb3gbTC8rTYIVf6if6JWGIrz45rhZsVE';
+
+    let questionsList: any[] = [];
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/questions?select=id,slug,subject,created_at,updated_at&status=eq.published&limit=5000`, {
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+      });
+
+      if (response.ok) {
+        questionsList = await response.json();
+      }
+    } catch (err) {
+      console.warn('Error fetching questions for sitemap from Supabase:', err);
+    }
+
+    const host = req.get('host') || 'attamreen.academy';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    // Static primary app pages
+    xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/exam</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/courses</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+
+    // Dynamic question URLs
+    questionsList.forEach((q: any) => {
+      const slugVal = q.slug || q.id;
+      if (slugVal) {
+        const lastMod = (q.updated_at || q.created_at || new Date().toISOString()).split('T')[0];
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/q/${encodeURIComponent(slugVal)}</loc>\n`;
+        xml += `    <lastmod>${lastMod}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `  </url>\n`;
+      }
+    });
+
+    xml += `</urlset>`;
+
+    res.header('Content-Type', 'application/xml');
+    return res.send(xml);
+  } catch (err: any) {
+    console.error('Sitemap route error:', err);
+    return res.status(500).send('Error generating sitemap');
+  }
+});
+
+// Dynamic Route Handler for /q/:slug with Google QAPage Schema & Meta Header Indexing
+app.get('/q/:slug', async (req, res, next) => {
+  const { slug } = req.params;
+  if (!slug) return next();
+
+  try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://yedhwzcbpkrqixvpkgoc.supabase.co';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllZGh3emNicGtycWl4dnBrZ29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNjA1OTIsImV4cCI6MjEwMTczNjU5Mn0.-oOgefi5RERPb3gbTC8rTYIVf6if6JWGIrz45rhZsVE';
+
+    let question: any = null;
+    try {
+      const fetchRes = await fetch(`${supabaseUrl}/rest/v1/questions?or=(slug.eq.${encodeURIComponent(slug)},id.eq.${encodeURIComponent(slug)})&limit=1`, {
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+      });
+
+      if (fetchRes.ok) {
+        const list = await fetchRes.json();
+        if (Array.isArray(list) && list.length > 0) {
+          question = list[0];
+        }
+      }
+    } catch (fErr) {
+      console.warn('Error fetching question for /q/:slug:', fErr);
+    }
+
+    if (question) {
+      const qText = question.question || 'প্রশ্ন';
+      const subj = question.subject || 'পরীক্ষা প্রস্তুতি';
+      const explanation = question.explanation || 'আত-তামরীন একাডেমি বিস্তারিত ব্যাখ্যা ও সঠিক সমাধান।';
+      const correctKey = question.correct_answer || 'option_a';
+      const correctAnswerText = question[correctKey] || question.option_a || '';
+
+      const title = `${qText} | ${subj} | আত-তামরীন একাডেমি`;
+      const description = `প্রশ্ন: ${qText}। সঠিক উত্তর: ${correctAnswerText}। ${explanation.slice(0, 160)}`;
+
+      const host = req.get('host') || 'attamreen.academy';
+      const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+      const fullUrl = `${protocol}://${host}/q/${encodeURIComponent(slug)}`;
+
+      const qaPageSchema = {
+        "@context": "https://schema.org",
+        "@type": "QAPage",
+        "mainEntity": {
+          "@type": "Question",
+          "name": qText,
+          "text": qText,
+          "answerCount": 1,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": correctAnswerText,
+            "explanation": explanation
+          }
+        }
+      };
+
+      const indexPath = process.env.NODE_ENV === 'production'
+        ? path.join(process.cwd(), 'dist', 'index.html')
+        : path.join(process.cwd(), 'index.html');
+
+      if (fs.existsSync(indexPath)) {
+        let html = fs.readFileSync(indexPath, 'utf-8');
+
+        // Inject Title
+        html = html.replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+
+        // Inject Meta Tags and JSON-LD
+        const metaTags = `
+    <meta name="description" content="${escapeHtml(description)}" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(description)}" />
+    <meta property="og:url" content="${escapeHtml(fullUrl)}" />
+    <meta property="og:type" content="article" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script id="jsonld-qapage-schema" type="application/ld+json">${JSON.stringify(qaPageSchema)}</script>
+`;
+        html = html.replace('</head>', `${metaTags}\n</head>`);
+        return res.send(html);
+      }
+    }
+  } catch (err) {
+    console.warn('Error rendering dynamic SEO for question page:', err);
+  }
+  next();
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

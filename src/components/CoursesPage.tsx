@@ -42,72 +42,7 @@ interface CoursesPageProps {
   onOpenLeaderboard?: (examId?: string) => void;
 }
 
-const INITIAL_COURSES: CourseModule[] = [
-  {
-    id: 'course-arabic-lecturer',
-    title: '১৯তম NTRCA প্রভাষক (আরবি) পূর্ণাঙ্গ প্রস্তুতি ব্যাচ',
-    subtitle: 'মাদ্রাসা প্রভাষক আরবি লিখিত ও প্রিলিমিনারি স্পেশাল কোর্স',
-    category: 'arabic_lecturer',
-    badge: 'প্রভাষক',
-    badgeSub: 'আরবি প্রভাষক',
-    price: '১২০০',
-    accentColor: 'emerald',
-    enrolledCount: '৩৮৫',
-    classesCount: 45,
-    sheetsCount: 32,
-    examsCount: 20,
-    topics: ['আরবি সাহিত্য ও ইতিহাস', 'বালাগাত ও মানতিক', 'নাহু ও সরফ বিশদ আলোচনা', 'বিগত ১০ বছরের প্রশ্ন সমাধান', '২০টি স্পেশাল মডেল টেস্ট'],
-    instructor: 'মাওলানা ড. আব্দুল্লাহ আল-মামুন'
-  },
-  {
-    id: 'course-assistant-moulvi',
-    title: '১৯তম NTRCA সহকারী মৌলভী পূর্ণাঙ্গ কোর্স',
-    subtitle: 'আল হাদিস, উসুলুল হাদিস, ফিকহ ও আরবি ব্যাকরণ স্পেশাল',
-    category: 'assistant_moulvi',
-    badge: 'সহকারী মৌলভী',
-    badgeSub: 'সহকারী মৌলভী',
-    price: '১০০০',
-    accentColor: 'amber',
-    enrolledCount: '৫২০',
-    classesCount: 40,
-    sheetsCount: 28,
-    examsCount: 16,
-    topics: ['কুরআন মাজিদ ও তাজবীদ', 'আল-হাদিস ও উসুলুল হাদিস', 'ফিকহ ও উসুলুল ফিকহ', 'আরবি দ্বিতীয় পত্র ব্যাকরণ', 'স্পেশাল রিভিশন মডেল টেস্ট'],
-    instructor: 'মাওলানা মুফতি হাবিবুর রহমান'
-  },
-  {
-    id: 'course-ebtedayi',
-    title: 'ইবতেদায়ী মৌলবি ও ক্বারী শিক্ষক স্পেশাল কোর্স',
-    subtitle: 'ইবতেদায়ী প্রধান ও সহকারী মৌলবি শিক্ষক নিবন্ধন প্রস্তুতি',
-    category: 'ebtedayi',
-    badge: 'ইবতেদায়ী',
-    badgeSub: 'মৌলবি ও ক্বারী',
-    price: '৮৫০',
-    accentColor: 'amber',
-    enrolledCount: '২৯০',
-    classesCount: 35,
-    sheetsCount: 22,
-    examsCount: 12,
-    topics: ['আকাইদ ও ফিকহ প্রস্তুতি', 'তাজবীদ ও কিরাত বিশ্লেষণ', 'বাংলা, ইংরেজি ও গণিত বেসিক', 'অধ্যায়ভিত্তিক প্রশ্ন সমাধান'],
-    instructor: 'মাওলানা ক্বারী মাহফুজুর রহমান'
-  },
-  {
-    id: 'course-general-subjects',
-    title: 'জেনারেল বিষয় (বাংলা, ইংরেজি, গণিত ও জিকে) ক্র্যাশ কোর্স',
-    subtitle: 'স্কুল ও কলেজ পর্যায়ের আবশ্যিক ১০০ নম্বরের পূর্ণাঙ্গ প্রস্তুতি',
-    category: 'general',
-    badge: 'জেনারেল',
-    badgeSub: 'আবশ্যিক বিষয়',
-    price: '৯৫০',
-    accentColor: 'purple',
-    enrolledCount: '৭৫০',
-    classesCount: 55,
-    sheetsCount: 40,
-    examsCount: 25,
-    topics: ['বাংলা ব্যাকরণ ও সাহিত্য', 'ইংরেজি গ্রামার ও ভোকাবুলারি', 'পাটিগণিত, বীজগণিত ও জ্যামিতি', 'বাংলাদেশ ও আন্তর্জাতিক বিষয়াবলি', 'সাম্প্রতিক তথ্য ও মডেল টেস্ট'],
-    instructor: 'বিশেষজ্ঞ জেনারেল শিক্ষক প্যানেল'
-  }
-];
+const INITIAL_COURSES: CourseModule[] = [];
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({
   questions = [],

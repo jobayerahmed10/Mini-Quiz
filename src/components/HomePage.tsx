@@ -131,27 +131,8 @@ export const HomePage: React.FC<HomePageProps> = ({
     });
   }, []);
 
-  // Preset fallback live exams to exactly match the design
-  const defaultLiveExams = [
-    {
-      id: 'exam-bangla-live',
-      title: 'বাংলা',
-      category: 'সাধারণ ও মাদ্রাসা কারিকুলাম',
-      question_count: 2,
-      time_minutes: 2,
-      examinee_count: '০+',
-      subject: 'বাংলা সাহিত্য ও ব্যাকরণ',
-    },
-    {
-      id: 'exam-english-live',
-      title: 'ইংরেজি মডেল টেস্ট',
-      category: 'সাধারণ ও মাদ্রাসা কারিকুলাম',
-      question_count: 10,
-      time_minutes: 5,
-      examinee_count: '০+',
-      subject: 'English Language & Literature',
-    }
-  ];
+  // Preset fallback live exams
+  const defaultLiveExams: any[] = [];
 
   // Filter out any exam that the student has already taken; display at most 5 new exams
   const allLiveExams = exams.length > 0 ? exams : defaultLiveExams;

@@ -1,5 +1,6 @@
 export interface Question {
   id: string | number;
+  slug?: string | null;
   question: string;
   option_a: string;
   option_b: string;
@@ -62,7 +63,7 @@ export interface QuizResult {
 
 export type TabRoute = 'home' | 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';
 
-export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard' | 'profile';
+export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard' | 'profile' | 'question_detail';
 
 export interface CourseRoutineItem {
   id?: string;
