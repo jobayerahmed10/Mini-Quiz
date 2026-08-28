@@ -37,6 +37,7 @@ export const SupabaseInfoModal: React.FC<SupabaseInfoModalProps> = ({ isOpen, on
 -- ==========================================
 CREATE TABLE IF NOT EXISTS public.questions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  exam_id TEXT,
   question TEXT NOT NULL,
   option_a TEXT NOT NULL,
   option_b TEXT NOT NULL,
@@ -49,6 +50,9 @@ CREATE TABLE IF NOT EXISTS public.questions (
   status TEXT DEFAULT 'published',
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 기존 questions টেবিল থাকলে exam_id কলাম যোগ করার কমান্ড:
+ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS exam_id TEXT;
 
 ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
 

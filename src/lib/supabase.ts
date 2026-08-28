@@ -145,9 +145,9 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     }
   } catch {}
 
-  // If no cache yet, provide SAMPLE_QUESTIONS so mobile data / offline users immediately see questions
-  if (cachedQuestions.length === 0 && Array.isArray(SAMPLE_QUESTIONS) && SAMPLE_QUESTIONS.length > 0) {
-    cachedQuestions = SAMPLE_QUESTIONS;
+  // Clean cache by removing any legacy sample questions
+  if (cachedQuestions.length > 0) {
+    cachedQuestions = cachedQuestions.filter((q: any) => q && !String(q.id).startsWith('sample-'));
   }
 
   if (!supabaseInstance) {
@@ -178,8 +178,11 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     }
 
     if (!data || data.length === 0) {
+      try {
+        localStorage.setItem('miniquiz_questions_cache', JSON.stringify([]));
+      } catch {}
       return {
-        questions: cachedQuestions,
+        questions: [],
         isFromSupabase: true,
         error: null,
       };
@@ -473,6 +476,98 @@ export interface NewQuestionInput {
   topic?: string;
   explanation?: string;
   status?: string;
+  exam_id?: string;
+}
+
+/**
+ * Fetches questions strictly matching a specific exam_id from Supabase 'public.questions' table
+ * Standard call required by spec: supabase.from('questions').select('*').eq('exam_id', examId)
+ */
+export async function fetchQuestionsByExamId(examId: string): Promise<Question[]> {
+  if (!supabaseInstance || !examId) return [];
+
+  const cleanExamId = String(examId).trim();
+  try {
+    // 1. Mandatory query by exam_id: supabase.from('questions').select('*').eq('exam_id', examId)
+    const { data, error } = await supabaseInstance
+      .from('questions')
+      .select('*')
+      .eq('exam_id', cleanExamId)
+      .order('created_at', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      return data
+        .filter((item: any) => item && item.status !== 'draft')
+        .map((item: any) => ({
+          id: String(item.id),
+          question: String(item.question || ''),
+          option_a: String(item.option_a || ''),
+          option_b: String(item.option_b || ''),
+          option_c: String(item.option_c || ''),
+          option_d: String(item.option_d || ''),
+          correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+          explanation: item.explanation ? String(item.explanation) : undefined,
+          subject: item.subject ? String(item.subject) : 'সকল বিষয়',
+          topic: item.topic ? String(item.topic) : undefined,
+          status: item.status || 'published',
+          exam_id: item.exam_id ? String(item.exam_id) : cleanExamId,
+          created_at: item.created_at || new Date().toISOString(),
+        }));
+    }
+
+    // 2. Also check if the exam record in 'exams' table contains explicit question_ids
+    const { data: examItem } = await supabaseInstance
+      .from('exams')
+      .select('question_ids')
+      .eq('id', cleanExamId)
+      .single();
+
+    if (examItem && examItem.question_ids) {
+      let qIds: string[] = [];
+      if (Array.isArray(examItem.question_ids)) {
+        qIds = examItem.question_ids.map((v: any) => String(v).trim());
+      } else if (typeof examItem.question_ids === 'string') {
+        try {
+          const parsed = JSON.parse(examItem.question_ids);
+          if (Array.isArray(parsed)) qIds = parsed.map((v: any) => String(v).trim());
+        } catch {
+          qIds = examItem.question_ids.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+      }
+
+      if (qIds.length > 0) {
+        const { data: qData, error: qErr } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('id', qIds);
+
+        if (!qErr && qData && qData.length > 0) {
+          return qData
+            .filter((item: any) => item && item.status !== 'draft')
+            .map((item: any) => ({
+              id: String(item.id),
+              question: String(item.question || ''),
+              option_a: String(item.option_a || ''),
+              option_b: String(item.option_b || ''),
+              option_c: String(item.option_c || ''),
+              option_d: String(item.option_d || ''),
+              correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+              explanation: item.explanation ? String(item.explanation) : undefined,
+              subject: item.subject ? String(item.subject) : 'সকল বিষয়',
+              topic: item.topic ? String(item.topic) : undefined,
+              status: item.status || 'published',
+              exam_id: item.exam_id ? String(item.exam_id) : cleanExamId,
+              created_at: item.created_at || new Date().toISOString(),
+            }));
+        }
+      }
+    }
+
+    return [];
+  } catch (err) {
+    console.error('Error in fetchQuestionsByExamId:', cleanExamId, err);
+    return [];
+  }
 }
 
 /**
@@ -482,12 +577,12 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
   if (!supabaseInstance) {
     return {
       success: false,
-      error: 'Supabase সংযোগ নেই। ডেমো মোডে নতুন প্রশ্ন যুক্ত হচ্ছে।',
+      error: 'Supabase সংযোগ নেই।',
     };
   }
 
   try {
-    const newRecord = {
+    const newRecord: any = {
       question: input.question.trim(),
       option_a: input.option_a.trim(),
       option_b: input.option_b.trim(),
@@ -500,6 +595,10 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       status: input.status || 'published',
       created_at: new Date().toISOString(),
     };
+
+    if (input.exam_id && input.exam_id.trim() !== '') {
+      newRecord.exam_id = input.exam_id.trim();
+    }
 
     const { data, error } = await supabaseInstance
       .from('questions')
@@ -529,6 +628,7 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
         subject: data.subject,
         topic: data.topic,
         status: data.status,
+        exam_id: data.exam_id ? String(data.exam_id) : undefined,
         created_at: data.created_at,
       },
     };

@@ -9,6 +9,7 @@ import {
 import { Question, UserAnswer } from '../types';
 import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText, isArabicText, isFullyArabic } from '../lib/utils';
 import { detectQuestionSubject } from '../lib/subjects';
+import { fetchQuestionsByExamId } from '../lib/supabase';
 
 interface PracticePageProps {
   questions: Question[];
@@ -53,7 +54,19 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     
     // Tier -1: Explicit exam matching by examId or admin question_ids (highest priority)
     if (targetExamId && targetExamId !== 'general') {
-      // First, check if the exam itself defined an explicit list of question_ids in local storage cache
+      // 1. Check if questions in rawPool have exam_id attached matching targetExamId
+      const explicitMatches = rawPool.filter(q => 
+        q.exam_id && (
+          String(q.exam_id).trim() === String(targetExamId).trim() ||
+          String(q.exam_id).toLowerCase().includes(String(targetExamId).toLowerCase()) ||
+          String(targetExamId).toLowerCase().includes(String(q.exam_id).toLowerCase())
+        )
+      );
+      if (explicitMatches.length > 0) {
+        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
+      }
+
+      // 2. Check if the exam record defined question_ids in local storage cache
       try {
         const rawExams = localStorage.getItem('miniquiz_exams_cache');
         if (rawExams) {
@@ -88,17 +101,8 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         }
       } catch (e) {}
 
-      // Check if questions themselves have the exam_id attached
-      const explicitMatches = rawPool.filter(q => 
-        q.exam_id && (
-          String(q.exam_id).trim() === String(targetExamId).trim() ||
-          String(q.exam_id).toLowerCase().includes(String(targetExamId).toLowerCase()) ||
-          String(targetExamId).toLowerCase().includes(String(q.exam_id).toLowerCase())
-        )
-      );
-      if (explicitMatches.length > 0) {
-        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
-      }
+      // Mandatory requirement: If a specific exam_id is provided, DO NOT fall back to dummy/random pool! Return []
+      return [];
     }
 
     if ((!subj || subj === 'all' || subj === 'সকল বিষয়') && !topic) {
@@ -122,66 +126,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       }
     }
 
-    // Stream-based matching for the special exam post buttons
-    const sLower = subj.toLowerCase();
-    let streamMatches: Question[] = [];
-
-    if (sLower.includes('আরবি প্রভাষক') || (sLower.includes('প্রভাষক') && sLower.includes('আরবি'))) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('আরবি') || text.includes('নাহু') || text.includes('সরফ') || 
-               text.includes('বালাগাত') || text.includes('সাহিত্য') || text.includes('তাফসির') || 
-               text.includes('হাদিস') || text.includes('ফিকহ') || text.includes('উসুল');
-      });
-    } else if (sLower.includes('সহকারী মৌলভী ক্বারী') || (sLower.includes('মৌলভী') && sLower.includes('কারী'))) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('তাজবীদ') || text.includes('ক্বিরাআত') || text.includes('কুরআন') || 
-               text.includes('মাখরাজ') || text.includes('সিফাত') || text.includes('হাদিস') || 
-               text.includes('ফিকহ') || text.includes('আরবি');
-      });
-    } else if (sLower.includes('সহকারী মৌলভী')) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('কুরআন') || text.includes('তাফসির') || text.includes('হাদিস') || 
-               text.includes('ফিকহ') || text.includes('আরবি') || text.includes('নাহু') || 
-               text.includes('আকিদা') || text.includes('ইতিহাস');
-      });
-    } else if (sLower.includes('ইবতেদায়ি মৌলভী') || sLower.includes('ইবতেদায়ী মৌলভী')) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('কুরআন') || text.includes('হাদিস') || text.includes('ফিকহ') || 
-               text.includes('আকিদা') || text.includes('আরবি') || text.includes('দ্বীনিয়্যাত');
-      });
-    } else if (sLower.includes('ইবতেদায়ি কারী') || sLower.includes('ইবতেদায়ী কারী') || sLower.includes('কারী')) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('তাজবীদ') || text.includes('ক্বিরাআত') || text.includes('কুরআন') || 
-               text.includes('মাখরাজ') || text.includes('সিফাত') || text.includes('হাদিস') || 
-               text.includes('ফিকহ');
-      });
-    } else if (sLower.includes('গ্রামার') || sLower.includes('grammar') || sLower.includes('নাহু') || sLower.includes('সরফ')) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('নাহু') || text.includes('সরফ') || text.includes('গ্রামার') || 
-               text.includes('ব্যাকরণ') || text.includes('ইবরাব') || text.includes('তারকীব') || 
-               text.includes('সিগাহ') || text.includes('বালাগাত');
-      });
-    } else if (sLower.includes('জেনারেল') || sLower.includes('সাধারণ')) {
-      streamMatches = rawPool.filter((q) => {
-        const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-        return text.includes('বাংলা') || text.includes('ইংরেজি') || text.includes('english') || 
-               text.includes('গণিত') || text.includes('মানসিক') || text.includes('বাংলাদেশ') || 
-               text.includes('আন্তর্জাতিক') || text.includes('আইসিটি') || text.includes('কম্পিউটার') || 
-               text.includes('বিজ্ঞান');
-      });
-    }
-
-    if (streamMatches.length > 0) {
-      return count && count > 0 && streamMatches.length > count ? streamMatches.slice(0, count) : streamMatches;
-    }
-
-    // Tier 1: Direct subject match
+    // Direct subject match
     const directMatches = rawPool.filter((q) => {
       if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
         return true;
@@ -194,39 +139,39 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       return count && count > 0 && directMatches.length > count ? directMatches.slice(0, count) : directMatches;
     }
 
-    // Tier 2: Keyword match
-    const keywords = subj
-      .replace(/[\(\)（）\[\]\-\_\,\.\/]/g, ' ')
-      .split(/\s+/)
-      .filter((k) => k.trim().length > 1);
-
-    const keywordMatches = rawPool.filter((q) => {
-      const combined = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
-      return keywords.some((k) => combined.includes(k.toLowerCase()));
-    });
-
-    if (keywordMatches.length > 0) {
-      return count && count > 0 && keywordMatches.length > count ? keywordMatches.slice(0, count) : keywordMatches;
-    }
-
-    // Tier 3: Fallback to all questions
-    return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
+    return [];
   };
 
-  // Lock exam questions on session mount so background Supabase updates don't wipe active exam
+  // Lock exam questions on session mount
   const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
     return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount, examId);
   });
 
-  // Re-sync exam questions if questions or examId changes
+  // Re-sync exam questions directly from Supabase by examId if provided, or from questions pool
   useEffect(() => {
-    if (questions && questions.length > 0) {
+    let isMounted = true;
+    if (examId && examId !== 'general') {
+      fetchQuestionsByExamId(examId).then((fetchedFromDb) => {
+        if (!isMounted) return;
+        if (fetchedFromDb && fetchedFromDb.length > 0) {
+          setExamQuestions(fetchedFromDb);
+        } else {
+          const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+          setExamQuestions(resolved);
+        }
+      }).catch(() => {
+        if (!isMounted) return;
+        const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+        setExamQuestions(resolved);
+      });
+    } else {
       const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
       setExamQuestions(resolved);
     }
+    return () => { isMounted = false; };
   }, [questions, activeSubject, activeTopic, targetQuestionCount, examId]);
 
-  const filteredQuestions = examQuestions && examQuestions.length > 0 ? examQuestions : getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+  const filteredQuestions = examQuestions;
   const totalQuestions = filteredQuestions.length;
   const answeredCount = Object.keys(userSelections).length;
   const unansweredCount = totalQuestions - answeredCount;

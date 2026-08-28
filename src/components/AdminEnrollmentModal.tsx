@@ -19,7 +19,10 @@ import {
   SlidersHorizontal,
   Mail,
   Calendar,
-  Key
+  Key,
+  PlusCircle,
+  HelpCircle,
+  Save
 } from 'lucide-react';
 import { CourseEnrollmentRecord } from '../types';
 import {
@@ -27,7 +30,10 @@ import {
   updateEnrollmentStatusInSupabase,
   deleteEnrollmentFromSupabase,
   submitEnrollmentToSupabase,
-  fetchAllRegisteredUsers
+  fetchAllRegisteredUsers,
+  addQuestionToSupabase,
+  fetchExamsFromSupabase,
+  ExamItem
 } from '../lib/supabase';
 import { setUserPremium, toBengaliNumeral } from '../lib/utils';
 
@@ -42,7 +48,7 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
   onClose,
   onStatusUpdated
 }) => {
-  const [activeMainTab, setActiveMainTab] = useState<'applications' | 'users'>('applications');
+  const [activeMainTab, setActiveMainTab] = useState<'applications' | 'users' | 'questions'>('applications');
   const [applications, setApplications] = useState<CourseEnrollmentRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<Array<{
     id: string;
@@ -54,6 +60,21 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
     avatarUrl?: string;
     role?: string;
   }>>([]);
+
+  // Question Form State
+  const [availableExams, setAvailableExams] = useState<ExamItem[]>([]);
+  const [qExamId, setQExamId] = useState<string>('');
+  const [customExamId, setCustomExamId] = useState<string>('');
+  const [qSubject, setQSubject] = useState<string>('সকল বিষয়');
+  const [qQuestion, setQQuestion] = useState<string>('');
+  const [qOptionA, setQOptionA] = useState<string>('');
+  const [qOptionB, setQOptionB] = useState<string>('');
+  const [qOptionC, setQOptionC] = useState<string>('');
+  const [qOptionD, setQOptionD] = useState<string>('');
+  const [qCorrect, setQCorrect] = useState<'option_a' | 'option_b' | 'option_c' | 'option_d'>('option_a');
+  const [qExplanation, setQExplanation] = useState<string>('');
+  const [isSubmittingQ, setIsSubmittingQ] = useState<boolean>(false);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -94,12 +115,68 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
       // 2. Load registered student accounts
       const usersRes = await fetchAllRegisteredUsers();
       setRegisteredUsers(usersRes.users || []);
+
+      // 3. Load exams for question assignment
+      const examsRes = await fetchExamsFromSupabase();
+      if (examsRes.exams && examsRes.exams.length > 0) {
+        setAvailableExams(examsRes.exams);
+        if (!qExamId) {
+          setQExamId(String(examsRes.exams[0].id));
+        }
+      }
     } catch (err) {
       console.error('Error loading applications/users for admin:', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [qExamId]);
+
+  const handleAddQuestionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qQuestion.trim() || !qOptionA.trim() || !qOptionB.trim()) {
+      showToast('⚠️ প্রশ্ন এবং অন্তত অপশন ক ও খ পূরণ করুন।');
+      return;
+    }
+
+    const finalExamId = qExamId === 'custom' ? customExamId.trim() : qExamId.trim();
+    if (!finalExamId) {
+      showToast('⚠️ একটি পরীক্ষা (Exam ID) নির্বাচন করুন বা আইডি লিখুন।');
+      return;
+    }
+
+    setIsSubmittingQ(true);
+    try {
+      const res = await addQuestionToSupabase({
+        question: qQuestion,
+        option_a: qOptionA,
+        option_b: qOptionB,
+        option_c: qOptionC || '',
+        option_d: qOptionD || '',
+        correct_answer: qCorrect,
+        subject: qSubject,
+        explanation: qExplanation,
+        exam_id: finalExamId,
+        status: 'published'
+      });
+
+      if (res.success) {
+        showToast(`✅ প্রশ্ন সফলভাবে সেভ হয়েছে! (Exam ID: ${finalExamId})`);
+        setQQuestion('');
+        setQOptionA('');
+        setQOptionB('');
+        setQOptionC('');
+        setQOptionD('');
+        setQExplanation('');
+        onStatusUpdated?.();
+      } else {
+        showToast(`❌ ${res.error || 'প্রশ্ন যোগ করা সম্ভব হয়নি'}`);
+      }
+    } catch (err) {
+      showToast('❌ প্রশ্ন যুক্ত করতে ত্রুটি ঘটেছে');
+    } finally {
+      setIsSubmittingQ(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -272,18 +349,18 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
           </div>
         </div>
 
-        {/* Primary Tabs (Applications vs Registered Users) */}
-        <div className="flex border-b border-emerald-700/20 bg-emerald-950/10 dark:bg-emerald-950/30 p-1.5 gap-1.5 shrink-0">
+        {/* Primary Tabs (Applications vs Registered Users vs Add Questions) */}
+        <div className="flex border-b border-emerald-700/20 bg-emerald-950/10 dark:bg-emerald-950/30 p-1.5 gap-1.5 shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveMainTab('applications')}
-            className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2 px-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
               activeMainTab === 'applications'
                 ? 'bg-[#046A38] text-white shadow-md'
                 : 'text-slate-700 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/40'
             }`}
           >
             <BookOpen className="w-4 h-4" />
-            <span>ভর্তি ও পেমেন্ট আবেদন ({toBengaliNumeral(applications.length)})</span>
+            <span>আবেদন ({toBengaliNumeral(applications.length)})</span>
             {pendingCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             )}
@@ -291,14 +368,26 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
 
           <button
             onClick={() => setActiveMainTab('users')}
-            className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2 px-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
               activeMainTab === 'users'
                 ? 'bg-[#046A38] text-white shadow-md'
                 : 'text-slate-700 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/40'
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>নিবন্ধিত শিক্ষার্থী তালিকা ({toBengaliNumeral(registeredUsers.length)})</span>
+            <span>শিক্ষার্থী ({toBengaliNumeral(registeredUsers.length)})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab('questions')}
+            className={`flex-1 py-2 px-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+              activeMainTab === 'questions'
+                ? 'bg-[#046A38] text-white shadow-md'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/40'
+            }`}
+          >
+            <PlusCircle className="w-4 h-4 text-amber-300" />
+            <span>নতুন প্রশ্ন যুক্তকরণ</span>
           </button>
         </div>
 
@@ -660,6 +749,179 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                 ))
             )}
           </div>
+        )}
+
+        {/* ================================================================== */}
+        {/* TAB 3: ADD NEW QUESTION WITH EXAM_ID                              */}
+        {/* ================================================================== */}
+        {activeMainTab === 'questions' && (
+          <form onSubmit={handleAddQuestionSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+              <HelpCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">এডমিন নির্দেশিকা:</span> এডমিন প্যানেল থেকে যেকোনো পরীক্ষায় (Exam ID) প্রশ্ন যুক্ত করলে তা সঙ্গে সঙ্গেই উক্ত পরীক্ষার জন্য Supabase `questions` টেবিলে সেভ হয়ে যাবে এবং মূল অ্যাপে দেখাবে।
+              </div>
+            </div>
+
+            {/* Exam Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                পরীক্ষা নির্বাচন করুন (Exam ID):
+              </label>
+              <select
+                value={qExamId}
+                onChange={(e) => setQExamId(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500"
+              >
+                {availableExams.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.title} (ID: {ex.id})
+                  </option>
+                ))}
+                <option value="custom">✏️ ম্যানুয়াল Exam ID লিখুন...</option>
+              </select>
+            </div>
+
+            {qExamId === 'custom' && (
+              <div className="space-y-1.5 animate-fade-in">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  কাস্টম Exam ID:
+                </label>
+                <input
+                  type="text"
+                  placeholder="যেমন: exam-bangla-101"
+                  value={customExamId}
+                  onChange={(e) => setCustomExamId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            )}
+
+            {/* Subject Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                বিষয় (Subject):
+              </label>
+              <input
+                type="text"
+                placeholder="যেমন: বাংলা, আরবি ব্যাকরণ, সাধারণ জ্ঞান"
+                value={qSubject}
+                onChange={(e) => setQSubject(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Question Text */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                প্রশ্ন (Question):
+              </label>
+              <textarea
+                rows={3}
+                placeholder="প্রশ্নের মূল বক্তব্য লিখুন..."
+                value={qQuestion}
+                onChange={(e) => setQQuestion(e.target.value)}
+                required
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Options grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">অপশন ক (A):</label>
+                <input
+                  type="text"
+                  placeholder="অপশন ক"
+                  value={qOptionA}
+                  onChange={(e) => setQOptionA(e.target.value)}
+                  required
+                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">অপশন খ (B):</label>
+                <input
+                  type="text"
+                  placeholder="অপশন খ"
+                  value={qOptionB}
+                  onChange={(e) => setQOptionB(e.target.value)}
+                  required
+                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">অপশন গ (C):</label>
+                <input
+                  type="text"
+                  placeholder="অপশন গ"
+                  value={qOptionC}
+                  onChange={(e) => setQOptionC(e.target.value)}
+                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">অপশন ঘ (D):</label>
+                <input
+                  type="text"
+                  placeholder="অপশন ঘ"
+                  value={qOptionD}
+                  onChange={(e) => setQOptionD(e.target.value)}
+                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+                />
+              </div>
+            </div>
+
+            {/* Correct Answer */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                সঠিক উত্তর (Correct Option):
+              </label>
+              <select
+                value={qCorrect}
+                onChange={(e) => setQCorrect(e.target.value as any)}
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-200"
+              >
+                <option value="option_a">ক (Option A)</option>
+                <option value="option_b">খ (Option B)</option>
+                <option value="option_c">গ (Option C)</option>
+                <option value="option_d">ঘ (Option D)</option>
+              </select>
+            </div>
+
+            {/* Explanation */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                ব্যাখ্যা (Explanation - Optional):
+              </label>
+              <textarea
+                rows={2}
+                placeholder="সঠিক উত্তরের ব্যাখ্যা লিখুন..."
+                value={qExplanation}
+                onChange={(e) => setQExplanation(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+              />
+            </div>
+
+            {/* Save Button */}
+            <button
+              type="submit"
+              disabled={isSubmittingQ}
+              className="w-full py-3 bg-[#046A38] hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSubmittingQ ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>সেভ হচ্ছে...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 text-amber-300" />
+                  <span>সরাসরি Supabase-এ প্রশ্ন সেভ করুন</span>
+                </>
+              )}
+            </button>
+          </form>
         )}
 
         {/* Footer */}
