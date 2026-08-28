@@ -18,6 +18,7 @@ interface PracticePageProps {
   targetQuestionCount?: number;
   timeMinutes?: number;
   examId?: string;
+  examTitle?: string;
   onFinishQuiz: (userAnswers: UserAnswer[], timeTakenSeconds?: number) => void;
   onNavigateHome: () => void;
   showHarakat?: boolean;
@@ -30,6 +31,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   targetQuestionCount,
   timeMinutes = 30,
   examId,
+  examTitle,
   onFinishQuiz,
   onNavigateHome,
   showHarakat = true,
@@ -54,52 +56,73 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     
     // Tier -1: Explicit exam matching by examId or admin question_ids (highest priority)
     if (targetExamId && targetExamId !== 'general') {
-      // 1. Check if questions in rawPool have exam_id attached matching targetExamId
-      const explicitMatches = rawPool.filter(q => 
-        q.exam_id && (
-          String(q.exam_id).trim() === String(targetExamId).trim() ||
-          String(q.exam_id).toLowerCase().includes(String(targetExamId).toLowerCase()) ||
-          String(targetExamId).toLowerCase().includes(String(q.exam_id).toLowerCase())
-        )
-      );
-      if (explicitMatches.length > 0) {
-        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
+      let candidateKeys = [String(targetExamId).trim().toLowerCase()];
+      if (examTitle && examTitle.trim()) {
+        candidateKeys.push(examTitle.trim().toLowerCase());
+      }
+      if (subj && subj !== 'all' && subj !== 'সকল বিষয়') {
+        candidateKeys.push(subj.trim().toLowerCase());
       }
 
-      // 2. Check if the exam record defined question_ids in local storage cache
       try {
         const rawExams = localStorage.getItem('miniquiz_exams_cache');
         if (rawExams) {
           const examsCache = JSON.parse(rawExams);
           const thisExam = examsCache.find((e: any) => 
-            String(e.id).trim() === String(targetExamId).trim() || 
+            String(e.id).trim().toLowerCase() === String(targetExamId).trim().toLowerCase() || 
             (e.title && String(e.title).trim().toLowerCase() === String(targetExamId).trim().toLowerCase())
           );
-          if (thisExam && thisExam.question_ids) {
-            let qIds: string[] = [];
-            if (Array.isArray(thisExam.question_ids)) {
-              qIds = thisExam.question_ids.map((v: any) => String(v).trim());
-            } else if (typeof thisExam.question_ids === 'string') {
-              const trimmed = thisExam.question_ids.trim();
-              if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                try {
-                  const parsed = JSON.parse(trimmed);
-                  if (Array.isArray(parsed)) qIds = parsed.map((v: any) => String(v).trim());
-                } catch {}
+          if (thisExam) {
+            if (thisExam.id) candidateKeys.push(String(thisExam.id).trim().toLowerCase());
+            if (thisExam.title) candidateKeys.push(String(thisExam.title).trim().toLowerCase());
+            if (thisExam.subject) candidateKeys.push(String(thisExam.subject).trim().toLowerCase());
+
+            if (thisExam.question_ids) {
+              let qIds: string[] = [];
+              if (Array.isArray(thisExam.question_ids)) {
+                qIds = thisExam.question_ids.map((v: any) => String(v).trim());
+              } else if (typeof thisExam.question_ids === 'string') {
+                const trimmed = thisExam.question_ids.trim();
+                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                  try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) qIds = parsed.map((v: any) => String(v).trim());
+                  } catch {}
+                }
+                if (qIds.length === 0) {
+                  qIds = trimmed.split(',').map((s: string) => s.trim());
+                }
               }
-              if (qIds.length === 0) {
-                qIds = trimmed.split(',').map((s: string) => s.trim());
-              }
-            }
-            if (qIds.length > 0) {
-              const exactMatches = rawPool.filter(q => qIds.includes(String(q.id).trim()));
-              if (exactMatches.length > 0) {
-                return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+              if (qIds.length > 0) {
+                const exactMatches = rawPool.filter(q => qIds.includes(String(q.id).trim()));
+                if (exactMatches.length > 0) {
+                  return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+                }
               }
             }
           }
         }
       } catch (e) {}
+
+      // 1. Check if questions in rawPool have exam_id or subject attached matching targetExamId or exam details
+      const explicitMatches = rawPool.filter(q => {
+        if (!q) return false;
+        const qExamId = String(q.exam_id || '').trim().toLowerCase();
+        const qSubj = String(q.subject || '').trim().toLowerCase();
+        if (!qExamId && !qSubj) return false;
+
+        return candidateKeys.some(key => {
+          if (!key) return false;
+          return (
+            (qExamId && (qExamId === key || qExamId.includes(key) || key.includes(qExamId))) ||
+            (qSubj && key.length > 3 && (qSubj === key || qSubj.includes(key) || key.includes(qSubj)))
+          );
+        });
+      });
+
+      if (explicitMatches.length > 0) {
+        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
+      }
 
       // Mandatory requirement: If a specific exam_id is provided, DO NOT fall back to dummy/random pool! Return []
       return [];

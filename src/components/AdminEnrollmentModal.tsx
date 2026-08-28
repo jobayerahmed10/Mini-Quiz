@@ -765,9 +765,20 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
 
             {/* Exam Selector */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                পরীক্ষা নির্বাচন করুন (Exam ID):
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  পরীক্ষা নির্বাচন করুন (Exam ID):
+                </label>
+                <button
+                  type="button"
+                  onClick={loadAllData}
+                  className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
+                  title="পরীক্ষা তালিকা রিফ্রেশ করুন"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>রিফ্রেশ</span>
+                </button>
+              </div>
               <select
                 value={qExamId}
                 onChange={(e) => setQExamId(e.target.value)}
@@ -778,7 +789,7 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                     {ex.title} (ID: {ex.id})
                   </option>
                 ))}
-                <option value="custom">✏️ ম্যানুয়াল Exam ID লিখুন...</option>
+                <option value="custom">✏️ ম্যানুয়াল Exam ID / শিরোনাম লিখুন...</option>
               </select>
             </div>
 
