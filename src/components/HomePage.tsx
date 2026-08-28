@@ -158,7 +158,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   // Calculate stats
-  const totalQuestionsCount = questions.length > 0 ? questions.length : 449;
+  const totalQuestionsCount = questions.length;
   const practicedCount = studentStats?.totalAnswered || studentStats?.totalAnsweredQuestions || 0;
 
   return (
