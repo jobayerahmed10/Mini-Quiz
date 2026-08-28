@@ -411,6 +411,14 @@ export async function addExamToSupabase(input: Omit<ExamItem, 'id'>): Promise<{ 
       };
     }
 
+    try {
+      localStorage.removeItem('miniquiz_exams_cache');
+      localStorage.removeItem('miniquiz_questions_cache');
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('tamreen_data_changed'));
+    }
+
     return {
       success: true,
       data: {
@@ -491,17 +499,25 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
   if (!supabaseInstance || !examId) return [];
 
   const cleanExamId = String(examId).trim();
+  if (!cleanExamId) return [];
+
   try {
-    const matchedIds = new Set<string>([cleanExamId]);
-    if (examTitle && examTitle.trim()) matchedIds.add(examTitle.trim());
-    if (examSubject && examSubject.trim()) matchedIds.add(examSubject.trim());
+    let rawQuestions: any[] = [];
 
-    let explicitQIds: string[] = [];
-    let targetSubject = examSubject?.trim() || '';
+    // 1. Strict primary foreign key query: supabase.from('questions').select('*').eq('exam_id', cleanExamId)
+    const { data: directData, error: directErr } = await supabaseInstance
+      .from('questions')
+      .select('*')
+      .eq('exam_id', cleanExamId)
+      .order('created_at', { ascending: true });
 
-    // 1. Gather all possible exam identifiers (id, title, subject, question_ids) from 'public.exams' safely
-    try {
-      let examQuery = supabaseInstance.from('exams').select('id, title, subject, question_ids');
+    if (!directErr && directData && directData.length > 0) {
+      rawQuestions = directData;
+    }
+
+    // 2. If direct match by text/id returned 0, check linked records in 'exams' table
+    if (rawQuestions.length === 0) {
+      let examQuery = supabaseInstance.from('exams').select('id, title, question_ids');
       if (isUuidString(cleanExamId)) {
         examQuery = examQuery.eq('id', cleanExamId);
       } else {
@@ -510,13 +526,12 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
 
       const { data: examData } = await examQuery;
       if (examData && examData.length > 0) {
+        let explicitQIds: string[] = [];
+        const additionalExamKeys: string[] = [];
+
         examData.forEach((e: any) => {
-          if (e.id) matchedIds.add(String(e.id).trim());
-          if (e.title) matchedIds.add(String(e.title).trim());
-          if (e.subject) {
-            matchedIds.add(String(e.subject).trim());
-            if (!targetSubject) targetSubject = String(e.subject).trim();
-          }
+          if (e.id) additionalExamKeys.push(String(e.id).trim());
+          if (e.title) additionalExamKeys.push(String(e.title).trim());
           if (e.question_ids) {
             if (Array.isArray(e.question_ids)) {
               e.question_ids.forEach((v: any) => { if (v) explicitQIds.push(String(v).trim()); });
@@ -532,127 +547,60 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
             }
           }
         });
-      }
-    } catch (eErr) {
-      console.warn('Notice loading exam metadata:', eErr);
-    }
 
-    const candidateExamIds = Array.from(matchedIds).filter(Boolean);
+        // Try querying questions matching linked exam keys
+        const uniqueExamKeys = Array.from(new Set(additionalExamKeys)).filter(Boolean);
+        if (uniqueExamKeys.length > 0) {
+          const { data: byKeysData } = await supabaseInstance
+            .from('questions')
+            .select('*')
+            .in('exam_id', uniqueExamKeys)
+            .order('created_at', { ascending: true });
 
-    // 2. Query 'questions' table
-    let finalQuestions: any[] = [];
+          if (byKeysData && byKeysData.length > 0) {
+            rawQuestions = byKeysData;
+          }
+        }
 
-    // A. Explicit question IDs on exam
-    if (explicitQIds.length > 0) {
-      const uuidQIds = explicitQIds.filter(isUuidString);
-      const strQIds = explicitQIds.filter((id) => !isUuidString(id));
+        // Try querying questions matching explicit question_ids
+        if (rawQuestions.length === 0 && explicitQIds.length > 0) {
+          const uniqueQIds = Array.from(new Set(explicitQIds)).filter(Boolean);
+          const { data: byQIdsData } = await supabaseInstance
+            .from('questions')
+            .select('*')
+            .in('id', uniqueQIds)
+            .order('created_at', { ascending: true });
 
-      if (uuidQIds.length > 0) {
-        const { data: qData } = await supabaseInstance.from('questions').select('*').in('id', uuidQIds);
-        if (qData) finalQuestions.push(...qData);
-      }
-      if (strQIds.length > 0) {
-        const { data: qData } = await supabaseInstance.from('questions').select('*').in('id', strQIds);
-        if (qData) {
-          qData.forEach((item) => {
-            if (!finalQuestions.some((q) => String(q.id) === String(item.id))) {
-              finalQuestions.push(item);
-            }
-          });
+          if (byQIdsData && byQIdsData.length > 0) {
+            rawQuestions = byQIdsData;
+          }
         }
       }
     }
 
-    // B. Match by candidate exam_ids
-    if (finalQuestions.length === 0) {
-      const uuidExamIds = candidateExamIds.filter(isUuidString);
-      const strExamIds = candidateExamIds.filter((id) => !isUuidString(id));
-
-      if (uuidExamIds.length > 0) {
-        const { data: uuidData } = await supabaseInstance
-          .from('questions')
-          .select('*')
-          .in('exam_id', uuidExamIds)
-          .order('created_at', { ascending: true });
-        if (uuidData && uuidData.length > 0) finalQuestions.push(...uuidData);
-      }
-      if (strExamIds.length > 0) {
-        const { data: strData } = await supabaseInstance
-          .from('questions')
-          .select('*')
-          .in('exam_id', strExamIds)
-          .order('created_at', { ascending: true });
-        if (strData && strData.length > 0) {
-          strData.forEach((item) => {
-            if (!finalQuestions.some((q) => String(q.id) === String(item.id))) {
-              finalQuestions.push(item);
-            }
-          });
-        }
-      }
+    // Return [] if no questions belong to this exam (NO random or subject fallbacks!)
+    if (rawQuestions.length === 0) {
+      return [];
     }
 
-    // C. Match by target subject if exam_id query returned 0
-    if (finalQuestions.length === 0 && targetSubject && targetSubject !== 'all' && targetSubject !== 'সকল বিষয়') {
-      const { data: subjData } = await supabaseInstance
-        .from('questions')
-        .select('*')
-        .eq('subject', targetSubject)
-        .order('created_at', { ascending: true });
-
-      if (subjData && subjData.length > 0) {
-        finalQuestions = subjData;
-      }
-    }
-
-    // D. General fallback: query published questions
-    if (finalQuestions.length === 0) {
-      const { data: allData } = await supabaseInstance
-        .from('questions')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (allData && allData.length > 0) {
-        const filtered = allData.filter((item: any) => {
-          if (!item) return false;
-          const qExamId = String(item.exam_id || '').trim().toLowerCase();
-          const qSubject = String(item.subject || '').trim().toLowerCase();
-
-          return candidateExamIds.some((cand) => {
-            const candLower = cand.toLowerCase();
-            return (
-              (qExamId && (qExamId === candLower || qExamId.includes(candLower) || candLower.includes(qExamId))) ||
-              (qSubject && (qSubject === candLower || qSubject.includes(candLower) || candLower.includes(qSubject)))
-            );
-          });
-        });
-
-        finalQuestions = filtered.length > 0 ? filtered : allData;
-      }
-    }
-
-    if (finalQuestions.length > 0) {
-      return finalQuestions
-        .filter((item: any) => item && item.status !== 'draft')
-        .map((item: any) => ({
-          id: String(item.id),
-          slug: item.slug ? String(item.slug) : String(item.id),
-          question: String(item.question || ''),
-          option_a: String(item.option_a || ''),
-          option_b: String(item.option_b || ''),
-          option_c: String(item.option_c || ''),
-          option_d: String(item.option_d || ''),
-          correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
-          explanation: item.explanation ? String(item.explanation) : undefined,
-          subject: item.subject ? String(item.subject) : 'সকল বিষয়',
-          topic: item.topic ? String(item.topic) : undefined,
-          status: item.status || 'published',
-          exam_id: item.exam_id ? String(item.exam_id) : cleanExamId,
-          created_at: item.created_at || new Date().toISOString(),
-        }));
-    }
-
-    return [];
+    return rawQuestions
+      .filter((item: any) => item && item.status !== 'draft')
+      .map((item: any) => ({
+        id: String(item.id),
+        slug: item.slug ? String(item.slug) : String(item.id),
+        question: String(item.question || ''),
+        option_a: String(item.option_a || ''),
+        option_b: String(item.option_b || ''),
+        option_c: String(item.option_c || ''),
+        option_d: String(item.option_d || ''),
+        correct_answer: (item.correct_answer || 'option_a') as any,
+        explanation: item.explanation ? String(item.explanation) : null,
+        subject: item.subject ? String(item.subject) : null,
+        topic: item.topic ? String(item.topic) : null,
+        status: item.status || 'published',
+        exam_id: item.exam_id ? String(item.exam_id) : null,
+        created_at: item.created_at || new Date().toISOString(),
+      }));
   } catch (err) {
     console.error('Error in fetchQuestionsByExamId:', cleanExamId, err);
     return [];
@@ -787,6 +735,14 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       };
     }
 
+    try {
+      localStorage.removeItem('miniquiz_questions_cache');
+      localStorage.removeItem('miniquiz_exams_cache');
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('tamreen_data_changed'));
+    }
+
     return {
       success: true,
       data: {
@@ -833,6 +789,14 @@ export async function deleteQuestionFromSupabase(id: string | number): Promise<{
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    try {
+      localStorage.removeItem('miniquiz_questions_cache');
+      localStorage.removeItem('miniquiz_exams_cache');
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('tamreen_data_changed'));
     }
 
     return { success: true };
@@ -1983,6 +1947,54 @@ export function subscribeToCoursesTable(onCoursesChange: () => void): () => void
     };
   } catch {
     return () => {};
+  }
+}
+
+/**
+ * Realtime listener for exams and questions database changes
+ */
+export function subscribeToExamsAndQuestionsTable(onDataChange: () => void): () => void {
+  const handleLocalEvent = () => {
+    onDataChange();
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('tamreen_data_changed', handleLocalEvent);
+  }
+
+  if (!supabaseInstance) {
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+      }
+    };
+  }
+
+  try {
+    const channel = supabaseInstance
+      .channel('exams_and_questions_live_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, () => {
+        try { localStorage.removeItem('miniquiz_questions_cache'); } catch {}
+        onDataChange();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => {
+        try { localStorage.removeItem('miniquiz_exams_cache'); } catch {}
+        onDataChange();
+      })
+      .subscribe();
+
+    return () => {
+      supabaseInstance.removeChannel(channel);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+      }
+    };
+  } catch {
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+      }
+    };
   }
 }
 

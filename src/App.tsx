@@ -28,7 +28,8 @@ import {
   supabaseGetSession,
   supabaseGetUser,
   supabaseOnAuthStateChange,
-  syncUserProfileFromSupabase
+  syncUserProfileFromSupabase,
+  subscribeToExamsAndQuestionsTable
 } from './lib/supabase';
 import { 
   getStudentStats, 
@@ -310,6 +311,16 @@ export default function App() {
 
   useEffect(() => {
     loadQuestions();
+  }, [loadQuestions]);
+
+  // Realtime subscribe to database/local changes of exams/questions
+  useEffect(() => {
+    const unsubscribe = subscribeToExamsAndQuestionsTable(() => {
+      loadQuestions();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [loadQuestions]);
 
   // Deep Link support: Auto-detect /q/:slug or ?q=... or ?exam=... in URL

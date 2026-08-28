@@ -171,6 +171,9 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   // Lock exam questions on session mount
   const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
+    if (examId && examId !== 'general') {
+      return []; // Start with empty array to prevent mock/different questions from showing
+    }
     return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount, examId);
   });
 
@@ -186,13 +189,12 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             : fetchedFromDb;
           setExamQuestions(formattedCount);
         } else {
-          const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
-          setExamQuestions(resolved);
+          // Strict requirement: Do NOT fall back to dummy/random pool for specific exams
+          setExamQuestions([]);
         }
       }).catch(() => {
         if (!isMounted) return;
-        const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
-        setExamQuestions(resolved);
+        setExamQuestions([]);
       });
     } else {
       const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);

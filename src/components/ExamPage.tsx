@@ -27,7 +27,7 @@ import {
   Send
 } from 'lucide-react';
 import { Question } from '../types';
-import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase, subscribeToExamsAndQuestionsTable } from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
@@ -143,6 +143,15 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
   useEffect(() => {
     loadExams();
+  }, [loadExams]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToExamsAndQuestionsTable(() => {
+      loadExams();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [loadExams]);
 
   const handleShare = (exam: ExamItem, e: React.MouseEvent) => {
