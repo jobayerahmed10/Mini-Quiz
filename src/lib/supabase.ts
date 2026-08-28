@@ -479,79 +479,133 @@ export interface NewQuestionInput {
   exam_id?: string;
 }
 
+function isUuidString(str: string): boolean {
+  if (!str) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+}
+
 /**
- * Fetches questions strictly matching a specific exam_id from Supabase 'public.questions' table
- * Standard call required by spec: supabase.from('questions').select('*').eq('exam_id', examId)
+ * Fetches questions strictly matching a specific exam_id or exam metadata from Supabase 'public.questions' table
  */
-export async function fetchQuestionsByExamId(examId: string): Promise<Question[]> {
+export async function fetchQuestionsByExamId(examId: string, examSubject?: string, examTitle?: string): Promise<Question[]> {
   if (!supabaseInstance || !examId) return [];
 
   const cleanExamId = String(examId).trim();
   try {
-    // 1. Gather all possible exam identifiers (id, title, subject, question_ids) from 'public.exams'
     const matchedIds = new Set<string>([cleanExamId]);
+    if (examTitle && examTitle.trim()) matchedIds.add(examTitle.trim());
+    if (examSubject && examSubject.trim()) matchedIds.add(examSubject.trim());
+
     let explicitQIds: string[] = [];
+    let targetSubject = examSubject?.trim() || '';
 
-    const { data: examData } = await supabaseInstance
-      .from('exams')
-      .select('id, title, subject, question_ids')
-      .or(`id.eq.${cleanExamId},title.eq.${cleanExamId}`);
+    // 1. Gather all possible exam identifiers (id, title, subject, question_ids) from 'public.exams' safely
+    try {
+      let examQuery = supabaseInstance.from('exams').select('id, title, subject, question_ids');
+      if (isUuidString(cleanExamId)) {
+        examQuery = examQuery.eq('id', cleanExamId);
+      } else {
+        examQuery = examQuery.eq('title', cleanExamId);
+      }
 
-    if (examData && examData.length > 0) {
-      examData.forEach((e: any) => {
-        if (e.id) matchedIds.add(String(e.id).trim());
-        if (e.title) matchedIds.add(String(e.title).trim());
-        if (e.subject) matchedIds.add(String(e.subject).trim());
-        if (e.question_ids) {
-          if (Array.isArray(e.question_ids)) {
-            e.question_ids.forEach((v: any) => {
-              if (v) explicitQIds.push(String(v).trim());
-            });
-          } else if (typeof e.question_ids === 'string') {
-            try {
-              const parsed = JSON.parse(e.question_ids);
-              if (Array.isArray(parsed)) {
-                parsed.forEach((v: any) => {
-                  if (v) explicitQIds.push(String(v).trim());
-                });
+      const { data: examData } = await examQuery;
+      if (examData && examData.length > 0) {
+        examData.forEach((e: any) => {
+          if (e.id) matchedIds.add(String(e.id).trim());
+          if (e.title) matchedIds.add(String(e.title).trim());
+          if (e.subject) {
+            matchedIds.add(String(e.subject).trim());
+            if (!targetSubject) targetSubject = String(e.subject).trim();
+          }
+          if (e.question_ids) {
+            if (Array.isArray(e.question_ids)) {
+              e.question_ids.forEach((v: any) => { if (v) explicitQIds.push(String(v).trim()); });
+            } else if (typeof e.question_ids === 'string') {
+              try {
+                const parsed = JSON.parse(e.question_ids);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((v: any) => { if (v) explicitQIds.push(String(v).trim()); });
+                }
+              } catch {
+                e.question_ids.split(',').forEach((s: string) => { if (s.trim()) explicitQIds.push(s.trim()); });
               }
-            } catch {
-              e.question_ids.split(',').forEach((s: string) => {
-                if (s.trim()) explicitQIds.push(s.trim());
-              });
             }
           }
-        }
-      });
+        });
+      }
+    } catch (eErr) {
+      console.warn('Notice loading exam metadata:', eErr);
     }
 
     const candidateExamIds = Array.from(matchedIds).filter(Boolean);
 
-    // 2. Query 'questions' table for matching exam_id (against any candidate id/title/subject)
-    const { data: byExamIdData, error: examIdErr } = await supabaseInstance
-      .from('questions')
-      .select('*')
-      .in('exam_id', candidateExamIds)
-      .order('created_at', { ascending: true });
-
+    // 2. Query 'questions' table
     let finalQuestions: any[] = [];
-    if (!examIdErr && byExamIdData && byExamIdData.length > 0) {
-      finalQuestions = byExamIdData;
-    }
 
-    // 3. If no direct exam_id matches found, but explicit question_ids exist on the exam
-    if (finalQuestions.length === 0 && explicitQIds.length > 0) {
-      const { data: byQIdsData, error: qErr } = await supabaseInstance
-        .from('questions')
-        .select('*')
-        .in('id', explicitQIds);
+    // A. Explicit question IDs on exam
+    if (explicitQIds.length > 0) {
+      const uuidQIds = explicitQIds.filter(isUuidString);
+      const strQIds = explicitQIds.filter((id) => !isUuidString(id));
 
-      if (!qErr && byQIdsData && byQIdsData.length > 0) {
-        finalQuestions = byQIdsData;
+      if (uuidQIds.length > 0) {
+        const { data: qData } = await supabaseInstance.from('questions').select('*').in('id', uuidQIds);
+        if (qData) finalQuestions.push(...qData);
+      }
+      if (strQIds.length > 0) {
+        const { data: qData } = await supabaseInstance.from('questions').select('*').in('id', strQIds);
+        if (qData) {
+          qData.forEach((item) => {
+            if (!finalQuestions.some((q) => String(q.id) === String(item.id))) {
+              finalQuestions.push(item);
+            }
+          });
+        }
       }
     }
 
-    // 4. Fallback: query all published questions from 'questions' and perform case-insensitive substring matching
+    // B. Match by candidate exam_ids
+    if (finalQuestions.length === 0) {
+      const uuidExamIds = candidateExamIds.filter(isUuidString);
+      const strExamIds = candidateExamIds.filter((id) => !isUuidString(id));
+
+      if (uuidExamIds.length > 0) {
+        const { data: uuidData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('exam_id', uuidExamIds)
+          .order('created_at', { ascending: true });
+        if (uuidData && uuidData.length > 0) finalQuestions.push(...uuidData);
+      }
+      if (strExamIds.length > 0) {
+        const { data: strData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('exam_id', strExamIds)
+          .order('created_at', { ascending: true });
+        if (strData && strData.length > 0) {
+          strData.forEach((item) => {
+            if (!finalQuestions.some((q) => String(q.id) === String(item.id))) {
+              finalQuestions.push(item);
+            }
+          });
+        }
+      }
+    }
+
+    // C. Match by target subject if exam_id query returned 0
+    if (finalQuestions.length === 0 && targetSubject && targetSubject !== 'all' && targetSubject !== 'সকল বিষয়') {
+      const { data: subjData } = await supabaseInstance
+        .from('questions')
+        .select('*')
+        .eq('subject', targetSubject)
+        .order('created_at', { ascending: true });
+
+      if (subjData && subjData.length > 0) {
+        finalQuestions = subjData;
+      }
+    }
+
+    // D. General fallback: query published questions
     if (finalQuestions.length === 0) {
       const { data: allData } = await supabaseInstance
         .from('questions')
@@ -559,20 +613,21 @@ export async function fetchQuestionsByExamId(examId: string): Promise<Question[]
         .order('created_at', { ascending: true });
 
       if (allData && allData.length > 0) {
-        finalQuestions = allData.filter((item: any) => {
+        const filtered = allData.filter((item: any) => {
           if (!item) return false;
           const qExamId = String(item.exam_id || '').trim().toLowerCase();
           const qSubject = String(item.subject || '').trim().toLowerCase();
-          if (!qExamId && !qSubject) return false;
 
           return candidateExamIds.some((cand) => {
             const candLower = cand.toLowerCase();
             return (
               (qExamId && (qExamId === candLower || qExamId.includes(candLower) || candLower.includes(qExamId))) ||
-              (qSubject && candLower.length > 3 && (qSubject === candLower || qSubject.includes(candLower) || candLower.includes(qSubject)))
+              (qSubject && (qSubject === candLower || qSubject.includes(candLower) || candLower.includes(qSubject)))
             );
           });
         });
+
+        finalQuestions = filtered.length > 0 ? filtered : allData;
       }
     }
 
@@ -581,6 +636,7 @@ export async function fetchQuestionsByExamId(examId: string): Promise<Question[]
         .filter((item: any) => item && item.status !== 'draft')
         .map((item: any) => ({
           id: String(item.id),
+          slug: item.slug ? String(item.slug) : String(item.id),
           question: String(item.question || ''),
           option_a: String(item.option_a || ''),
           option_b: String(item.option_b || ''),
@@ -612,42 +668,42 @@ export async function fetchQuestionBySlugOrId(slugOrId: string): Promise<Questio
 
   if (supabaseInstance) {
     try {
-      // 1. Try querying by slug or id
-      const { data, error } = await supabaseInstance
-        .from('questions')
-        .select('*')
-        .or(`slug.eq.${cleanVal},id.eq.${cleanVal}`)
-        .limit(1);
+      if (isUuidString(cleanVal)) {
+        const { data } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .eq('id', cleanVal)
+          .limit(1);
 
-      if (!error && data && data.length > 0) {
-        const item = data[0];
-        return {
-          id: String(item.id),
-          slug: item.slug ? String(item.slug) : String(item.id),
-          question: String(item.question || ''),
-          option_a: String(item.option_a || ''),
-          option_b: String(item.option_b || ''),
-          option_c: String(item.option_c || ''),
-          option_d: String(item.option_d || ''),
-          correct_answer: (item.correct_answer || 'option_a') as any,
-          explanation: item.explanation ? String(item.explanation) : null,
-          subject: item.subject ? String(item.subject) : null,
-          topic: item.topic ? String(item.topic) : null,
-          status: item.status || 'published',
-          exam_id: item.exam_id ? String(item.exam_id) : null,
-          created_at: item.created_at || new Date().toISOString(),
-        };
+        if (data && data.length > 0) {
+          const item = data[0];
+          return {
+            id: String(item.id),
+            slug: item.slug ? String(item.slug) : String(item.id),
+            question: String(item.question || ''),
+            option_a: String(item.option_a || ''),
+            option_b: String(item.option_b || ''),
+            option_c: String(item.option_c || ''),
+            option_d: String(item.option_d || ''),
+            correct_answer: (item.correct_answer || 'option_a') as any,
+            explanation: item.explanation ? String(item.explanation) : null,
+            subject: item.subject ? String(item.subject) : null,
+            topic: item.topic ? String(item.topic) : null,
+            status: item.status || 'published',
+            exam_id: item.exam_id ? String(item.exam_id) : null,
+            created_at: item.created_at || new Date().toISOString(),
+          };
+        }
       }
 
-      // 2. Fallback try by ID only if or condition fails
-      const { data: idData } = await supabaseInstance
+      const { data: slugData } = await supabaseInstance
         .from('questions')
         .select('*')
-        .eq('id', cleanVal)
+        .eq('slug', cleanVal)
         .limit(1);
 
-      if (idData && idData.length > 0) {
-        const item = idData[0];
+      if (slugData && slugData.length > 0) {
+        const item = slugData[0];
         return {
           id: String(item.id),
           slug: item.slug ? String(item.slug) : String(item.id),

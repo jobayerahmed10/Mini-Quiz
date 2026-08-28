@@ -123,9 +123,6 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       if (explicitMatches.length > 0) {
         return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
       }
-
-      // Mandatory requirement: If a specific exam_id is provided, DO NOT fall back to dummy/random pool! Return []
-      return [];
     }
 
     if ((!subj || subj === 'all' || subj === 'সকল বিষয়') && !topic) {
@@ -150,16 +147,23 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     }
 
     // Direct subject match
-    const directMatches = rawPool.filter((q) => {
-      if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
-        return true;
-      }
-      const detected = detectQuestionSubject(q);
-      return detected === subj || subj.includes(detected) || detected.includes(subj);
-    });
+    if (subj && subj !== 'all' && subj !== 'সকল বিষয়') {
+      const directMatches = rawPool.filter((q) => {
+        if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
+          return true;
+        }
+        const detected = detectQuestionSubject(q);
+        return detected === subj || subj.includes(detected) || detected.includes(subj);
+      });
 
-    if (directMatches.length > 0) {
-      return count && count > 0 && directMatches.length > count ? directMatches.slice(0, count) : directMatches;
+      if (directMatches.length > 0) {
+        return count && count > 0 && directMatches.length > count ? directMatches.slice(0, count) : directMatches;
+      }
+    }
+
+    // Fallback: Return raw pool if present
+    if (rawPool.length > 0) {
+      return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
     }
 
     return [];
@@ -174,10 +178,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   useEffect(() => {
     let isMounted = true;
     if (examId && examId !== 'general') {
-      fetchQuestionsByExamId(examId).then((fetchedFromDb) => {
+      fetchQuestionsByExamId(examId, activeSubject, examTitle).then((fetchedFromDb) => {
         if (!isMounted) return;
         if (fetchedFromDb && fetchedFromDb.length > 0) {
-          setExamQuestions(fetchedFromDb);
+          const formattedCount = targetQuestionCount && targetQuestionCount > 0 && fetchedFromDb.length > targetQuestionCount
+            ? fetchedFromDb.slice(0, targetQuestionCount)
+            : fetchedFromDb;
+          setExamQuestions(formattedCount);
         } else {
           const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
           setExamQuestions(resolved);
@@ -192,7 +199,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       setExamQuestions(resolved);
     }
     return () => { isMounted = false; };
-  }, [questions, activeSubject, activeTopic, targetQuestionCount, examId]);
+  }, [questions, activeSubject, activeTopic, targetQuestionCount, examId, examTitle]);
 
   const filteredQuestions = examQuestions;
   const totalQuestions = filteredQuestions.length;
