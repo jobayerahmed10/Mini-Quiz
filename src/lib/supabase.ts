@@ -519,14 +519,27 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
 
     // 2. If direct match by text/id returned 0, check linked records in 'exams' table
     if (rawQuestions.length === 0) {
-      let examQuery = supabaseInstance.from('exams').select('id, title, question_ids');
-      if (isUuidString(cleanExamId)) {
-        examQuery = examQuery.eq('id', cleanExamId);
+      let examData: any[] = [];
+      
+      // Try querying by ID first (works for UUID, custom string, or integer IDs)
+      const { data: byIdData } = await supabaseInstance
+        .from('exams')
+        .select('id, title, question_ids')
+        .eq('id', cleanExamId);
+        
+      if (byIdData && byIdData.length > 0) {
+        examData = byIdData;
       } else {
-        examQuery = examQuery.eq('title', cleanExamId);
+        // Fall back to title lookup if not found by ID
+        const { data: byTitleData } = await supabaseInstance
+          .from('exams')
+          .select('id, title, question_ids')
+          .eq('title', cleanExamId);
+        if (byTitleData && byTitleData.length > 0) {
+          examData = byTitleData;
+        }
       }
 
-      const { data: examData } = await examQuery;
       if (examData && examData.length > 0) {
         let explicitQIds: string[] = [];
         const additionalExamKeys: string[] = [];

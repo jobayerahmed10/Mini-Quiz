@@ -189,12 +189,14 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             : fetchedFromDb;
           setExamQuestions(formattedCount);
         } else {
-          // Strict requirement: Do NOT fall back to dummy/random pool for specific exams
-          setExamQuestions([]);
+          // Fall back to robust matching from the locally synchronized/cached questions pool (including admin-generated/added offline items)
+          const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+          setExamQuestions(fallbackResolved && fallbackResolved.length > 0 ? fallbackResolved : []);
         }
       }).catch(() => {
         if (!isMounted) return;
-        setExamQuestions([]);
+        const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+        setExamQuestions(fallbackResolved && fallbackResolved.length > 0 ? fallbackResolved : []);
       });
     } else {
       const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
