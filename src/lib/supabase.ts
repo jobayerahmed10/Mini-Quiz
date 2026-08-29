@@ -773,6 +773,64 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
 }
 
 /**
+ * Inserts multiple MCQ questions into Supabase 'public.questions' table in bulk
+ */
+export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[]): Promise<{ success: boolean; count?: number; error?: string }> {
+  if (!supabaseInstance) {
+    return {
+      success: false,
+      error: 'Supabase সংযোগ নেই।',
+    };
+  }
+
+  try {
+    const newRecords = inputs.map(input => ({
+      question: input.question.trim(),
+      option_a: input.option_a.trim(),
+      option_b: input.option_b.trim(),
+      option_c: input.option_c.trim(),
+      option_d: input.option_d.trim(),
+      correct_answer: input.correct_answer,
+      subject: input.subject.trim(),
+      topic: input.topic?.trim() || null,
+      explanation: input.explanation?.trim() || null,
+      status: input.status || 'published',
+      exam_id: input.exam_id?.trim() || null,
+      created_at: new Date().toISOString(),
+    }));
+
+    const { data, error } = await supabaseInstance
+      .from('questions')
+      .insert(newRecords)
+      .select();
+
+    if (error) {
+      console.error('Supabase bulk insert error:', error);
+      return {
+        success: false,
+        error: `প্রশ্নগুলো যুক্ত করতে ব্যর্থ: ${error.message}`,
+      };
+    }
+
+    try {
+      localStorage.removeItem('miniquiz_questions_cache');
+      localStorage.removeItem('miniquiz_exams_cache');
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('tamreen_data_changed'));
+    }
+
+    return {
+      success: true,
+      count: data?.length || 0
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Deletes a question from Supabase by ID
  */
 export async function deleteQuestionFromSupabase(id: string | number): Promise<{ success: boolean; error?: string }> {

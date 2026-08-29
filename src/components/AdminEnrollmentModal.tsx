@@ -22,7 +22,8 @@ import {
   Key,
   PlusCircle,
   HelpCircle,
-  Save
+  Save,
+  Sparkles
 } from 'lucide-react';
 import { CourseEnrollmentRecord } from '../types';
 import {
@@ -32,10 +33,12 @@ import {
   submitEnrollmentToSupabase,
   fetchAllRegisteredUsers,
   addQuestionToSupabase,
+  addMultipleQuestionsToSupabase,
   fetchExamsFromSupabase,
   deleteExamFromSupabase,
   addExamToSupabase,
-  ExamItem
+  ExamItem,
+  supabase
 } from '../lib/supabase';
 import { setUserPremium, toBengaliNumeral } from '../lib/utils';
 
@@ -90,6 +93,16 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
   const [newExamDescription, setNewExamDescription] = useState<string>('');
   const [isSubmittingExam, setIsSubmittingExam] = useState<boolean>(false);
 
+  // AI MCQ Generator States
+  const [showAiGenModal, setShowAiGenModal] = useState<boolean>(false);
+  const [aiGenExam, setAiGenExam] = useState<ExamItem | null>(null);
+  const [aiGenSubject, setAiGenSubject] = useState<string>('');
+  const [aiGenTopic, setAiGenTopic] = useState<string>('');
+  const [aiGenCount, setAiGenCount] = useState<number>(10);
+  const [aiGenFocus, setAiGenFocus] = useState<string>('');
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState<boolean>(false);
+  const [realQuestionCounts, setRealQuestionCounts] = useState<Record<string, number>>({});
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -139,6 +152,23 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
           setQExamId(String(examsRes.exams[0].id));
         }
       }
+
+      // 4. Fetch real question counts from Supabase
+      if (supabase) {
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('id, exam_id');
+        if (qData) {
+          const counts: Record<string, number> = {};
+          qData.forEach((q: any) => {
+            if (q.exam_id) {
+              const k = String(q.exam_id).trim();
+              counts[k] = (counts[k] || 0) + 1;
+            }
+          });
+          setRealQuestionCounts(counts);
+        }
+      }
     } catch (err) {
       console.error('Error loading applications/users for admin:', err);
     } finally {
@@ -152,10 +182,129 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
       if (res.exams) {
         setAvailableExams(res.exams);
       }
+      if (supabase) {
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('id, exam_id');
+        if (qData) {
+          const counts: Record<string, number> = {};
+          qData.forEach((q: any) => {
+            if (q.exam_id) {
+              const k = String(q.exam_id).trim();
+              counts[k] = (counts[k] || 0) + 1;
+            }
+          });
+          setRealQuestionCounts(counts);
+        }
+      }
     } catch (err) {
       console.error('Error refetching exams:', err);
     }
   }, []);
+
+  const handleStartAiGenSetup = (exam: ExamItem) => {
+    setAiGenExam(exam);
+    setAiGenSubject(exam.subject || 'সকল বিষয়');
+    setAiGenTopic('');
+    setAiGenCount(10);
+    setAiGenFocus('NTRCA এবং বিসিএস নিয়োগ পরীক্ষা স্ট্যান্ডার্ড');
+    setShowAiGenModal(true);
+  };
+
+  const handleGenerateQuestionsWithAi = async () => {
+    if (!aiGenExam) return;
+    setIsGeneratingQuestions(true);
+    showToast('✨ এআই প্রশ্ন তৈরি শুরু হচ্ছে, দয়া করে অপেক্ষা করুন...');
+
+    try {
+      const prompt = `You are a professional exam question creator for NTRCA, BCS, Madrasah, and Primary School recruitment exams in Bangladesh.
+Generate exactly ${aiGenCount} multiple-choice questions (MCQs) in Bengali for the subject "${aiGenSubject}" and exam title "${aiGenExam.title}".
+${aiGenTopic ? `Focus on the specific topic: "${aiGenTopic}".` : ''}
+${aiGenFocus ? `Standard and difficulty guideline: "${aiGenFocus}".` : ''}
+
+CRITICAL REQUIREMENT: Return ONLY a raw JSON array matching this exact format, with no markdown styling (do NOT wrap in \`\`\`json or \`\`\` tags), and no extra text outside the JSON.
+
+[
+  {
+    "question": "প্রশ্নের মূল বক্তব্য",
+    "option_a": "অপশন ক",
+    "option_b": "অপশন খ",
+    "option_c": "অপশন গ",
+    "option_d": "অপশন ঘ",
+    "correct_answer": "option_a", // MUST be exactly one of "option_a", "option_b", "option_c", "option_d"
+    "explanation": "সঠিক উত্তরের সুন্দর ব্যাখ্যা"
+  }
+]
+`;
+
+      const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          systemInstruction: 'You are a database seeding agent. Output only a valid JSON array of objects without any conversational text or markdown codeblock backticks.',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Gemini API request failed');
+      }
+
+      const resData = await response.json();
+      const text = resData.text || '';
+      
+      // Attempt to clean and extract JSON
+      let jsonStr = text.trim();
+      if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.replace(/^```(json)?/, '').trim();
+      }
+      if (jsonStr.endsWith('```')) {
+        jsonStr = jsonStr.replace(/```$/, '').trim();
+      }
+
+      // Find first [ and last ]
+      const startIdx = jsonStr.indexOf('[');
+      const endIdx = jsonStr.lastIndexOf(']');
+      if (startIdx !== -1 && endIdx !== -1) {
+        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+      }
+
+      const parsedQuestions = JSON.parse(jsonStr);
+      if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
+        throw new Error('Parsed questions is not a non-empty array');
+      }
+
+      // Map to NewQuestionInput
+      const inputs = parsedQuestions.map((q: any) => ({
+        question: String(q.question || ''),
+        option_a: String(q.option_a || ''),
+        option_b: String(q.option_b || ''),
+        option_c: String(q.option_c || ''),
+        option_d: String(q.option_d || ''),
+        correct_answer: (q.correct_answer || 'option_a') as any,
+        subject: aiGenSubject,
+        topic: aiGenTopic || q.topic || '',
+        explanation: q.explanation || '',
+        exam_id: aiGenExam.id,
+        status: 'published'
+      }));
+
+      const bulkRes = await addMultipleQuestionsToSupabase(inputs);
+      if (bulkRes.success) {
+        showToast(`✅ সফলভাবে ${bulkRes.count}টি প্রশ্ন জেনারেট এবং সেভ করা হয়েছে!`);
+        setShowAiGenModal(false);
+        await refetchExams();
+        window.dispatchEvent(new Event('tamreen_data_changed'));
+      } else {
+        alert(`ত্রুটি: ${bulkRes.error || 'প্রশ্নগুলো সেভ করা যায়নি।'}`);
+      }
+    } catch (err: any) {
+      console.error('AI Gen Error:', err);
+      alert(`এআই প্রশ্ন তৈরিতে সমস্যা হয়েছে: ${err.message || 'JSON ফরম্যাট মিলছে না। অনুগ্রহ করে আবার চেষ্টা করুন।'}`);
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
 
   const handleDeleteExam = async (examId: string) => {
     if (!window.confirm('আপনি কি নিশ্চিত যে এই পরীক্ষাটি মুছে ফেলতে চান? এর ফলে এই পরীক্ষার সাথে যুক্ত সমস্ত প্রশ্ন এবং অগ্রগতি ডিলিট হয়ে যেতে পারে।')) {
@@ -1096,7 +1245,7 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                 availableExams.map((exam) => (
                   <div
                     key={exam.id}
-                    className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 transition-all hover:border-[#046A38]/30"
+                    className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-[#046A38]/30"
                   >
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1111,19 +1260,39 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                       <div className="flex items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 font-bold flex-wrap">
                         <span>বিষয়: {exam.subject}</span>
                         <span>•</span>
-                        <span>প্রশ্ন: {toBengaliNumeral(exam.question_count || 0)}টি</span>
+                        <span>নির্ধারিত প্রশ্ন: {toBengaliNumeral(exam.question_count || 0)}টি</span>
+                        <span>•</span>
+                        <span>প্রকৃত প্রশ্ন: <strong className={realQuestionCounts[String(exam.id).trim()] ? "text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded" : "text-amber-600 dark:text-amber-400 font-black bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded"}>{toBengaliNumeral(realQuestionCounts[String(exam.id).trim()] || 0)}টি</strong></span>
                         <span>•</span>
                         <span>সময়: {toBengaliNumeral(exam.time_minutes || 0)} মিনিট</span>
                       </div>
+                      {(!realQuestionCounts[String(exam.id).trim()] || realQuestionCounts[String(exam.id).trim()] === 0) && (
+                        <div className="text-[10px] text-rose-500 dark:text-rose-400 font-black bg-rose-50 dark:bg-rose-950/30 px-2 py-1 rounded-lg inline-block">
+                          ⚠️ এই পরীক্ষায় কোনো প্রশ্ন নেই! নিচে এআই জেনারেটর বোতাম চাপুন।
+                        </div>
+                      )}
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteExam(exam.id)}
-                      className="p-2 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-xl transition-all cursor-pointer shrink-0"
-                      title="ডিলিট করুন"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <button
+                        onClick={() => handleStartAiGenSetup(exam)}
+                        className="py-1.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl text-[10px] flex items-center gap-1 shadow-xs transition-all cursor-pointer active:scale-95"
+                        title="এআই (Gemini) দিয়ে দ্রুত নতুন প্রশ্ন তৈরি ও যুক্ত করুন"
+                        type="button"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>এআই দিয়ে প্রশ্ন যোগ</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteExam(exam.id)}
+                        className="p-2 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-xl transition-all cursor-pointer"
+                        title="ডিলিট করুন"
+                        type="button"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -1288,6 +1457,125 @@ export const AdminEnrollmentModal: React.FC<AdminEnrollmentModalProps> = ({
                   )}
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================== */}
+        {/* AI QUESTION GENERATOR MODAL                                       */}
+        {/* ================================================================== */}
+        {showAiGenModal && aiGenExam && (
+          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in">
+            <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+              {/* Header */}
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-emerald-900/10 to-teal-900/10 dark:from-emerald-950/20 dark:to-teal-950/20 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+                  <span className="text-sm font-black text-slate-800 dark:text-white">এআই (Gemini) প্রশ্ন জেনারেটর</span>
+                </div>
+                <button
+                  onClick={() => setShowAiGenModal(false)}
+                  disabled={isGeneratingQuestions}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer transition-all disabled:opacity-50"
+                  type="button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form Content */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl space-y-1">
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-wider">টার্গেট পরীক্ষা (Target Exam)</div>
+                  <div className="text-xs font-black text-slate-800 dark:text-white">{aiGenExam.title}</div>
+                  <div className="text-[10px] text-slate-400">পরীক্ষা আইডি: {aiGenExam.id}</div>
+                </div>
+
+                {/* Subject Input */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                    বিষয় (Subject) <span className="text-rose-500">*</span>:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="যেমন: বাংলা ব্যাকরণ, সাধারণ বিজ্ঞান"
+                    value={aiGenSubject}
+                    onChange={(e) => setAiGenSubject(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-[#046A38] outline-none text-xs"
+                    disabled={isGeneratingQuestions}
+                  />
+                </div>
+
+                {/* Questions Count Select */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                    কতগুলো প্রশ্ন জেনারেট করবেন? <span className="text-rose-500">*</span>:
+                  </label>
+                  <select
+                    value={aiGenCount}
+                    onChange={(e) => setAiGenCount(parseInt(e.target.value) || 10)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-[#046A38] outline-none text-xs"
+                    disabled={isGeneratingQuestions}
+                  >
+                    <option value={5}>৫টি MCQ প্রশ্ন</option>
+                    <option value={10}>১০টি MCQ প্রশ্ন (প্রস্তাবিত)</option>
+                    <option value={15}>১৫টি MCQ প্রশ্ন</option>
+                    <option value={20}>২০টি MCQ প্রশ্ন</option>
+                  </select>
+                </div>
+
+                {/* Topic Focus */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                    বিশেষ টপিক বা অধ্যায় (ঐচ্ছিক Topic):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="যেমন: সন্ধি, সমাস, শতকরা, মানবদেহ, কম্পিউটার"
+                    value={aiGenTopic}
+                    onChange={(e) => setAiGenTopic(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-[#046A38] outline-none text-xs"
+                    disabled={isGeneratingQuestions}
+                  />
+                  <p className="text-[10px] text-slate-400 font-medium">কোনো নির্দিষ্ট টপিক থেকে প্রশ্ন চাইলে এখানে লিখুন, অন্যথায় সম্পূর্ণ বিষয়ের ওপর প্রশ্ন তৈরি হবে।</p>
+                </div>
+
+                {/* Instruction / Focus Level */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                    ডিফিকাল্টি স্ট্যান্ডার্ড / বাড়তি নির্দেশিকা (ঐচ্ছিক Guideline):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="যেমন: NTRCA প্রিলিমিনারি ও প্রাইমারি নিয়োগ পরীক্ষা স্ট্যান্ডার্ড"
+                    value={aiGenFocus}
+                    onChange={(e) => setAiGenFocus(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-[#046A38] outline-none text-xs"
+                    disabled={isGeneratingQuestions}
+                  />
+                </div>
+
+                {/* Submit Action Button */}
+                <button
+                  type="button"
+                  onClick={handleGenerateQuestionsWithAi}
+                  disabled={isGeneratingQuestions}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingQuestions ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>এআই প্রশ্ন তৈরি করছে ও ডাটাবেজে যুক্ত করছে...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>এআই দিয়ে জেনারেট ও সেভ করুন</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
