@@ -264,15 +264,17 @@ export const DEFAULT_EXAM_PRESETS: ExamItem[] = [];
 /**
  * Fetches exams/model tests from Supabase table 'public.exams'
  */
-export async function fetchExamsFromSupabase(): Promise<FetchExamsResult> {
+export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Promise<FetchExamsResult> {
   let cachedExams: ExamItem[] = [];
-  try {
-    const raw = localStorage.getItem('miniquiz_exams_cache');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) cachedExams = parsed;
-    }
-  } catch {}
+  if (!forceRefresh) {
+    try {
+      const raw = localStorage.getItem('miniquiz_exams_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) cachedExams = parsed;
+      }
+    } catch {}
+  }
 
   if (!supabaseInstance) {
     return {

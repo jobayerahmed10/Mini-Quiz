@@ -124,11 +124,24 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Load latest exams from Supabase or cache
   useEffect(() => {
-    fetchExamsFromSupabase().then((res) => {
-      if (res.exams && res.exams.length > 0) {
-        setExams(res.exams);
-      }
-    });
+    const refreshExams = (force: boolean = false) => {
+      fetchExamsFromSupabase(force).then((res) => {
+        if (res.exams) {
+          setExams(res.exams);
+        }
+      });
+    };
+
+    refreshExams(false);
+
+    const handleDataChanged = () => {
+      refreshExams(true);
+    };
+
+    window.addEventListener('tamreen_data_changed', handleDataChanged);
+    return () => {
+      window.removeEventListener('tamreen_data_changed', handleDataChanged);
+    };
   }, []);
 
   // Preset fallback live exams

@@ -14,6 +14,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
 import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { AuthModal } from './components/AuthModal';
+import { AdminEnrollmentModal } from './components/AdminEnrollmentModal';
 import { SharedExamEntranceCard } from './components/SharedExamEntranceCard';
 import { RegistrationPromptModal } from './components/RegistrationPromptModal';
 import { QuestionDetailPage } from './components/QuestionDetailPage';
@@ -80,6 +81,7 @@ export default function App() {
   const [resultViewMode, setResultViewMode] = useState<'summary' | 'explanation'>('summary');
   const [studentStats, setStudentStats] = useState<StudentStats>(getStudentStats());
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+  const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
 
   // Authentication & Registration Gating State
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
@@ -665,6 +667,7 @@ export default function App() {
           <ProfilePage
             onNavigateHome={handleNavigateHome}
             onOpenLeaderboard={handleOpenLeaderboard}
+            onOpenAdminPanel={() => setShowAdminModal(true)}
             onOpenCourses={() => {
               setCurrentPage('home');
               setActiveTab('courses');
@@ -844,6 +847,12 @@ export default function App() {
             setPendingTabAfterAuth(null);
           }
         }}
+      />
+
+      {/* Admin Panel Modal */}
+      <AdminEnrollmentModal
+        isOpen={showAdminModal}
+        onClose={() => setShowAdminModal(false)}
       />
 
       {/* Direct Exam Access Registration Modal */}

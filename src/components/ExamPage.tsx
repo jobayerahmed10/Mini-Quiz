@@ -112,10 +112,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     }
   };
 
-  const loadExams = useCallback(async () => {
+  const loadExams = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
     const [res, leaderboardEntries] = await Promise.all([
-      fetchExamsFromSupabase(),
+      fetchExamsFromSupabase(forceRefresh),
       fetchLeaderboardEntriesFromSupabase('all'),
     ]);
 
@@ -142,12 +142,12 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   }, []);
 
   useEffect(() => {
-    loadExams();
+    loadExams(false);
   }, [loadExams]);
 
   useEffect(() => {
     const unsubscribe = subscribeToExamsAndQuestionsTable(() => {
-      loadExams();
+      loadExams(true);
     });
     return () => {
       unsubscribe();
