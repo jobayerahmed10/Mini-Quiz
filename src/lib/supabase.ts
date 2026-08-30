@@ -114,7 +114,7 @@ export interface FetchQuestionsResult {
   error?: string | null;
 }
 
-export async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs = 3500, fallbackVal: T): Promise<T> {
+export async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs = 8000, fallbackVal: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<T>((resolve) => {
     timer = setTimeout(() => {
@@ -126,6 +126,10 @@ export async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs 
   return Promise.race([promisePromise, timeoutPromise]).then((res) => {
     clearTimeout(timer);
     return res;
+  }).catch((err) => {
+    clearTimeout(timer);
+    console.warn('Network request exception caught in fetchWithTimeout:', err);
+    return fallbackVal;
   });
 }
 
