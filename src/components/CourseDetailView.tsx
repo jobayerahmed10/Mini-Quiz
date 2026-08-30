@@ -157,9 +157,12 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
   const getExamCompletionInfo = (exam: CourseExam) => {
     const isCompleted = isExamCompleted(exam.id, exam.title);
-    const result = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title);
+    const result = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title) || {
+      score: 0,
+      totalQuestions: exam.question_count || 10
+    };
     return {
-      isCompleted: isCompleted && !!result,
+      isCompleted: isCompleted || !!result,
       result
     };
   };

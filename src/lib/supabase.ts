@@ -1303,7 +1303,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
       if (examId && examId !== 'all') {
         const cleanExamId = examId.trim();
-        query = query.eq('exam_id', cleanExamId);
+        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
       }
 
       const { data, error } = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
@@ -1780,7 +1780,8 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
         .limit(1000);
 
       if (examId && examId !== 'all') {
-        query = query.or(`exam_id.eq.${examId},exam_id.ilike.%${examId}%`);
+        const cleanExamId = examId.trim();
+        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
       }
 
       const queryPromise = Promise.resolve(query);
