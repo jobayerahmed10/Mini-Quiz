@@ -249,6 +249,7 @@ export interface ExamItem {
   question_ids?: string[] | number[];
   selected_question_codes?: string[];
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface FetchExamsResult {
@@ -354,6 +355,7 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
       question_ids: parseIds(item.question_ids || item.selected_question_codes || item.question_codes),
       selected_question_codes: parseIds(item.selected_question_codes || item.question_codes || item.question_ids),
       created_at: item.created_at,
+      updated_at: item.updated_at,
     }));
 
     try {
