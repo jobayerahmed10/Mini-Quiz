@@ -9,7 +9,8 @@ import {
   getExamLeaderboard,
   getFreeOverallLeaderboard,
   ExamLeaderboardItem,
-  FreeOverallLeaderboardItem
+  FreeOverallLeaderboardItem,
+  subscribeToLeaderboard
 } from '../lib/supabase';
 
 export type LeaderboardFilterType = 'today' | 'this_week' | 'this_month' | 'all_time' | 'this_exam';
@@ -384,10 +385,23 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   exams: propsExams,
   onReviewAnswers,
 }) => {
-  const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId);
+  const [selectedExamId, setSelectedExamId] = useState<string>(() => {
+    if (initialExamId && initialExamId !== 'all') return initialExamId;
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlExam = urlParams.get('exam') || urlParams.get('examId') || urlParams.get('test');
+      if (urlExam) return urlExam;
+      const pathname = window.location.pathname;
+      const match = pathname.match(/\/exam\/([^/]+)/);
+      if (match && match[1]) return match[1];
+    }
+    return initialExamId;
+  });
   
   useEffect(() => {
-    setSelectedExamId(initialExamId);
+    if (initialExamId && initialExamId !== 'all') {
+      setSelectedExamId(initialExamId);
+    }
   }, [initialExamId]);
 
   const effectiveExamOnlyMode = isExamOnlyMode || (selectedExamId !== 'all');
@@ -435,25 +449,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     setIsLoading(true);
     try {
       if (currentFilter === 'this_exam' && selectedExamId && selectedExamId !== 'all') {
-        // A. Call secure Exam-Specific Leaderboard RPC
+        // A. Call secure Exam-Specific Leaderboard RPC / Direct Query
         const examRows = await getExamLeaderboard(selectedExamId);
         if (examRows && examRows.length > 0) {
-          const filteredRows = examRows.filter((r) => {
-            const rawName = (r.full_name || '').trim();
-            if (!rawName) return false;
-            const lower = rawName.toLowerCase();
-            const isPlaceholder = lower === 'anonymous' || lower === 'unknown' || lower === 'test_user';
-            if (isPlaceholder) {
-              const isCurr = Boolean(
-                (r.user_id && currentUserId && r.user_id === currentUserId) ||
-                (normalizedCurrentUserName && lower === normalizedCurrentUserName)
-              );
-              return isCurr;
-            }
-            return true;
-          });
-
-          const mapped: LeaderboardDisplayItem[] = filteredRows.map((row, idx) => {
+          // Global mapping without personal user filtering
+          const mapped: LeaderboardDisplayItem[] = examRows.map((row, idx) => {
             const rowUserId = (row.user_id || '').trim();
             const isCurr = Boolean(
               currentUserId && rowUserId && rowUserId === currentUserId && !rowUserId.startsWith('guest_') && !rowUserId.startsWith('anon_')
@@ -576,9 +576,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     const handleProfileUpdate = () => {
       loadLeaderboardData();
     };
+    const handleFocus = () => {
+      loadLeaderboardData();
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('tamreen_profile_updated', handleProfileUpdate);
+      window.addEventListener('focus', handleFocus);
     }
+
+    const unsubscribeRealtime = subscribeToLeaderboard(() => {
+      loadLeaderboardData();
+    }, selectedExamId !== 'all' ? selectedExamId : undefined);
 
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -593,6 +602,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('tamreen_profile_updated', handleProfileUpdate);
+        window.removeEventListener('focus', handleFocus);
+      }
+      if (unsubscribeRealtime) {
+        unsubscribeRealtime();
       }
       if (bc) bc.close();
     };

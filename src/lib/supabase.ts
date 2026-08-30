@@ -1299,7 +1299,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
       if (examId && examId !== 'all') {
         const cleanExamId = examId.trim();
-        query = query.or(`exam_id.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%`);
+        query = query.eq('exam_id', cleanExamId);
       }
 
       const { data, error } = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
@@ -2078,6 +2078,41 @@ export function subscribeToCoursesTable(onCoursesChange: () => void): () => void
         { event: '*', schema: 'public', table: 'courses' },
         () => {
           onCoursesChange();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseInstance.removeChannel(channel);
+    };
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Realtime listener for exam leaderboard / exam results changes
+ */
+export function subscribeToLeaderboard(onLeaderboardChange: () => void, examId?: string): () => void {
+  if (!supabaseInstance) return () => {};
+
+  try {
+    const channelConfig: any = {
+      event: '*',
+      schema: 'public',
+      table: 'exam_results',
+    };
+    if (examId && examId !== 'all') {
+      channelConfig.filter = `exam_id=eq.${examId}`;
+    }
+
+    const channel = supabaseInstance
+      .channel(`leaderboard_live_sync_${examId || 'global'}`)
+      .on(
+        'postgres_changes',
+        channelConfig,
+        () => {
+          onLeaderboardChange();
         }
       )
       .subscribe();
