@@ -248,34 +248,37 @@ export function isUserRegistered(): boolean {
   }
 }
 
+export function getGuestDeviceId(): string {
+  try {
+    let devId = localStorage.getItem('tamreen_guest_device_id');
+    if (!devId) {
+      devId = 'guest_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+      localStorage.setItem('tamreen_guest_device_id', devId);
+    }
+    return devId;
+  } catch {
+    return 'guest_device_' + Date.now();
+  }
+}
+
 export function getUserUniqueId(): string {
   try {
     let uId = localStorage.getItem('tamreen_user_id');
+    const prof = getUserProfile();
+    if (prof?.isRegistered && prof?.student_id) {
+      return prof.student_id;
+    }
     if (!uId) {
-      // Check if user has student_id or id in profile
-      const prof = getUserProfile();
       if (prof?.student_id) {
         uId = prof.student_id;
       } else {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-          uId = crypto.randomUUID();
-        } else {
-          uId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = (Math.random() * 16) | 0,
-              v = c === 'x' ? r : (r & 0x3) | 0x8;
-            return v.toString(16);
-          });
-        }
+        uId = getGuestDeviceId();
       }
       localStorage.setItem('tamreen_user_id', uId);
     }
     return uId;
   } catch {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      const r = (Math.random() * 16) | 0,
-        v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    return getGuestDeviceId();
   }
 }
 
@@ -385,6 +388,10 @@ export function saveUserProfile(
     localStorage.setItem(USER_ROLL_KEY, finalRoll);
     if (isRegistered) {
       localStorage.setItem('tamreen_user_auth_status', 'registered');
+      // Clear guest session attempt cache so logged in user gets fresh/new attempt capability
+      localStorage.removeItem('tamreen_completed_exams');
+      localStorage.removeItem('tamreen_exam_completion_times');
+      localStorage.removeItem('tamreen_saved_exam_results');
     }
   } catch {
     // ignore localstorage errors
