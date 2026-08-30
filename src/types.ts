@@ -1,5 +1,6 @@
 export interface Question {
   id: string | number;
+  question_code?: string | null;
   slug?: string | null;
   question: string;
   option_a: string;

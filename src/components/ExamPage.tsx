@@ -427,11 +427,13 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
             const availableCount = getMatchingQuestionCount(exam.subject);
 
-            // Display question count matching specified exam.question_count if set, else availableCount
-            const displayQuestionCount = exam.question_count && Number(exam.question_count) > 0
-              ? (availableCount > 0 ? Math.min(Number(exam.question_count), availableCount) : Number(exam.question_count))
-              : (availableCount > 0 ? availableCount : 15);
-            const displayTotalMarks = displayQuestionCount;
+            const explicitCodesCount = exam.selected_question_codes?.length || exam.question_ids?.length;
+            const displayQuestionCount = explicitCodesCount && explicitCodesCount > 0
+              ? explicitCodesCount
+              : (exam.question_count && Number(exam.question_count) > 0
+                ? Number(exam.question_count)
+                : (availableCount > 0 ? availableCount : 20));
+            const displayTotalMarks = exam.total_marks || displayQuestionCount;
             
             const displayTimeMinutes = exam.time_minutes || Math.max(5, Math.round(displayQuestionCount * 0.7));
 

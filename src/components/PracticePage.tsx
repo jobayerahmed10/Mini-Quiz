@@ -49,12 +49,14 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     setTimeLeft(safeTimeMinutes * 60);
   }, [safeTimeMinutes]);
 
-  // Robust multi-tier question matching so exam never collapses to 0 and admin selections are respected
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(examId && examId !== 'general'));
+
+  // Strict question matching for specific exams (by Question Codes or exam_id) and general topic practice
   const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number, activeExamId?: string): Question[] => {
     const rawPool = pool || [];
     const targetExamId = activeExamId || examId;
     
-    // Tier -1: Explicit exam matching by examId or admin question_ids (highest priority)
+    // Strict Mode for specific Exams: Only load specifically assigned question codes or exam_id
     if (targetExamId && targetExamId !== 'general') {
       let candidateKeys = [String(targetExamId).trim().toLowerCase()];
       if (examTitle && examTitle.trim()) {
@@ -73,16 +75,13 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             (e.title && String(e.title).trim().toLowerCase() === String(targetExamId).trim().toLowerCase())
           );
           if (thisExam) {
-            if (thisExam.id) candidateKeys.push(String(thisExam.id).trim().toLowerCase());
-            if (thisExam.title) candidateKeys.push(String(thisExam.title).trim().toLowerCase());
-            if (thisExam.subject) candidateKeys.push(String(thisExam.subject).trim().toLowerCase());
-
-            if (thisExam.question_ids) {
+            const rawCodes = thisExam.selected_question_codes || thisExam.question_ids || thisExam.question_codes;
+            if (rawCodes) {
               let qIds: string[] = [];
-              if (Array.isArray(thisExam.question_ids)) {
-                qIds = thisExam.question_ids.map((v: any) => String(v).trim());
-              } else if (typeof thisExam.question_ids === 'string') {
-                const trimmed = thisExam.question_ids.trim();
+              if (Array.isArray(rawCodes)) {
+                qIds = rawCodes.map((v: any) => String(v).trim());
+              } else if (typeof rawCodes === 'string') {
+                const trimmed = rawCodes.trim();
                 if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
                   try {
                     const parsed = JSON.parse(trimmed);
@@ -94,9 +93,21 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                 }
               }
               if (qIds.length > 0) {
-                const exactMatches = rawPool.filter(q => qIds.includes(String(q.id).trim()));
+                const idMap = new Map<string, Question>();
+                rawPool.forEach(q => {
+                  idMap.set(String(q.id).trim(), q);
+                  if (q.question_code) idMap.set(String(q.question_code).trim(), q);
+                  if (q.slug) idMap.set(String(q.slug).trim(), q);
+                });
+                const exactMatches: Question[] = [];
+                qIds.forEach(code => {
+                  const found = idMap.get(code);
+                  if (found && !exactMatches.includes(found)) {
+                    exactMatches.push(found);
+                  }
+                });
                 if (exactMatches.length > 0) {
-                  return count && count > 0 && exactMatches.length > count ? exactMatches.slice(0, count) : exactMatches;
+                  return exactMatches;
                 }
               }
             }
@@ -104,25 +115,24 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         }
       } catch (e) {}
 
-      // 1. Check if questions in rawPool have exam_id or subject attached matching targetExamId or exam details
+      // Check if questions in rawPool have matching exam_id
       const explicitMatches = rawPool.filter(q => {
         if (!q) return false;
         const qExamId = String(q.exam_id || '').trim().toLowerCase();
-        const qSubj = String(q.subject || '').trim().toLowerCase();
-        if (!qExamId && !qSubj) return false;
+        if (!qExamId) return false;
 
         return candidateKeys.some(key => {
           if (!key) return false;
-          return (
-            (qExamId && (qExamId === key || qExamId.includes(key) || key.includes(qExamId))) ||
-            (qSubj && key.length > 3 && (qSubj === key || qSubj.includes(key) || key.includes(qSubj)))
-          );
+          return qExamId === key || qExamId.includes(key) || key.includes(qExamId);
         });
       });
 
       if (explicitMatches.length > 0) {
-        return count && count > 0 && explicitMatches.length > count ? explicitMatches.slice(0, count) : explicitMatches;
+        return explicitMatches;
       }
+
+      // If this is a specific exam and no questions matched, return empty array (NO auto range / arbitrary fallbacks)
+      return [];
     }
 
     if ((!subj || subj === 'all' || subj === 'সকল বিষয়') && !topic) {
@@ -161,7 +171,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       }
     }
 
-    // Fallback: Return raw pool if present
+    // Fallback for general practice
     if (rawPool.length > 0) {
       return count && count > 0 && rawPool.length > count ? rawPool.slice(0, count) : rawPool;
     }
@@ -181,13 +191,12 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   useEffect(() => {
     let isMounted = true;
     if (examId && examId !== 'general') {
+      setIsLoading(true);
       fetchQuestionsByExamId(examId, activeSubject, examTitle).then((fetchedFromDb) => {
         if (!isMounted) return;
+        setIsLoading(false);
         if (fetchedFromDb && fetchedFromDb.length > 0) {
-          const formattedCount = targetQuestionCount && targetQuestionCount > 0 && fetchedFromDb.length > targetQuestionCount
-            ? fetchedFromDb.slice(0, targetQuestionCount)
-            : fetchedFromDb;
-          setExamQuestions(formattedCount);
+          setExamQuestions(fetchedFromDb);
         } else {
           // Fall back to robust matching from the locally synchronized/cached questions pool (including admin-generated/added offline items)
           const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
@@ -195,10 +204,12 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         }
       }).catch(() => {
         if (!isMounted) return;
+        setIsLoading(false);
         const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
         setExamQuestions(fallbackResolved && fallbackResolved.length > 0 ? fallbackResolved : []);
       });
     } else {
+      setIsLoading(false);
       const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
       setExamQuestions(resolved);
     }
@@ -305,6 +316,16 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     onFinishQuiz(finalAnswers, timeSpent);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-[#070D1E] flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-4" />
+        <h3 className="text-base font-bold text-slate-800 dark:text-white">পরীক্ষার প্রশ্ন লোড হচ্ছে...</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">অনুগ্রহ করে অপেক্ষা করুন</p>
+      </div>
+    );
+  }
+
   if (totalQuestions === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-5 animate-fade-in mb-24">
@@ -316,7 +337,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
             কোনো প্রশ্ন পাওয়া যায়নি
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            অনুগ্রহ করে অন্য একটি বিষয় নির্বাচন করুন অথবা হোমে ফিরে নতুন টেস্ট শুরু করুন।
+            এই পরীক্ষার জন্য এখনো কোনো নির্দিষ্ট প্রশ্ন যুক্ত করা হয়নি। অনুগ্রহ করে অন্য পরীক্ষা নির্বাচন করুন।
           </p>
         </div>
 

@@ -34,7 +34,6 @@ interface ProfilePageProps {
   onOpenCourses: () => void;
   onStartPractice?: (subject?: string, topic?: string) => void;
   onOpenFontSettings?: () => void;
-  onOpenAdminPanel?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
   fontSize?: 'normal' | 'medium' | 'large';
@@ -69,7 +68,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onOpenLeaderboard,
   onOpenCourses,
   onStartPractice,
-  onOpenAdminPanel,
   isDarkMode = false,
   onToggleDarkMode,
   fontSize = 'normal',
@@ -849,31 +847,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <ChevronRight className="w-5 h-5 text-slate-400" />
             </button>
           </div>
-
-          {/* ======================== Admin Panel ======================== */}
-          {onOpenAdminPanel && (
-            <div className="mb-4 bg-white dark:bg-[#0D172A] rounded-2xl border border-[#046A38]/30 dark:border-[#046A38]/40 shadow-xs overflow-hidden transition-all">
-              <button
-                onClick={onOpenAdminPanel}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/20 cursor-pointer transition-colors text-[#046A38] dark:text-emerald-400 font-bold"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-[#046A38] dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-base font-black block">
-                      এডমিন প্যানেল (Admin Panel)
-                    </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      পরীক্ষা ডিলিট, নতুন পরীক্ষা ও শিক্ষার্থী ব্যবস্থাপনা করুন
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-emerald-600" />
-              </button>
-            </div>
-          )}
 
           {/* ======================== 5. লগআউট ======================== */}
           <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">

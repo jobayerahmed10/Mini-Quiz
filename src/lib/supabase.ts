@@ -247,6 +247,7 @@ export interface ExamItem {
   is_premium?: boolean;
   status?: string;
   question_ids?: string[] | number[];
+  selected_question_codes?: string[];
   created_at?: string;
 }
 
@@ -350,7 +351,8 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
       examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
       is_premium: Boolean(item.is_premium),
       status: item.status || 'active',
-      question_ids: parseIds(item.question_ids),
+      question_ids: parseIds(item.question_ids || item.selected_question_codes || item.question_codes),
+      selected_question_codes: parseIds(item.selected_question_codes || item.question_codes || item.question_ids),
       created_at: item.created_at,
     }));
 
@@ -495,115 +497,160 @@ function isUuidString(str: string): boolean {
 }
 
 /**
- * Fetches questions strictly matching a specific exam_id or exam metadata from Supabase 'public.questions' table
+ * Fetches questions strictly matching a specific exam_id or selected_question_codes from Supabase
+ * Strict Requirements:
+ * 1. Fetch by Question Code Array: Queries exams table to get 'selected_question_codes' (or 'question_ids'),
+ *    then queries questions table using .in() to retrieve only those specific questions in exact order.
+ * 2. Disabled Auto Range/Pagination: No range/offset queries, renders only specifically selected questions.
  */
 export async function fetchQuestionsByExamId(examId: string, examSubject?: string, examTitle?: string): Promise<Question[]> {
   if (!supabaseInstance || !examId) return [];
 
   const cleanExamId = String(examId).trim();
-  if (!cleanExamId) return [];
+  if (!cleanExamId || cleanExamId === 'general') return [];
 
   try {
     let rawQuestions: any[] = [];
+    let selectedCodesList: string[] = [];
 
-    // 1. Strict primary foreign key query: supabase.from('questions').select('*').eq('exam_id', cleanExamId)
-    const { data: directData, error: directErr } = await supabaseInstance
-      .from('questions')
-      .select('*')
-      .eq('exam_id', cleanExamId)
-      .order('created_at', { ascending: true });
+    // Helper to parse question codes/ids from various formats (array, JSON string, comma-separated)
+    const extractCodes = (val: any): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map((v: any) => String(v).trim()).filter(Boolean);
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              return parsed.map((v: any) => String(v).trim()).filter(Boolean);
+            }
+          } catch {}
+        }
+        return trimmed.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+      return [String(val).trim()].filter(Boolean);
+    };
 
-    if (!directErr && directData && directData.length > 0) {
-      rawQuestions = directData;
-    }
+    // 1. First, lookup the exam record in 'exams' table to retrieve 'selected_question_codes' or 'question_ids'
+    let examRecord: any = null;
 
-    // 2. If direct match by text/id returned 0, check linked records in 'exams' table
-    if (rawQuestions.length === 0) {
-      let examData: any[] = [];
-      
-      // Try querying by ID first (works for UUID, custom string, or integer IDs)
-      const { data: byIdData } = await supabaseInstance
-        .from('exams')
-        .select('id, title, question_ids')
-        .eq('id', cleanExamId);
-        
-      if (byIdData && byIdData.length > 0) {
-        examData = byIdData;
-      } else {
-        // Fall back to title lookup if not found by ID
-        const { data: byTitleData } = await supabaseInstance
-          .from('exams')
-          .select('id, title, question_ids')
-          .eq('title', cleanExamId);
-        if (byTitleData && byTitleData.length > 0) {
-          examData = byTitleData;
+    // Check local cache first for fastest response
+    try {
+      const rawExams = localStorage.getItem('miniquiz_exams_cache');
+      if (rawExams) {
+        const parsedExams = JSON.parse(rawExams);
+        if (Array.isArray(parsedExams)) {
+          examRecord = parsedExams.find((e: any) => 
+            String(e.id).trim().toLowerCase() === cleanExamId.toLowerCase() ||
+            (e.title && String(e.title).trim().toLowerCase() === cleanExamId.toLowerCase()) ||
+            (examTitle && e.title && String(e.title).trim().toLowerCase() === examTitle.trim().toLowerCase())
+          );
         }
       }
+    } catch {}
 
-      if (examData && examData.length > 0) {
-        let explicitQIds: string[] = [];
-        const additionalExamKeys: string[] = [];
+    // Query 'exams' table from Supabase
+    let examQuery = supabaseInstance.from('exams').select('*');
+    const { data: dbExams } = await examQuery.or(`id.eq.${cleanExamId},title.eq.${cleanExamId}`);
+    if (dbExams && dbExams.length > 0) {
+      examRecord = dbExams[0];
+    } else if (examTitle && examTitle.trim()) {
+      const { data: titleExams } = await supabaseInstance.from('exams').select('*').eq('title', examTitle.trim());
+      if (titleExams && titleExams.length > 0) {
+        examRecord = titleExams[0];
+      }
+    }
 
-        examData.forEach((e: any) => {
-          if (e.id) additionalExamKeys.push(String(e.id).trim());
-          if (e.title) additionalExamKeys.push(String(e.title).trim());
-          if (e.question_ids) {
-            if (Array.isArray(e.question_ids)) {
-              e.question_ids.forEach((v: any) => { if (v) explicitQIds.push(String(v).trim()); });
-            } else if (typeof e.question_ids === 'string') {
-              try {
-                const parsed = JSON.parse(e.question_ids);
-                if (Array.isArray(parsed)) {
-                  parsed.forEach((v: any) => { if (v) explicitQIds.push(String(v).trim()); });
-                }
-              } catch {
-                e.question_ids.split(',').forEach((s: string) => { if (s.trim()) explicitQIds.push(s.trim()); });
-              }
-            }
+    if (examRecord) {
+      const codes = [
+        ...extractCodes(examRecord.selected_question_codes),
+        ...extractCodes(examRecord.question_ids),
+        ...extractCodes(examRecord.question_codes),
+        ...extractCodes(examRecord.selected_questions),
+      ];
+      selectedCodesList = Array.from(new Set(codes));
+    }
+
+    // 2. If selected question codes exist, fetch specifically those Question Codes
+    if (selectedCodesList.length > 0) {
+      // Query questions by id (which holds the question codes like 'Q-U-FIQH-0021' or numeric/UUID)
+      const { data: byIdData, error: byIdErr } = await supabaseInstance
+        .from('questions')
+        .select('*')
+        .in('id', selectedCodesList);
+
+      if (!byIdErr && byIdData && byIdData.length > 0) {
+        // Maintain the exact ordering of selected_question_codes specified by the admin
+        const idMap = new Map<string, any>();
+        byIdData.forEach((q: any) => {
+          idMap.set(String(q.id).trim(), q);
+          if (q.slug) idMap.set(String(q.slug).trim(), q);
+        });
+
+        const orderedList: any[] = [];
+        selectedCodesList.forEach((code) => {
+          const matched = idMap.get(code);
+          if (matched && !orderedList.includes(matched)) {
+            orderedList.push(matched);
           }
         });
 
-        // Try querying questions matching linked exam keys
-        const uniqueExamKeys = Array.from(new Set(additionalExamKeys)).filter(Boolean);
-        if (uniqueExamKeys.length > 0) {
-          const { data: byKeysData } = await supabaseInstance
-            .from('questions')
-            .select('*')
-            .in('exam_id', uniqueExamKeys)
-            .order('created_at', { ascending: true });
+        // Add any remaining matched questions
+        byIdData.forEach((q: any) => {
+          if (!orderedList.includes(q)) orderedList.push(q);
+        });
 
-          if (byKeysData && byKeysData.length > 0) {
-            rawQuestions = byKeysData;
-          }
-        }
+        rawQuestions = orderedList;
+      }
 
-        // Try querying questions matching explicit question_ids
-        if (rawQuestions.length === 0 && explicitQIds.length > 0) {
-          const uniqueQIds = Array.from(new Set(explicitQIds)).filter(Boolean);
-          const { data: byQIdsData } = await supabaseInstance
-            .from('questions')
-            .select('*')
-            .in('id', uniqueQIds)
-            .order('created_at', { ascending: true });
+      // If byId returned 0, try querying by slug
+      if (rawQuestions.length === 0) {
+        const { data: bySlugData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('slug', selectedCodesList);
 
-          if (byQIdsData && byQIdsData.length > 0) {
-            rawQuestions = byQIdsData;
-          }
+        if (bySlugData && bySlugData.length > 0) {
+          rawQuestions = bySlugData;
         }
       }
     }
 
-    // Return [] if no questions belong to this exam (NO random or subject fallbacks!)
+    // 3. If no specific question codes were linked or returned 0, fetch questions directly linked via exam_id
+    if (rawQuestions.length === 0) {
+      const candidateExamKeys = Array.from(new Set([
+        cleanExamId,
+        examRecord?.id ? String(examRecord.id).trim() : null,
+        examRecord?.title ? String(examRecord.title).trim() : null,
+        examTitle ? String(examTitle).trim() : null,
+      ])).filter(Boolean) as string[];
+
+      const { data: directData, error: directErr } = await supabaseInstance
+        .from('questions')
+        .select('*')
+        .in('exam_id', candidateExamKeys)
+        .order('created_at', { ascending: true });
+
+      if (!directErr && directData && directData.length > 0) {
+        rawQuestions = directData;
+      }
+    }
+
+    // 4. Return strictly empty array if no questions are assigned to this exam (NO random pagination/ranges)
     if (rawQuestions.length === 0) {
       return [];
     }
 
-    return rawQuestions
+    const formattedQuestions: Question[] = rawQuestions
       .filter((item: any) => item && item.status !== 'draft')
       .map((item: any) => ({
         id: String(item.id),
+        question_code: item.question_code ? String(item.question_code) : String(item.id),
         slug: item.slug ? String(item.slug) : String(item.id),
-        question: String(item.question || ''),
+        question: String(item.question || item.question_text || ''),
         option_a: String(item.option_a || ''),
         option_b: String(item.option_b || ''),
         option_c: String(item.option_c || ''),
@@ -616,6 +663,8 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         exam_id: item.exam_id ? String(item.exam_id) : null,
         created_at: item.created_at || new Date().toISOString(),
       }));
+
+    return formattedQuestions;
   } catch (err) {
     console.error('Error in fetchQuestionsByExamId:', cleanExamId, err);
     return [];
