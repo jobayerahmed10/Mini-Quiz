@@ -12,7 +12,6 @@ import {
   Calendar,
   Bookmark,
   BookOpen,
-  RotateCcw,
   Trophy,
   Download,
   Play,
@@ -1039,24 +1038,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                   ) : isCompleted ? (
                     /* Completed State Action Buttons Row */
                     <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() =>
-                            handleAttemptStartExam({
-                              subject: course.title,
-                              examId: exam.id,
-                              examType: exam.topic || exam.title,
-                              questionCount: specs.questionCount,
-                              timeMinutes: specs.timeMinutes
-                            })
-                          }
-                          className="py-2 px-2 rounded-xl border border-amber-300/80 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                          title="পুনরায় পরীক্ষা দিন"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>পুনরায় দিন</span>
-                        </button>
-
+                      <div className="grid grid-cols-2 gap-2.5">
                         <button
                           onClick={() =>
                             onReviewAnswers({
@@ -1065,7 +1047,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                               examType: exam.topic || exam.title
                             })
                           }
-                          className="py-2 px-2 rounded-xl border border-sky-300/80 bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 hover:bg-sky-100 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                          className="py-2.5 px-3 rounded-xl border border-sky-300/80 bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 hover:bg-sky-100 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
                           title="উত্তরমালা ও সমাধান"
                         >
                           <FileText className="w-3.5 h-3.5 text-sky-600 shrink-0" />
@@ -1076,7 +1058,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                           onClick={() => {
                             setShowLeaderboardModal(true);
                           }}
-                          className="py-2 px-2 rounded-xl border border-emerald-300/80 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                          className="py-2.5 px-3 rounded-xl border border-emerald-300/80 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
                           title="মেধা তালিকা"
                         >
                           <Trophy className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
