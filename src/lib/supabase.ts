@@ -536,25 +536,9 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       return [String(val).trim()].filter(Boolean);
     };
 
-    // 1. First, lookup the exam record in 'exams' table to retrieve 'selected_question_codes' or 'question_ids'
+    // 1. First, lookup the exam record directly in Supabase 'exams' table to ensure fresh data
     let examRecord: any = null;
 
-    // Check local cache first for fastest response
-    try {
-      const rawExams = localStorage.getItem('miniquiz_exams_cache');
-      if (rawExams) {
-        const parsedExams = JSON.parse(rawExams);
-        if (Array.isArray(parsedExams)) {
-          examRecord = parsedExams.find((e: any) => 
-            String(e.id).trim().toLowerCase() === cleanExamId.toLowerCase() ||
-            (e.title && String(e.title).trim().toLowerCase() === cleanExamId.toLowerCase()) ||
-            (examTitle && e.title && String(e.title).trim().toLowerCase() === examTitle.trim().toLowerCase())
-          );
-        }
-      }
-    } catch {}
-
-    // Query 'exams' table from Supabase
     let examQuery = supabaseInstance.from('exams').select('*');
     const { data: dbExams } = await examQuery.or(`id.eq.${cleanExamId},title.eq.${cleanExamId}`);
     if (dbExams && dbExams.length > 0) {
@@ -564,6 +548,23 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       if (titleExams && titleExams.length > 0) {
         examRecord = titleExams[0];
       }
+    }
+
+    // Fallback to local cache only if Supabase returned nothing
+    if (!examRecord) {
+      try {
+        const rawExams = localStorage.getItem('miniquiz_exams_cache');
+        if (rawExams) {
+          const parsedExams = JSON.parse(rawExams);
+          if (Array.isArray(parsedExams)) {
+            examRecord = parsedExams.find((e: any) => 
+              String(e.id).trim().toLowerCase() === cleanExamId.toLowerCase() ||
+              (e.title && String(e.title).trim().toLowerCase() === cleanExamId.toLowerCase()) ||
+              (examTitle && e.title && String(e.title).trim().toLowerCase() === examTitle.trim().toLowerCase())
+            );
+          }
+        }
+      } catch {}
     }
 
     if (examRecord) {
