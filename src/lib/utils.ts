@@ -569,42 +569,6 @@ export function addCompletedExamId(examIdentifier: string): void {
 
 export function isExamCompleted(examId: string, examTitle?: string): boolean {
   const completedList = getCompletedExamIds();
-  const times = getCompletionTimes();
-
-  // Check if exam was updated or re-created in Supabase after completion (Bypass Deleted Exam Cache)
-  let examItem: any = null;
-  try {
-    const rawExams = localStorage.getItem('miniquiz_exams_cache');
-    if (rawExams) {
-      const parsed = JSON.parse(rawExams);
-      if (Array.isArray(parsed)) {
-        examItem = parsed.find((e: any) => 
-          (examId && String(e.id).trim() === String(examId).trim()) ||
-          (examTitle && e.title && String(e.title).trim() === String(examTitle).trim())
-        );
-      }
-    }
-  } catch {}
-
-  if (examItem && (examItem.updated_at || examItem.created_at)) {
-    const examTimestamp = new Date(examItem.updated_at || examItem.created_at).getTime();
-    const identifiers = [examId, examTitle].filter(Boolean) as string[];
-    
-    for (const id of identifiers) {
-      const completedAt = times[id];
-      if (completedAt) {
-        const completionTimestamp = new Date(completedAt).getTime();
-        if (!isNaN(examTimestamp) && !isNaN(completionTimestamp) && examTimestamp > completionTimestamp) {
-          // Exam was re-created / updated after completion! Reset cache and allow retaking.
-          resetExamAttemptCache(id);
-          if (examId) resetExamAttemptCache(examId);
-          if (examTitle) resetExamAttemptCache(examTitle);
-          return false;
-        }
-      }
-    }
-  }
-
   if (examId && completedList.includes(examId)) return true;
   if (examTitle && completedList.includes(examTitle)) return true;
   return false;
