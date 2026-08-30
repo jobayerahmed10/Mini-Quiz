@@ -579,17 +579,45 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
 
     // 2. If selected question codes exist, fetch specifically those Question Codes
     if (selectedCodesList.length > 0) {
-      // Query questions by id (which holds the question codes like 'Q-U-FIQH-0021' or numeric/UUID)
+      // Query questions by id
       const { data: byIdData, error: byIdErr } = await supabaseInstance
         .from('questions')
         .select('*')
         .in('id', selectedCodesList);
 
+      let matchedQuestions: any[] = [];
       if (!byIdErr && byIdData && byIdData.length > 0) {
+        matchedQuestions = byIdData;
+      }
+
+      // Query questions by question_code column
+      if (matchedQuestions.length === 0) {
+        const { data: byCodeData, error: byCodeErr } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('question_code', selectedCodesList);
+        if (!byCodeErr && byCodeData && byCodeData.length > 0) {
+          matchedQuestions = byCodeData;
+        }
+      }
+
+      // Query questions by slug
+      if (matchedQuestions.length === 0) {
+        const { data: bySlugData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .in('slug', selectedCodesList);
+        if (bySlugData && bySlugData.length > 0) {
+          matchedQuestions = bySlugData;
+        }
+      }
+
+      if (matchedQuestions.length > 0) {
         // Maintain the exact ordering of selected_question_codes specified by the admin
         const idMap = new Map<string, any>();
-        byIdData.forEach((q: any) => {
+        matchedQuestions.forEach((q: any) => {
           idMap.set(String(q.id).trim(), q);
+          if (q.question_code) idMap.set(String(q.question_code).trim(), q);
           if (q.slug) idMap.set(String(q.slug).trim(), q);
         });
 
@@ -601,24 +629,11 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
           }
         });
 
-        // Add any remaining matched questions
-        byIdData.forEach((q: any) => {
+        matchedQuestions.forEach((q: any) => {
           if (!orderedList.includes(q)) orderedList.push(q);
         });
 
         rawQuestions = orderedList;
-      }
-
-      // If byId returned 0, try querying by slug
-      if (rawQuestions.length === 0) {
-        const { data: bySlugData } = await supabaseInstance
-          .from('questions')
-          .select('*')
-          .in('slug', selectedCodesList);
-
-        if (bySlugData && bySlugData.length > 0) {
-          rawQuestions = bySlugData;
-        }
       }
     }
 
