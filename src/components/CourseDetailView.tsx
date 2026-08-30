@@ -44,6 +44,7 @@ import {
   fetchCourseExamsFromSupabase,
   fetchCourseRoutinesFromSupabase,
   fetchCourseSyllabusFromSupabase,
+  fetchUserCompletedExamsFromSupabase,
   subscribeToCourseDetails
 } from '../lib/supabase';
 import {
@@ -157,13 +158,15 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
   const getExamCompletionInfo = (exam: CourseExam) => {
     const isCompleted = isExamCompleted(exam.id, exam.title);
-    const result = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title) || {
-      score: 0,
-      totalQuestions: exam.question_count || 10
-    };
+    const savedResult = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title);
     return {
-      isCompleted: isCompleted || !!result,
-      result
+      isCompleted: isCompleted || Boolean(savedResult),
+      result: savedResult || {
+        score: 0,
+        totalQuestions: exam.question_count || 10,
+        correctCount: 0,
+        wrongCount: 0
+      }
     };
   };
 
@@ -184,7 +187,8 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
         fetchCourseSheetsFromSupabase(course.id, course.title),
         fetchCourseExamsFromSupabase(course.id, course.title),
         fetchCourseRoutinesFromSupabase(course.id, course.title),
-        fetchCourseSyllabusFromSupabase(course.id, course.title)
+        fetchCourseSyllabusFromSupabase(course.id, course.title),
+        fetchUserCompletedExamsFromSupabase().catch(() => [])
       ]);
       setSheets(sheetRes.sheets || []);
       setExams(examRes.exams || []);

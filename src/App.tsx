@@ -24,6 +24,7 @@ import {
   fetchExamsFromSupabase, 
   saveLeaderboardEntryToSupabase, 
   submitExamResultToSupabase, 
+  fetchUserCompletedExamsFromSupabase,
   LeaderboardEntry,
   supabaseGetSession,
   supabaseGetUser,
@@ -287,8 +288,12 @@ export default function App() {
 
   // Listen to profile updates & exam completion to keep studentStats in sync
   useEffect(() => {
+    // Initial sync of completed exams from Supabase
+    fetchUserCompletedExamsFromSupabase().catch(() => {});
+
     const handleSyncStats = () => {
       setStudentStats(getStudentStats());
+      fetchUserCompletedExamsFromSupabase().catch(() => {});
     };
     window.addEventListener('tamreen_profile_updated', handleSyncStats);
     window.addEventListener('tamreen_exam_completed', handleSyncStats);

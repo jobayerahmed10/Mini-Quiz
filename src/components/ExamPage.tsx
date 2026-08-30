@@ -27,7 +27,14 @@ import {
   Send
 } from 'lucide-react';
 import { Question } from '../types';
-import { ExamItem, fetchExamsFromSupabase, fetchLeaderboardEntriesFromSupabase, subscribeToExamsAndQuestionsTable } from '../lib/supabase';
+import { 
+  ExamItem, 
+  fetchExamsFromSupabase, 
+  fetchLeaderboardEntriesFromSupabase, 
+  getDistinctExamParticipantCounts,
+  fetchUserCompletedExamsFromSupabase,
+  subscribeToExamsAndQuestionsTable 
+} from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
@@ -112,37 +119,46 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     }
   };
 
+  const [, setCompletedUpdateTrigger] = useState(0);
+
   const loadExams = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
-    const [res, leaderboardEntries] = await Promise.all([
-      fetchExamsFromSupabase(forceRefresh),
-      fetchLeaderboardEntriesFromSupabase('all'),
-    ]);
+    try {
+      const [res, distinctCounts] = await Promise.all([
+        fetchExamsFromSupabase(forceRefresh),
+        getDistinctExamParticipantCounts(),
+        fetchUserCompletedExamsFromSupabase().catch(() => []),
+      ]);
 
-    if (res.exams) {
-      setExams(res.exams);
-    } else {
-      setExams([]);
-    }
+      if (res.exams) {
+        setExams(res.exams);
+      } else {
+        setExams([]);
+      }
 
-    // Calculate actual participant count per exam from leaderboard
-    const countsMap: Record<string, number> = {};
-    if (Array.isArray(leaderboardEntries)) {
-      leaderboardEntries.forEach((entry) => {
-        if (entry.exam_id) {
-          countsMap[entry.exam_id] = (countsMap[entry.exam_id] || 0) + 1;
-        }
-        if (entry.exam_title && entry.exam_title !== entry.exam_id) {
-          countsMap[entry.exam_title] = (countsMap[entry.exam_title] || 0) + 1;
-        }
-      });
+      setExamineeCounts(distinctCounts || {});
+      setCompletedUpdateTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.warn('loadExams error:', err);
+    } finally {
+      setIsLoading(false);
     }
-    setExamineeCounts(countsMap);
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     loadExams(false);
+  }, [loadExams]);
+
+  useEffect(() => {
+    const handleExamCompleted = () => {
+      loadExams(true);
+    };
+    window.addEventListener('tamreen_exam_completed', handleExamCompleted);
+    window.addEventListener('tamreen_profile_updated', handleExamCompleted);
+    return () => {
+      window.removeEventListener('tamreen_exam_completed', handleExamCompleted);
+      window.removeEventListener('tamreen_profile_updated', handleExamCompleted);
+    };
   }, [loadExams]);
 
   useEffect(() => {

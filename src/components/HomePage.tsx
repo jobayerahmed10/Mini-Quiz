@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { Question, TabRoute } from '../types';
 import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
-import { ExamItem, fetchExamsFromSupabase } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 
 interface HomePageProps {
@@ -123,12 +123,17 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, []);
 
   // Load latest exams from Supabase or cache
+  const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
+
   useEffect(() => {
     const refreshExams = (force: boolean = false) => {
       fetchExamsFromSupabase(force).then((res) => {
         if (res.exams) {
           setExams(res.exams);
         }
+      });
+      getDistinctExamParticipantCounts().then((counts) => {
+        setExamineeCounts(counts || {});
       });
     };
 
@@ -139,8 +144,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     };
 
     window.addEventListener('tamreen_data_changed', handleDataChanged);
+    window.addEventListener('tamreen_exam_completed', handleDataChanged);
     return () => {
       window.removeEventListener('tamreen_data_changed', handleDataChanged);
+      window.removeEventListener('tamreen_exam_completed', handleDataChanged);
     };
   }, []);
 
@@ -502,7 +509,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             {displayLiveExams.map((exam, idx) => {
               const questionCount = exam.question_count || (exam.total_marks ? Number(exam.total_marks) : 10);
               const timeMinutes = exam.time_minutes || 5;
-              const examineeCount = exam.examinee_count || '০+';
+              const countNum = examineeCounts[exam.id] ?? examineeCounts[exam.title] ?? 0;
+              const examineeCount = `${toBengaliNumeral(countNum)} জন`;
               const subject = exam.subject || 'সাধারণ ও মাদ্রাসা কারিকুলাম';
 
               return (

@@ -10,7 +10,14 @@ import {
 } from '../types';
 import { detectQuestionSubject, MAIN_SUBJECT_POSTS, MainSubjectPost } from './subjects';
 import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
-import { getUserRollNumber } from './utils';
+import { 
+  getUserRollNumber, 
+  getUserUniqueId, 
+  getUserProfile, 
+  getGuestDeviceId, 
+  addCompletedExamId, 
+  getCompletedExamIds 
+} from './utils';
 
 /**
  * Safely retrieve Supabase configuration.
@@ -1210,6 +1217,122 @@ export async function submitExamResultToSupabase(params: {
 }
 
 /**
+ * Fetch all exam IDs/titles that the current user (registered or guest) has completed from Supabase.
+ * Automatically synchronizes with local storage.
+ */
+export async function fetchUserCompletedExamsFromSupabase(userId?: string): Promise<string[]> {
+  const currentUId = userId || getUserUniqueId();
+  const prof = getUserProfile();
+  const guestDevId = getGuestDeviceId();
+  const candidateIds = Array.from(new Set([
+    currentUId,
+    prof?.student_id,
+    prof?.phone,
+    guestDevId,
+  ].filter(Boolean) as string[]));
+
+  const completedExamIds: string[] = [];
+
+  // 1. Try Supabase exam_results table
+  if (supabaseInstance && candidateIds.length > 0) {
+    try {
+      const orFilter = candidateIds.map((id) => `user_id.eq.${id},guest_id.eq.${id}`).join(',');
+      const query = supabaseInstance
+        .from('exam_results')
+        .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
+        .or(orFilter);
+
+      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        data.forEach((r: any) => {
+          if (r.exam_id) {
+            const cleanId = String(r.exam_id).trim();
+            completedExamIds.push(cleanId);
+            addCompletedExamId(cleanId);
+          }
+          if (r.exam_title) {
+            const cleanTitle = String(r.exam_title).trim();
+            completedExamIds.push(cleanTitle);
+            addCompletedExamId(cleanTitle);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('fetchUserCompletedExamsFromSupabase error:', e);
+    }
+  }
+
+  // 2. Also check local storage completed list
+  const localCompleted = getCompletedExamIds();
+  localCompleted.forEach((id) => {
+    if (!completedExamIds.includes(id)) {
+      completedExamIds.push(id);
+    }
+  });
+
+  return Array.from(new Set(completedExamIds));
+}
+
+/**
+ * Fetch distinct participant counts per exam from Supabase exam_results & leaderboard.
+ * Returns a map of examId/examTitle -> distinct participant count.
+ */
+export async function getDistinctExamParticipantCounts(): Promise<Record<string, number>> {
+  const countsMap: Record<string, number> = {};
+  const examParticipantSets: Record<string, Set<string>> = {};
+
+  const addParticipant = (examKey: string, participantKey: string) => {
+    if (!examKey || !participantKey) return;
+    const cleanKey = examKey.trim().toLowerCase();
+    if (!examParticipantSets[cleanKey]) {
+      examParticipantSets[cleanKey] = new Set<string>();
+    }
+    examParticipantSets[cleanKey].add(participantKey.toLowerCase().trim());
+  };
+
+  // 1. Try global_leaderboard or exam_results from Supabase
+  if (supabaseInstance) {
+    try {
+      let query = supabaseInstance
+        .from('exam_results')
+        .select('exam_id, exam_title, user_id, guest_id, user_name, full_name, guest_name, id');
+
+      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        for (const row of data) {
+          const isReg = Boolean(row.user_id && !row.user_id.startsWith('guest_') && !row.user_id.startsWith('anon_'));
+          const pKey = isReg
+            ? String(row.user_id)
+            : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '');
+          if (row.exam_id) addParticipant(row.exam_id, pKey);
+          if (row.exam_title) addParticipant(row.exam_title, pKey);
+        }
+      }
+    } catch (e) {
+      console.warn('getDistinctExamParticipantCounts Supabase error:', e);
+    }
+  }
+
+  // 2. Also check local entries
+  const localEntries = getLocalLeaderboardEntries();
+  for (const entry of localEntries) {
+    const isReg = Boolean(entry.user_id && !entry.user_id.startsWith('guest_') && !entry.user_id.startsWith('anon_'));
+    const pKey = isReg
+      ? String(entry.user_id)
+      : String(entry.guest_name || entry.user_name || entry.full_name || entry.id || '');
+    if (entry.exam_id) addParticipant(entry.exam_id, pKey);
+    if (entry.exam_title) addParticipant(entry.exam_title, pKey);
+  }
+
+  // Calculate distinct counts
+  for (const [examKey, setOfParticipants] of Object.entries(examParticipantSets)) {
+    countsMap[examKey] = setOfParticipants.size;
+  }
+
+  return countsMap;
+}
+
+/**
  * Fetch exam-specific leaderboard via Supabase `exam_results` table (Sort by score DESC)
  * or via secure RPC `get_exam_leaderboard`.
  * Falls back gracefully to server RPC API and local store.
@@ -1247,19 +1370,46 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       console.warn('Supabase get_exam_leaderboard RPC error:', rpcErr);
     }
 
-    // 2. Direct Supabase Query from `exam_results` table sorted by score DESC
+    // 2. Direct Supabase Query from `global_leaderboard` view or `exam_results` table sorted by score DESC
     try {
-      let query = supabaseInstance
-        .from('exam_results')
-        .select('*')
-        .order('score', { ascending: false });
+      let data: any = null;
+      let error: any = null;
 
-      if (examId && examId !== 'all') {
-        const cleanExamId = examId.trim();
-        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+      // 2A. Try 'global_leaderboard' VIEW first
+      try {
+        let viewQuery = supabaseInstance
+          .from('global_leaderboard')
+          .select('*')
+          .order('score', { ascending: false });
+
+        if (examId && examId !== 'all') {
+          const cleanExamId = examId.trim();
+          viewQuery = viewQuery.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+        }
+
+        const viewRes = await fetchWithTimeout(Promise.resolve(viewQuery), 4000, { data: null, error: null } as any);
+        if (!viewRes.error && Array.isArray(viewRes.data) && viewRes.data.length > 0) {
+          data = viewRes.data;
+        }
+      } catch {}
+
+      // 2B. If VIEW not present, query `exam_results` table
+      if (!data || data.length === 0) {
+        let query = supabaseInstance
+          .from('exam_results')
+          .select('*')
+          .order('score', { ascending: false });
+
+        if (examId && examId !== 'all') {
+          const cleanExamId = examId.trim();
+          query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+        }
+
+        const directRes = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
+        data = directRes.data;
+        error = directRes.error;
       }
 
-      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
       if (!error && Array.isArray(data) && data.length > 0) {
         // Fetch profiles to map names and avatars
         const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
@@ -1281,21 +1431,42 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         // Deduplicate best result per distinct participant
         const bestMap = new Map<string, any>();
         for (const row of data) {
-          const uKey = String(row.user_id || row.full_name || row.user_name || row.id || '');
+          const isReg = Boolean(row.user_id && !row.user_id.startsWith('guest_') && !row.user_id.startsWith('anon_'));
+          const uKey = isReg
+            ? String(row.user_id).trim()
+            : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '').trim().toLowerCase();
+          
           const existing = bestMap.get(uKey);
-          const scoreVal = Number(row.score ?? row.correct_answers ?? 0);
-          if (!existing || scoreVal > Number(existing.score ?? existing.correct_answers ?? 0)) {
+          const scoreVal = Number(row.score ?? row.correct_answers ?? row.correct_count ?? 0);
+          const timeVal = Number(row.time_taken_seconds ?? row.time_taken ?? 999999);
+          const rowDate = new Date(row.submitted_at || row.created_at || 0).getTime();
+
+          if (!existing) {
             bestMap.set(uKey, row);
+          } else {
+            const existScore = Number(existing.score ?? existing.correct_answers ?? existing.correct_count ?? 0);
+            const existTime = Number(existing.time_taken_seconds ?? existing.time_taken ?? 999999);
+            const existDate = new Date(existing.submitted_at || existing.created_at || 0).getTime();
+
+            if (scoreVal > existScore) {
+              bestMap.set(uKey, row);
+            } else if (scoreVal === existScore) {
+              if (timeVal < existTime) {
+                bestMap.set(uKey, row);
+              } else if (rowDate > existDate) {
+                bestMap.set(uKey, row);
+              }
+            }
           }
         }
 
         // Sort: 1. Score DESC, 2. Time Taken ASC, 3. Submitted At ASC
         const sortedRows = Array.from(bestMap.values()).sort((a, b) => {
-          const scoreA = Number(a.score ?? a.correct_answers ?? 0);
-          const scoreB = Number(b.score ?? b.correct_answers ?? 0);
+          const scoreA = Number(a.score ?? a.correct_answers ?? a.correct_count ?? 0);
+          const scoreB = Number(b.score ?? b.correct_answers ?? b.correct_count ?? 0);
           if (scoreB !== scoreA) return scoreB - scoreA;
-          const timeA = Number(a.time_taken_seconds || 999999);
-          const timeB = Number(b.time_taken_seconds || 999999);
+          const timeA = Number(a.time_taken_seconds ?? a.time_taken ?? 999999);
+          const timeB = Number(b.time_taken_seconds ?? b.time_taken ?? 999999);
           if (timeA !== timeB) return timeA - timeB;
           return new Date(a.submitted_at || 0).getTime() - new Date(b.submitted_at || 0).getTime();
         });
@@ -1304,11 +1475,11 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
           const prof = profilesMap.get(row.user_id);
           const fullName = row.guest_name || row.full_name || row.user_name || prof?.full_name || 'পরীক্ষার্থী';
           const avatarUrl = row.avatar_url || prof?.avatar_url;
-          const score = Number(row.score ?? row.correct_answers ?? 0);
-          const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers || 0) + Number(row.wrong_answers || 0)) ?? 0);
-          const correctAnswers = Number(row.correct_answers ?? row.score ?? 0);
-          const wrongAnswers = Number(row.wrong_answers ?? 0);
-          const timeTaken = Number(row.time_taken_seconds || 0);
+          const score = Number(row.score ?? row.correct_answers ?? row.correct_count ?? 0);
+          const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
+          const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
+          const wrongAnswers = Number(row.wrong_answers ?? row.wrong_count ?? 0);
+          const timeTaken = Number(row.time_taken_seconds ?? row.time_taken ?? 0);
           const uId = String(row.user_id || '');
           const isGuest = Boolean(
             row.is_guest === true ||
@@ -1723,23 +1894,50 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   let dbEntries: LeaderboardEntry[] = [];
 
-  // 2. Fetch directly from Supabase `exam_results` table (Sort by score DESC)
+  // 2. Fetch directly from Supabase `global_leaderboard` view or `exam_results` table (Sort by score DESC)
   if (supabaseInstance) {
     try {
-      let query = supabaseInstance
-        .from('exam_results')
-        .select('*')
-        .order('score', { ascending: false })
-        .limit(1000);
+      let data: any = null;
+      let error: any = null;
 
-      if (examId && examId !== 'all') {
-        const cleanExamId = examId.trim();
-        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+      // 2A. Try 'global_leaderboard' VIEW first
+      try {
+        let viewQuery = supabaseInstance
+          .from('global_leaderboard')
+          .select('*')
+          .order('score', { ascending: false })
+          .limit(1000);
+
+        if (examId && examId !== 'all') {
+          const cleanExamId = examId.trim();
+          viewQuery = viewQuery.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+        }
+
+        const viewRes = await fetchWithTimeout(Promise.resolve(viewQuery), 4000, { data: null, error: null } as any);
+        if (!viewRes.error && Array.isArray(viewRes.data) && viewRes.data.length > 0) {
+          data = viewRes.data;
+        }
+      } catch {}
+
+      // 2B. If VIEW not present, query `exam_results` table
+      if (!data || data.length === 0) {
+        let query = supabaseInstance
+          .from('exam_results')
+          .select('*')
+          .order('score', { ascending: false })
+          .limit(1000);
+
+        if (examId && examId !== 'all') {
+          const cleanExamId = examId.trim();
+          query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+        }
+
+        const queryPromise = Promise.resolve(query);
+        const timeoutFallback = { data: null, error: { message: 'Timeout' } };
+        const directRes = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+        data = directRes.data;
+        error = directRes.error;
       }
-
-      const queryPromise = Promise.resolve(query);
-      const timeoutFallback = { data: null, error: { message: 'Timeout' } };
-      const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
 
       if (data && !error && Array.isArray(data) && data.length > 0) {
         // Fetch profiles
@@ -1774,10 +1972,10 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
           );
           const name = rawGuest || item.full_name || item.user_name || prof?.full_name || 'পরীক্ষার্থী';
           const avatar = item.avatar_url || prof?.avatar_url;
-          const score = Number(item.score ?? item.correct_answers ?? 0);
-          const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers || 0) + Number(item.wrong_answers || 0)) ?? 0);
-          const correctCount = Number(item.correct_answers ?? item.score ?? 0);
-          const wrongCount = Number(item.wrong_answers ?? 0);
+          const score = Number(item.score ?? item.correct_answers ?? item.correct_count ?? 0);
+          const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers ?? item.correct_count ?? 0) + Number(item.wrong_answers ?? item.wrong_count ?? 0)) ?? 0);
+          const correctCount = Number(item.correct_answers ?? item.correct_count ?? item.score ?? 0);
+          const wrongCount = Number(item.wrong_answers ?? item.wrong_count ?? 0);
           const accuracy = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 100;
 
           return {
@@ -1795,7 +1993,7 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
             wrong_count: wrongCount,
             accuracy,
             is_guest: isGuest,
-            time_taken_seconds: Number(item.time_taken_seconds || 0),
+            time_taken_seconds: Number(item.time_taken_seconds ?? item.time_taken ?? 0),
             created_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
           };
         });
@@ -1831,23 +2029,38 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
     }
   }
 
-  // Combine and deduplicate across server, db, and local
-  const mergedMap = new Map<string, LeaderboardEntry>();
+  // Combine and deduplicate across server, db, and local: Keep only BEST result per unique participant per exam
+  const bestPerExamAndUser = new Map<string, LeaderboardEntry>();
   [...serverEntries, ...dbEntries, ...localEntries].forEach((e) => {
-    const key = e.id || `${e.user_id || e.user_name}_${e.exam_id}_${e.score}_${e.created_at}`;
-    if (!mergedMap.has(key)) {
-      mergedMap.set(key, e);
+    const isReg = Boolean(e.user_id && !e.user_id.startsWith('guest_') && !e.user_id.startsWith('anon_'));
+    const pKey = isReg
+      ? String(e.user_id).trim()
+      : String(e.guest_name || e.user_name || e.full_name || e.id).trim().toLowerCase();
+    const examKey = (e.exam_id || e.exam_title || 'general').trim().toLowerCase();
+    const compoundKey = `${examKey}__${pKey}`;
+
+    const existing = bestPerExamAndUser.get(compoundKey);
+    if (!existing) {
+      bestPerExamAndUser.set(compoundKey, e);
     } else {
-      const existing = mergedMap.get(key)!;
-      mergedMap.set(key, {
-        ...existing,
-        user_id: existing.user_id || e.user_id,
-        user_avatar: existing.user_avatar || e.user_avatar,
-      });
+      const eScore = Number(e.score || 0);
+      const existScore = Number(existing.score || 0);
+      if (eScore > existScore) {
+        bestPerExamAndUser.set(compoundKey, e);
+      } else if (eScore === existScore) {
+        const eAcc = Number(e.accuracy || 0);
+        const existAcc = Number(existing.accuracy || 0);
+        if (eAcc > existAcc) {
+          bestPerExamAndUser.set(compoundKey, e);
+        } else if (new Date(e.created_at).getTime() > new Date(existing.created_at).getTime()) {
+          // Keep latest submission
+          bestPerExamAndUser.set(compoundKey, e);
+        }
+      }
     }
   });
 
-  const mergedList = Array.from(mergedMap.values());
+  const mergedList = Array.from(bestPerExamAndUser.values());
 
   // Sort by score descending (Sort by score DESC)
   mergedList.sort((a, b) => {
