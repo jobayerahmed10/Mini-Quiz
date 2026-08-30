@@ -1155,76 +1155,29 @@ export async function submitExamResultToSupabase(params: {
       console.warn('Profiles upsert warning:', profErr);
     }
 
-    // 3B. Multi-tier resilient insert into exam_results
-    let inserted = false;
-    // Attempt 1: Full payload with name and title metadata
-    try {
-      const { error: fullErr } = await supabaseInstance
-        .from('exam_results')
-        .insert([
-          {
-            user_id: params.user_id,
-            exam_id: params.exam_id,
-            score: params.score,
-            total_marks: params.total_marks,
-            correct_answers: params.correct_answers,
-            wrong_answers: params.wrong_answers,
-            time_taken_seconds: timeTaken,
-            submitted_at: submittedAt,
-            full_name: effectiveName,
-            user_name: effectiveName,
-            guest_name: isGuest ? effectiveName : params.guest_name,
-            is_guest: isGuest,
-            exam_title: params.exam_title,
-            is_free: params.is_free ?? true,
-          },
-        ]);
-      if (!fullErr) {
-        inserted = true;
-      }
-    } catch {}
+    // 3B. Insert into exam_results as requested
+    const { data, error } = await supabaseInstance
+      .from('exam_results')
+      .insert([
+        {
+          exam_id: params.exam_id,
+          user_id: params.user_id || null,
+          guest_id: isGuest ? params.user_id : null,
+          user_name: effectiveName || 'গেস্ট ইউজার',
+          score: params.score,
+          correct_count: params.correct_answers,
+          wrong_count: params.wrong_answers,
+          time_taken: timeTaken,
+          total_marks: params.total_marks,
+          exam_title: params.exam_title,
+          submitted_at: submittedAt,
+          is_free: params.is_free ?? true,
+        },
+      ]);
 
-    // Attempt 2: Standard schema columns
-    if (!inserted) {
-      try {
-        const { error: stdErr } = await supabaseInstance
-          .from('exam_results')
-          .insert([
-            {
-              user_id: params.user_id,
-              exam_id: params.exam_id,
-              score: params.score,
-              total_marks: params.total_marks,
-              correct_answers: params.correct_answers,
-              wrong_answers: params.wrong_answers,
-              time_taken_seconds: timeTaken,
-              submitted_at: submittedAt,
-            },
-          ]);
-        if (!stdErr) {
-          inserted = true;
-        } else {
-          console.warn('Standard exam_results insert warning:', stdErr.message);
-        }
-      } catch {}
-    }
-
-    // Attempt 3: Core minimal columns (user_id, exam_id, score)
-    if (!inserted) {
-      try {
-        const { error: minErr } = await supabaseInstance
-          .from('exam_results')
-          .insert([
-            {
-              user_id: params.user_id,
-              exam_id: params.exam_id,
-              score: params.score,
-            },
-          ]);
-        if (minErr) {
-          console.warn('Minimal exam_results insert error:', minErr.message);
-        }
-      } catch {}
+    if (error) {
+      console.log(error);
+      return { success: false, error: error.message };
     }
 
     // 3C. Also insert into leaderboard_entries for dual-write compatibility if table exists

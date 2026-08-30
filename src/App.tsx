@@ -502,29 +502,31 @@ export default function App() {
       wrong_answers: wrongCount,
       time_taken_seconds: timeTakenSeconds,
       submitted_at: entry.created_at,
+    }).then((res) => {
+      // Mark specific active exam as completed and persist result
+      if (activeExamId) {
+        addCompletedExamId(activeExamId);
+        saveExamResult(activeExamId, result);
+      }
+      if (activeExamTitle) {
+        addCompletedExamId(activeExamTitle);
+        saveExamResult(activeExamTitle, result);
+      }
+      if (selectedSubject) {
+        saveExamResult(selectedSubject, result);
+      }
+      saveExamResult('latest_exam_result', result);
+
+      // Save to real full exam history and wrong answers bank
+      saveExamToHistory(result);
+      saveWrongAnswersFromQuiz(result);
+
+      const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
+      setStudentStats(updatedStats);
+
+      // Redirect to Leaderboard Page upon successful insert
+      handleOpenLeaderboard(examId);
     });
-
-    // Mark specific active exam as completed and persist result
-    if (activeExamId) {
-      addCompletedExamId(activeExamId);
-      saveExamResult(activeExamId, result);
-    }
-    if (activeExamTitle) {
-      addCompletedExamId(activeExamTitle);
-      saveExamResult(activeExamTitle, result);
-    }
-    if (selectedSubject) {
-      saveExamResult(selectedSubject, result);
-    }
-    saveExamResult('latest_exam_result', result);
-
-    // Save to real full exam history and wrong answers bank
-    saveExamToHistory(result);
-    saveWrongAnswersFromQuiz(result);
-
-    const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
-    setStudentStats(updatedStats);
-    navigateWithHistory('result');
   };
 
   const handleReviewAnswers = (opts: { examId?: string; subject?: string; examType?: string; questionCount?: number; timeMinutes?: number }) => {
