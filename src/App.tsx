@@ -45,7 +45,8 @@ import {
   saveUserProfile, 
   clearUserProfile,
   saveExamToHistory,
-  saveWrongAnswersFromQuiz
+  saveWrongAnswersFromQuiz,
+  resetExamAttemptCache
 } from './lib/utils';
 
 export default function App() {
@@ -565,6 +566,9 @@ export default function App() {
   };
 
   const handleStartPractice = (subjectOrOpts: string | { subject: string; topic?: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string } = 'সকল বিষয়') => {
+    // Unique Attempt Isolation: Completely reset quiz result state on clicking/starting any exam
+    setQuizResult(null);
+
     if (typeof subjectOrOpts === 'string') {
       setSelectedSubject(subjectOrOpts);
       setSelectedTopic(undefined);
@@ -577,10 +581,12 @@ export default function App() {
       setSelectedTopic(subjectOrOpts.topic);
       setExamQuestionCount(subjectOrOpts.questionCount);
       setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
-      setActiveExamId(subjectOrOpts.examId || subjectOrOpts.examType);
+      const eId = subjectOrOpts.examId;
+      const eType = subjectOrOpts.examType;
+      setActiveExamId(eId || eType);
       const title = subjectOrOpts.topic
         ? `${subjectOrOpts.subject} (${subjectOrOpts.topic})`
-        : (subjectOrOpts.examType || subjectOrOpts.subject);
+        : (eType || subjectOrOpts.subject);
       setActiveExamTitle(title);
     }
     navigateWithHistory('practice');
