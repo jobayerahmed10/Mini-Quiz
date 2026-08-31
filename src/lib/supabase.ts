@@ -5057,15 +5057,27 @@ export function generateSlug(title: string): string {
   return sanitized ? `${sanitized}-${Date.now().toString(36).substring(4)}` : `blog-${Date.now()}`;
 }
 
-export async function fetchBlogPosts(): Promise<BlogPost[]> {
+export async function fetchBlogPosts(filterOptions?: { category?: string; sub_category?: string; subject?: string }): Promise<BlogPost[]> {
   let blogs: BlogPost[] = getCachedBlogs();
 
   if (supabaseInstance) {
     try {
-      const { data, error } = await supabaseInstance
+      let query = supabaseInstance
         .from('blogs')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (filterOptions?.category && filterOptions.category !== 'সবগুলো') {
+        query = query.eq('category', filterOptions.category);
+      }
+      if (filterOptions?.sub_category) {
+        query = query.eq('sub_category', filterOptions.sub_category);
+      }
+      if (filterOptions?.subject) {
+        query = query.eq('subject', filterOptions.subject);
+      }
+
+      const { data, error } = await query;
 
       if (!error && Array.isArray(data) && data.length > 0) {
         const mapped: BlogPost[] = data.map((item: any) => ({
@@ -5076,6 +5088,8 @@ export async function fetchBlogPosts(): Promise<BlogPost[]> {
           excerpt: item.excerpt || item.description || '',
           content: item.content || item.full_content || '',
           category: (item.category || 'নিবন্ধন প্রস্তুতি') as BlogCategory,
+          sub_category: item.sub_category || item.subCategory || undefined,
+          subject: item.subject || item.topic || undefined,
           author: item.author || 'আত-তামরীন একাডেমি',
           published_date: item.published_date || '৩১ আগস্ট ২০২৬',
           reading_time_minutes: Number(item.reading_time_minutes || item.reading_time || 5),
@@ -5086,8 +5100,10 @@ export async function fetchBlogPosts(): Promise<BlogPost[]> {
           is_featured: Boolean(item.is_featured),
         }));
 
+        if (!filterOptions || (!filterOptions.category && !filterOptions.sub_category && !filterOptions.subject)) {
+          setCachedBlogs(mapped);
+        }
         blogs = mapped;
-        setCachedBlogs(mapped);
         return blogs;
       }
     } catch (err) {
@@ -5095,10 +5111,23 @@ export async function fetchBlogPosts(): Promise<BlogPost[]> {
     }
   }
 
+  // If cached or fallback, apply filtering locally
+  if (filterOptions) {
+    if (filterOptions.category && filterOptions.category !== 'সবগুলো') {
+      blogs = blogs.filter(b => b.category === filterOptions.category);
+    }
+    if (filterOptions.sub_category) {
+      blogs = blogs.filter(b => b.sub_category === filterOptions.sub_category);
+    }
+    if (filterOptions.subject) {
+      blogs = blogs.filter(b => b.subject === filterOptions.subject);
+    }
+  }
+
   return blogs;
 }
 
-export async function saveBlogPost(postData: Partial<BlogPost> & { title: string; content: string; category: BlogCategory }): Promise<{ success: boolean; post?: BlogPost; error?: string }> {
+export async function saveBlogPost(postData: Partial<BlogPost> & { title: string; content: string; category: BlogCategory; sub_category?: string; subject?: string }): Promise<{ success: boolean; post?: BlogPost; error?: string }> {
   try {
     const slug = postData.slug || generateSlug(postData.title);
     const newPost: BlogPost = {
@@ -5109,6 +5138,8 @@ export async function saveBlogPost(postData: Partial<BlogPost> & { title: string
       excerpt: postData.excerpt || postData.content.substring(0, 140) + '...',
       content: postData.content,
       category: postData.category,
+      sub_category: postData.sub_category || undefined,
+      subject: postData.subject || undefined,
       author: postData.author || 'আত-তামরীন টিম',
       published_date: postData.published_date || new Intl.DateTimeFormat('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()),
       reading_time_minutes: postData.reading_time_minutes || Math.max(1, Math.ceil(postData.content.split(/\s+/).length / 150)),
@@ -5142,6 +5173,8 @@ export async function saveBlogPost(postData: Partial<BlogPost> & { title: string
           excerpt: newPost.excerpt,
           content: newPost.content,
           category: newPost.category,
+          sub_category: newPost.sub_category || null,
+          subject: newPost.subject || null,
           author: newPost.author,
           published_date: newPost.published_date,
           reading_time_minutes: newPost.reading_time_minutes,

@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { BlogPost, BlogCategory } from '../types';
+import { BLOG_TAXONOMY } from '../data/blogData';
 import { 
   saveBlogPost, 
   deleteBlogPost, 
@@ -54,6 +55,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<BlogCategory>('নিবন্ধন প্রস্তুতি');
+  const [subCategory, setSubCategory] = useState<string>('সহকারী মৌলভী');
+  const [subject, setSubject] = useState<string>('কুরআন ও তাফসির');
   const [thumbnail, setThumbnail] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [content, setContent] = useState('');
@@ -63,6 +66,39 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
   const [status, setStatus] = useState<'published' | 'draft'>('published');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get available sub-categories for the selected category
+  const currentCategoryTaxonomy = BLOG_TAXONOMY.find(c => c.name === category);
+  const availableSubCategories = currentCategoryTaxonomy?.subCategories || [];
+  const currentSubCategoryTaxonomy = availableSubCategories.find(s => s.name === subCategory);
+  const availableSubjects = currentSubCategoryTaxonomy?.subjects || [];
+
+  const handleCategoryChange = (newCat: BlogCategory) => {
+    setCategory(newCat);
+    const tax = BLOG_TAXONOMY.find(c => c.name === newCat);
+    if (tax && tax.subCategories.length > 0) {
+      const firstSub = tax.subCategories[0];
+      setSubCategory(firstSub.name);
+      if (firstSub.subjects.length > 0) {
+        setSubject(firstSub.subjects[0]);
+      } else {
+        setSubject('');
+      }
+    } else {
+      setSubCategory('');
+      setSubject('');
+    }
+  };
+
+  const handleSubCategoryChange = (newSub: string) => {
+    setSubCategory(newSub);
+    const subTax = availableSubCategories.find(s => s.name === newSub);
+    if (subTax && subTax.subjects.length > 0) {
+      setSubject(subTax.subjects[0]);
+    } else {
+      setSubject('');
+    }
+  };
 
   const loadBlogs = async () => {
     setIsLoading(true);
@@ -107,6 +143,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
     setEditingId(blog.id);
     setTitle(blog.title);
     setCategory(blog.category);
+    setSubCategory(blog.sub_category || '');
+    setSubject(blog.subject || '');
     setThumbnail(blog.thumbnail);
     setExcerpt(blog.excerpt);
     setContent(blog.content);
@@ -121,6 +159,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
     setEditingId(null);
     setTitle('');
     setCategory('নিবন্ধন প্রস্তুতি');
+    setSubCategory('সহকারী মৌলভী');
+    setSubject('কুরআন ও তাফসির');
     setThumbnail('');
     setExcerpt('');
     setContent('');
@@ -139,10 +179,12 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
 
     setIsSaving(true);
     try {
-      const payload: Partial<BlogPost> & { title: string; content: string; category: BlogCategory } = {
+      const payload: Partial<BlogPost> & { title: string; content: string; category: BlogCategory; sub_category?: string; subject?: string } = {
         ...(editingId ? { id: editingId } : {}),
         title: title.trim(),
         category,
+        sub_category: subCategory.trim() || undefined,
+        subject: subject.trim() || undefined,
         thumbnail: thumbnail.trim() || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
         excerpt: excerpt.trim() || content.substring(0, 140) + '...',
         content: content.trim(),
@@ -267,16 +309,54 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                 {/* Category */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    ক্যাটাগরি (Category) *
+                    মূল ক্যাটাগরি (Main Category) *
                   </label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value as BlogCategory)}
+                    onChange={(e) => handleCategoryChange(e.target.value as BlogCategory)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-[#046A38]"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Sub Category */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    সাব-ক্যাটাগরি (Sub-Category)
+                  </label>
+                  <select
+                    value={subCategory}
+                    onChange={(e) => handleSubCategoryChange(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-[#046A38]"
+                  >
+                    <option value="">-- সাব-ক্যাটাগরি নির্বাচন করুন --</option>
+                    {availableSubCategories.map((sub) => (
+                      <option key={sub.id} value={sub.name}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subject */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    বিষয় / টপিক (Subject / Topic)
+                  </label>
+                  <select
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-[#046A38]"
+                  >
+                    <option value="">-- বিষয় নির্বাচন করুন --</option>
+                    {availableSubjects.map((sbj) => (
+                      <option key={sbj} value={sbj}>
+                        {sbj}
                       </option>
                     ))}
                   </select>

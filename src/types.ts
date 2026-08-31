@@ -79,6 +79,8 @@ export interface BlogPost {
   excerpt: string;
   content: string;
   category: BlogCategory;
+  sub_category?: string;
+  subject?: string;
   author: string;
   published_date: string;
   reading_time_minutes: number;
