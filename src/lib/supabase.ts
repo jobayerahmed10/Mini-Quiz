@@ -986,9 +986,11 @@ export interface LeaderboardEntry {
 
 export interface ExamLeaderboardItem {
   rank: number;
-  user_id: string;
+  user_id?: string;
   full_name: string;
+  user_name?: string;
   guest_name?: string;
+  guest_id?: string;
   avatar_url?: string;
   roll_number?: string;
   student_id?: string;
@@ -1162,6 +1164,9 @@ export async function submitExamResultToSupabase(params: {
   }
 
   try {
+    const isValidUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
     let authUserId: string | null = null;
     try {
       const { data: { user } } = await supabaseInstance.auth.getUser();
@@ -1170,20 +1175,23 @@ export async function submitExamResultToSupabase(params: {
       }
     } catch {}
 
-    const registeredUserId = (!isGuest && (authUserId || (params.user_id && !params.user_id.startsWith('guest_') && !params.user_id.startsWith('anon_'))))
-      ? String(authUserId || params.user_id).trim()
+    const userProfile = getUserProfile();
+    const rawCandidateId = authUserId || (userProfile as any)?.id || params.user_id;
+    // Only pass user_id to Supabase if it is a valid UUID to prevent PostgreSQL type errors
+    const dbUserId = (!isGuest && isValidUuid(rawCandidateId))
+      ? String(rawCandidateId).trim()
       : null;
 
     let registeredRollNumber: string | null = params.roll_number || params.student_id || null;
     let registeredFullName: string = effectiveName || 'পরীক্ষার্থী';
 
-    // 3A. Fetch and Upsert Profile ONLY for registered users
-    if (registeredUserId) {
+    // 3A. Fetch and Upsert Profile ONLY for registered users with a valid UUID
+    if (dbUserId) {
       try {
         const { data: prof } = await supabaseInstance
           .from('profiles')
           .select('full_name, roll_number, student_id')
-          .eq('id', registeredUserId)
+          .eq('id', dbUserId)
           .maybeSingle();
 
         if (prof) {
@@ -1196,7 +1204,7 @@ export async function submitExamResultToSupabase(params: {
         }
 
         const profileData: any = {
-          id: registeredUserId,
+          id: dbUserId,
           full_name: registeredFullName,
           avatar_url: params.avatar_url || null,
           updated_at: submittedAt,
@@ -1214,7 +1222,7 @@ export async function submitExamResultToSupabase(params: {
       }
     }
 
-    // 3B. Insert into exam_results directly with user_id NULL for guests, Auth UUID/registered ID for registered users
+    // 3B. Insert into exam_results directly with user_id (UUID or null)
     const guestId = isGuest
       ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
       : null;
@@ -1224,7 +1232,7 @@ export async function submitExamResultToSupabase(params: {
     const submissionData = {
       exam_id: String(params.exam_id),
       exam_title: params.exam_title || 'মডেল টেস্ট',
-      user_id: registeredUserId,
+      user_id: dbUserId,
       user_name: userName,
       full_name: registeredFullName,
       guest_name: guestName,
@@ -1419,12 +1427,13 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
   if (supabaseInstance) {
     try {
       const cleanExamId = examId.trim();
+      const escapedExamId = cleanExamId.replace(/"/g, '\\"');
       
-      // Query exam_results directly as requested
+      // Query exam_results directly as requested with quoted values for PostgREST compatibility
       let query = supabaseInstance
         .from('exam_results')
         .select('*')
-        .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
+        .or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`)
         .order('score', { ascending: false })
         .order('time_taken', { ascending: true });
 
@@ -1437,7 +1446,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         let queryFallback = supabaseInstance
           .from('exam_results')
           .select('*')
-          .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
+          .or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`)
           .order('score', { ascending: false })
           .order('time_taken_seconds', { ascending: true });
         const fallbackRes = await fetchWithTimeout(Promise.resolve(queryFallback), 6000, { data: null, error: null } as any);
@@ -1466,9 +1475,10 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         // Deduplicate best result per distinct participant
         const bestMap = new Map<string, any>();
         for (const row of data) {
-          const isReg = Boolean(row.user_id && !String(row.user_id).startsWith('guest_') && !String(row.user_id).startsWith('anon_'));
+          const uIdStr = row.user_id ? String(row.user_id).trim() : '';
+          const isReg = Boolean(row.is_guest === false || (uIdStr && !uIdStr.startsWith('guest_') && !uIdStr.startsWith('anon_')));
           const uKey = isReg
-            ? String(row.user_id).trim()
+            ? (uIdStr || String(row.roll_number || row.student_id || row.full_name || row.user_name || row.id || '').trim().toLowerCase())
             : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '').trim().toLowerCase();
           
           const existing = bestMap.get(uKey);
@@ -1508,15 +1518,15 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
         return sortedRows.map((row: any, idx: number) => {
           const uId = row.user_id ? String(row.user_id).trim() : null;
-          const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
-          const prof = isRegistered ? profilesMap.get(uId) : null;
+          const isRegistered = Boolean(row.is_guest === false || (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')));
+          const prof = (isRegistered && uId) ? profilesMap.get(uId) : null;
           const isGuest = !isRegistered;
 
-          // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
-          const fullName = prof?.full_name || row.user_name || row.guest_name || row.full_name || 'Anonymous';
+          // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.full_name ?? exam_results.guest_name ?? 'Anonymous'
+          const fullName = prof?.full_name || row.full_name || row.user_name || row.guest_name || 'পরীক্ষার্থী';
           
-          // ID/Roll fallback: profiles.roll_number ?? exam_results.guest_id ?? 'N/A'
-          const rawRollOrId = prof?.roll_number || prof?.student_id || row.guest_id || row.roll_number || row.student_id;
+          // ID/Roll fallback: profiles.roll_number ?? exam_results.roll_number ?? exam_results.guest_id ?? 'N/A'
+          const rawRollOrId = prof?.roll_number || prof?.student_id || row.roll_number || row.student_id || row.guest_id;
           const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
           const avatarUrl = isRegistered ? (prof?.avatar_url || row.avatar_url) : row.avatar_url;
@@ -1872,11 +1882,14 @@ export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): P
   }
 
   try {
+    const isValidUuid = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
     const record = {
       id: entry.id,
       exam_id: entry.exam_id,
       exam_title: entry.exam_title,
-      user_id: entry.user_id || null,
+      user_id: isValidUuid(entry.user_id) ? entry.user_id : null,
       user_name: entry.user_name,
       user_avatar: entry.user_avatar || null,
       score: entry.score,
@@ -1949,7 +1962,8 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
       if (examId && examId !== 'all') {
         const cleanExamId = examId.trim();
-        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
+        const escapedExamId = cleanExamId.replace(/"/g, '\\"');
+        query = query.or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`);
       }
 
       const queryPromise = Promise.resolve(query);

@@ -176,29 +176,30 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         // Map real participants by unique user ID or distinct guest key
         const candidatesMap = new Map<string, any>();
 
+        const currentUserProfile = getUserProfile();
+        const currentRoll = currentUserProfile?.roll_number || currentUserProfile?.student_id;
+        const currentName = currentUserProfile?.name?.trim()?.toLowerCase();
+        const isRegisteredUser = isUserRegistered();
+
         // Add from RPC
         for (const item of rpcEntries) {
-          const rawName = (item.guest_name || item.full_name || '').trim();
+          const rawName = (item.full_name || item.user_name || item.guest_name || '').trim();
           if (!rawName) continue;
+
           const isUser = Boolean(
-            currentUserId &&
-            item.user_id &&
-            item.user_id === currentUserId &&
-            !item.user_id.startsWith('guest_') &&
-            !item.user_id.startsWith('anon_') &&
-            !item.is_guest
+            isRegisteredUser && (
+              (currentUserId && item.user_id && item.user_id === currentUserId) ||
+              (currentRoll && (item.roll_number === currentRoll || item.student_id === currentRoll || item.guest_id === currentRoll)) ||
+              (currentName && (rawName.toLowerCase() === currentName || (item.full_name || '').toLowerCase() === currentName))
+            )
           );
-          const isGuest = Boolean(
-            item.is_guest ||
-            !item.user_id ||
-            item.user_id.startsWith('guest_') ||
-            item.user_id.startsWith('anon_') ||
-            Boolean(item.guest_name) ||
-            rawName.includes('গেস্ট')
-          );
-          const key = (isUser && item.user_id)
-            ? item.user_id.trim()
-            : (item.guest_name || rawName || item.user_id || '').toLowerCase();
+          const isGuest = item.is_guest !== undefined
+            ? item.is_guest
+            : (!isUser && (!item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name)));
+
+          const key = (isUser && (item.user_id || currentRoll))
+            ? (item.user_id || currentRoll)
+            : (item.roll_number || item.student_id || item.guest_id || item.user_id || rawName || 'anon').toLowerCase();
 
           candidatesMap.set(key, {
             name: rawName,

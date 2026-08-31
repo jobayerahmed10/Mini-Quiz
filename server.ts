@@ -127,6 +127,7 @@ interface ServerExamResult {
   is_guest?: boolean;
   avatar_url?: string;
   roll_number?: string;
+  student_id?: string;
   score: number;
   total_marks: number;
   correct_answers: number;
@@ -965,11 +966,13 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
       );
     });
 
-    // Keep best result per distinct participant (registered user_id OR distinct guest)
+    // Keep best result per distinct participant (registered user_id/roll_number OR distinct guest)
     const userBestMap = new Map<string, ServerExamResult>();
     for (const r of matching) {
-      const isReg = r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_');
-      const uKey = isReg ? r.user_id.trim() : (r.guest_name || r.full_name || r.id).trim().toLowerCase();
+      const isReg = r.is_guest === false || Boolean(r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_'));
+      const uKey = isReg
+        ? String(r.user_id || r.roll_number || r.student_id || r.full_name || r.user_name || r.id).trim().toLowerCase()
+        : String(r.guest_id || r.guest_name || r.full_name || r.user_name || r.id).trim().toLowerCase();
       const existing = userBestMap.get(uKey);
       if (!existing) {
         userBestMap.set(uKey, r);
@@ -995,10 +998,10 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
     });
 
     const formatted = list.map((r, idx) => {
-      const isReg = Boolean(r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_'));
+      const isReg = r.is_guest === false || Boolean(r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_'));
       const isGuest = !isReg;
       const fullName = r.user_name || r.full_name || r.guest_name || 'Anonymous';
-      const rollNumber = r.roll_number || r.guest_id || 'N/A';
+      const rollNumber = r.roll_number || r.student_id || r.guest_id || 'N/A';
       return {
         rank: idx + 1,
         user_id: r.user_id || undefined,
@@ -1009,6 +1012,7 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
         is_guest: isGuest,
         avatar_url: r.avatar_url || '',
         roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
+        student_id: rollNumber !== 'N/A' ? rollNumber : undefined,
         score: r.score,
         total_marks: r.total_marks,
         correct_answers: r.correct_answers,
