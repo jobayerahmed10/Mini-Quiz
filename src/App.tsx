@@ -466,8 +466,9 @@ export default function App() {
     const effectiveName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
     const guestName = isGuest ? effectiveName : undefined;
     const userAvatar = userProfile?.avatar;
+    const userRoll = userProfile?.roll_number || userProfile?.student_id || getUserRollNumber(userProfile?.phone);
     const userId = isRegistered 
-      ? (userProfile?.id || userProfile?.roll_number || userProfile?.student_id || getUserUniqueId()) 
+      ? (userRoll || (userProfile as any)?.id || getUserUniqueId()) 
       : `guest_${(rawName || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
     const isFreeExam = !String(activeExamId || '').toLowerCase().includes('paid');
 

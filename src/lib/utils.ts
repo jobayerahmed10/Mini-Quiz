@@ -248,11 +248,6 @@ export function isUserRegistered(): boolean {
   }
 }
 
-export function isValidUUID(id?: string | null): boolean {
-  if (!id || typeof id !== 'string') return false;
-  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id.trim());
-}
-
 export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

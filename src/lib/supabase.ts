@@ -22,7 +22,6 @@ import {
   getBookmarkedIds,
   getLocalQuestionLikeCount,
   setLocalQuestionLikeCount,
-  isValidUUID,
   generateUUID
 } from './utils';
 
