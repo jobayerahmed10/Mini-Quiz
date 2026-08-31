@@ -4590,3 +4590,82 @@ export async function submitQuestionCommunityExplanation(explanation: {
   return { success: true, newExplanation: fallbackItem };
 }
 
+export async function customPhoneLoginOrRegister(
+  fullName: string,
+  phone: string,
+  email?: string
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const cleanPhone = (phone || '').trim();
+    const cleanName = (fullName || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    if (!cleanPhone || !cleanName) {
+      return { success: false, error: 'নাম এবং মোবাইল নম্বর প্রদান করা আবশ্যক।' };
+    }
+
+    if (!supabaseInstance) {
+      return { success: false, error: 'ডাটাবেজ সংযোগ পাওয়া যায়নি।' };
+    }
+
+    // 1. Check if phone exists
+    const { data: existingProfile, error: searchError } = await supabaseInstance
+      .from('profiles')
+      .select('*')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
+
+    if (searchError) {
+      console.warn('Phone lookup error:', searchError);
+    }
+
+    if (existingProfile) {
+      // 2. User exists: return existing data and roll number
+      const roll = existingProfile.roll_number || existingProfile.student_id || getUserRollNumber(cleanPhone);
+      return {
+        success: true,
+        user: {
+          id: existingProfile.id,
+          full_name: existingProfile.full_name,
+          phone: existingProfile.phone,
+          email: existingProfile.email,
+          role: existingProfile.role || 'student',
+          roll_number: roll,
+          student_id: roll,
+          avatar_url: existingProfile.avatar_url || ''
+        }
+      };
+    }
+
+    // 3. New User
+    const newId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const newRoll = getUserRollNumber(cleanPhone); // TM-XXXXXX
+    const newProfile = {
+      id: newId,
+      full_name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail || null,
+      role: 'student',
+      roll_number: newRoll,
+      student_id: newRoll,
+      avatar_url: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: insertError } = await supabaseInstance
+      .from('profiles')
+      .insert([newProfile]);
+
+    if (insertError) {
+      return { success: false, error: 'প্রোফাইল তৈরি করতে সমস্যা হয়েছে: ' + insertError.message };
+    }
+
+    return {
+      success: true,
+      user: newProfile
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'একটি ত্রুটি ঘটেছে।' };
+  }
+}
