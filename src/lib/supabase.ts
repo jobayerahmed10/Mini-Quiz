@@ -5032,8 +5032,13 @@ export function getCachedBlogs(): BlogPost[] {
     const raw = localStorage.getItem(BLOGS_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out old demo blogs if any exist
+        const nonDemo = parsed.filter((b: BlogPost) => !b.id.startsWith('blog-'));
+        if (nonDemo.length !== parsed.length) {
+          localStorage.setItem(BLOGS_CACHE_KEY, JSON.stringify(nonDemo));
+        }
+        return nonDemo;
       }
     }
   } catch {}

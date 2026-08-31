@@ -24,10 +24,11 @@ import {
   ShieldCheck,
   Volume2
 } from 'lucide-react';
-import { Question, TabRoute } from '../types';
+import { Question, TabRoute, BlogPost } from '../types';
 import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
-import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, toggleBlogBookmark, getLocalBookmarkedBlogIds } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
+import { BlogDetailView } from './BlogDetailView';
 
 interface HomePageProps {
   questions?: Question[];
@@ -124,8 +125,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Load latest exams from Supabase or cache
   const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
-
   const [serverCompletedIds, setServerCompletedIds] = useState<string[]>([]);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
 
   useEffect(() => {
     const refreshExams = (force: boolean = false) => {
@@ -146,15 +148,30 @@ export const HomePage: React.FC<HomePageProps> = ({
 
     refreshExams(false);
 
+    fetchBlogPosts().then((posts) => {
+      if (Array.isArray(posts)) {
+        setBlogPosts(posts.slice(0, 5));
+      }
+    });
+
     const handleDataChanged = () => {
       refreshExams(true);
+      fetchBlogPosts().then((posts) => {
+        if (Array.isArray(posts)) {
+          setBlogPosts(posts.slice(0, 5));
+        }
+      });
     };
 
     window.addEventListener('tamreen_data_changed', handleDataChanged);
     window.addEventListener('tamreen_exam_completed', handleDataChanged);
+    window.addEventListener('tamreen_blog_changed', handleDataChanged);
+    window.addEventListener('storage', handleDataChanged);
     return () => {
       window.removeEventListener('tamreen_data_changed', handleDataChanged);
       window.removeEventListener('tamreen_exam_completed', handleDataChanged);
+      window.removeEventListener('tamreen_blog_changed', handleDataChanged);
+      window.removeEventListener('storage', handleDataChanged);
     };
   }, []);
 
@@ -194,7 +211,15 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6 sm:space-y-7 animate-fade-in mb-24 font-hind">
-      
+      {selectedBlogPost ? (
+        <BlogDetailView
+          post={selectedBlogPost}
+          allPosts={blogPosts}
+          onBack={() => setSelectedBlogPost(null)}
+          onSelectPost={(post) => setSelectedBlogPost(post)}
+        />
+      ) : (
+        <>
       {/* ========================================================================= */}
       {/* 1. HERO BANNER SLIDER (Exact Match to Screenshot 3) */}
       {/* ========================================================================= */}
@@ -606,7 +631,104 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* ========================================================================= */}
-      {/* 7. তামরীন এআই ডাউট সলভার কার্ড (Exact Match to Screenshot 2) */}
+      {/* 6.5. ব্লগ পোস্ট (সর্বোচ্চ ৫টি) */}
+      {/* ========================================================================= */}
+      <section className="space-y-3">
+        {/* Section Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[#0b705c] dark:text-emerald-400">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight font-hind">
+                ব্লগ পোস্ট
+              </h2>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                শিক্ষক নিবন্ধন প্রস্তুতি ও শিক্ষামূলক সর্বশেষ প্রবন্ধ
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onTabNavigate && onTabNavigate('blogs')}
+            className="neu-pill !rounded-full px-3 py-1 sm:px-3.5 sm:py-1.5 text-xs font-black text-slate-700 dark:text-slate-200 flex items-center gap-1 hover:scale-105 transition-all cursor-pointer shadow-2xs"
+          >
+            <span>সব ব্লগ</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300" />
+          </button>
+        </div>
+
+        {/* Blog Posts List */}
+        {blogPosts.length > 0 ? (
+          <div className="space-y-3 sm:space-y-4">
+            {blogPosts.map((blog, idx) => (
+              <div
+                key={blog.id || `blog-${idx}`}
+                onClick={() => {
+                  setSelectedBlogPost(blog);
+                }}
+                className="neu-card !rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row items-stretch sm:items-center gap-4 hover:shadow-md transition-all cursor-pointer group"
+              >
+                {/* Thumbnail */}
+                <div className="w-full sm:w-28 h-32 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/60 dark:border-slate-700/60 relative">
+                  <img
+                    src={blog.thumbnail || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80'}
+                    alt={blog.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
+                    {blog.category}
+                  </span>
+                </div>
+
+                {/* Content info */}
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {blog.published_date}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {toBengaliNumeral(blog.reading_time_minutes || 5)} মিনিট পড়া
+                    </span>
+                  </div>
+
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind leading-snug group-hover:text-[#0b705c] dark:group-hover:text-emerald-400 transition-colors line-clamp-1">
+                    {blog.title}
+                  </h3>
+
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                    {blog.excerpt}
+                  </p>
+                </div>
+
+                {/* Right Arrow */}
+                <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#0b705c] dark:text-emerald-400 shrink-0 group-hover:bg-[#0b705c] group-hover:text-white transition-all">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="neu-card !rounded-3xl p-5 sm:p-6 text-center border border-slate-200/70 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center text-[#0b705c] dark:text-emerald-400 mx-auto shadow-2xs">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-hind">
+                কোনো ব্লগ পোস্ট পাওয়া যায়নি
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                অ্যাডমিন প্যানেল থেকে নতুন ব্লগ পোস্ট প্রকাশ করলে তা এখানে প্রদর্শিত হবে।
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
       {/* ========================================================================= */}
       <section className="rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-amber-50/80 via-yellow-50/40 to-amber-50/70 dark:from-[#131b2e] dark:via-[#162238] dark:to-[#131b2e] border border-amber-200/80 dark:border-amber-800/40 shadow-xs space-y-4">
         <div className="flex items-center gap-3.5 sm:gap-4">
@@ -652,6 +774,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           }
         }}
       />
+        </>
+      )}
     </div>
   );
 };
