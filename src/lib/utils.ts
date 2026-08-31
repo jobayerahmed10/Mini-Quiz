@@ -1,4 +1,4 @@
-import { QuizResult } from '../types';
+import { QuizResult, Question } from '../types';
 
 /**
  * Removes Arabic Tashkeel / Harakat (diacritics) from text
@@ -612,9 +612,13 @@ export function getExamResult(examIdentifier?: string): QuizResult | null {
 }
 
 /**
- * Bookmarked Questions Storage
+ * Bookmarked & Liked Questions Storage
  */
 const BOOKMARKS_KEY = 'tamreen_bookmarked_ids';
+const BOOKMARKED_QUESTIONS_KEY = 'tamreen_bookmarked_questions_store';
+const LIKES_KEY = 'tamreen_user_liked_question_ids';
+const LIKED_QUESTIONS_KEY = 'tamreen_liked_questions_store';
+const QUESTION_LIKE_COUNTS_KEY = 'tamreen_question_like_counts';
 
 export function getBookmarkedIds(): string[] {
   try {
@@ -625,23 +629,195 @@ export function getBookmarkedIds(): string[] {
   }
 }
 
-export function toggleBookmarkId(id: string): boolean {
+export function getSavedBookmarkedQuestions(): Question[] {
+  try {
+    const raw = localStorage.getItem(BOOKMARKED_QUESTIONS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveBookmarkedQuestion(q: Question): void {
+  if (!q || !q.id) return;
+  try {
+    const list = getSavedBookmarkedQuestions();
+    const existingIdx = list.findIndex((item) => String(item.id) === String(q.id));
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...q };
+    } else {
+      list.unshift(q);
+    }
+    localStorage.setItem(BOOKMARKED_QUESTIONS_KEY, JSON.stringify(list));
+
+    const ids = getBookmarkedIds();
+    const idStr = String(q.id);
+    if (!ids.includes(idStr)) {
+      ids.push(idStr);
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(ids));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids, questions: list } }));
+    }
+  } catch {}
+}
+
+export function removeBookmarkedQuestion(id: string | number): void {
+  const idStr = String(id);
+  try {
+    const list = getSavedBookmarkedQuestions().filter((q) => String(q.id) !== idStr);
+    localStorage.setItem(BOOKMARKED_QUESTIONS_KEY, JSON.stringify(list));
+
+    const ids = getBookmarkedIds().filter((qId) => qId !== idStr);
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(ids));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids, questions: list } }));
+    }
+  } catch {}
+}
+
+export function toggleBookmarkId(id: string, questionObj?: Question): boolean {
   const list = getBookmarkedIds();
   const idx = list.indexOf(id);
   let isSaved = false;
   if (idx >= 0) {
     list.splice(idx, 1);
     isSaved = false;
+    if (questionObj) {
+      removeBookmarkedQuestion(id);
+    }
   } else {
     list.push(id);
     isSaved = true;
+    if (questionObj) {
+      saveBookmarkedQuestion(questionObj);
+    }
   }
   try {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids: list } }));
+    }
   } catch {
     // ignore
   }
   return isSaved;
+}
+
+// Liked Questions Helpers
+export function getLikedIds(): string[] {
+  try {
+    const data = localStorage.getItem(LIKES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getSavedLikedQuestions(): Question[] {
+  try {
+    const raw = localStorage.getItem(LIKED_QUESTIONS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLikedQuestion(q: Question): void {
+  if (!q || !q.id) return;
+  try {
+    const list = getSavedLikedQuestions();
+    const existingIdx = list.findIndex((item) => String(item.id) === String(q.id));
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...q };
+    } else {
+      list.unshift(q);
+    }
+    localStorage.setItem(LIKED_QUESTIONS_KEY, JSON.stringify(list));
+
+    const ids = getLikedIds();
+    const idStr = String(q.id);
+    if (!ids.includes(idStr)) {
+      ids.push(idStr);
+      localStorage.setItem(LIKES_KEY, JSON.stringify(ids));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids, questions: list } }));
+    }
+  } catch {}
+}
+
+export function removeLikedQuestion(id: string | number): void {
+  const idStr = String(id);
+  try {
+    const list = getSavedLikedQuestions().filter((q) => String(q.id) !== idStr);
+    localStorage.setItem(LIKED_QUESTIONS_KEY, JSON.stringify(list));
+
+    const ids = getLikedIds().filter((qId) => qId !== idStr);
+    localStorage.setItem(LIKES_KEY, JSON.stringify(ids));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids, questions: list } }));
+    }
+  } catch {}
+}
+
+export function getLocalQuestionLikeCount(id: string | number): number {
+  try {
+    const raw = localStorage.getItem(QUESTION_LIKE_COUNTS_KEY);
+    if (!raw) return 0;
+    const map = JSON.parse(raw);
+    return typeof map[String(id)] === 'number' ? map[String(id)] : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function setLocalQuestionLikeCount(id: string | number, count: number): void {
+  try {
+    const raw = localStorage.getItem(QUESTION_LIKE_COUNTS_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[String(id)] = Math.max(0, count);
+    localStorage.setItem(QUESTION_LIKE_COUNTS_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export function toggleLikedId(id: string, questionObj?: Question): { isLiked: boolean; newCount: number } {
+  const list = getLikedIds();
+  const idx = list.indexOf(id);
+  let isLiked = false;
+  let currentCount = getLocalQuestionLikeCount(id);
+
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    isLiked = false;
+    currentCount = Math.max(0, currentCount - 1);
+    if (questionObj) {
+      removeLikedQuestion(id);
+    }
+  } else {
+    list.push(id);
+    isLiked = true;
+    currentCount = currentCount + 1;
+    if (questionObj) {
+      saveLikedQuestion(questionObj);
+    }
+  }
+
+  try {
+    localStorage.setItem(LIKES_KEY, JSON.stringify(list));
+    setLocalQuestionLikeCount(id, currentCount);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: list, questionId: id, count: currentCount } }));
+    }
+  } catch {}
+
+  return { isLiked, newCount: currentCount };
 }
 
 /**

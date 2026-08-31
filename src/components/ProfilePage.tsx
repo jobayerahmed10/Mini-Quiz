@@ -13,7 +13,8 @@ import {
   getBookmarkedIds, toggleBookmarkId, isUserRegistered, clearUserProfile, UserProfile,
   compressAndResizeAvatar, getCompletedExamIds, getExamResult,
   getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
-  removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId
+  removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId,
+  getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -111,9 +112,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [copiedRoll, setCopiedRoll] = useState(false);
 
-  // Dynamic Likes & Bookmarks State
-  const [dbLikedIds, setDbLikedIds] = useState<string[]>([]);
-  const [dbBookmarkedIds, setDbBookmarkedIds] = useState<string[]>([]);
+  // Dynamic Likes & Bookmarks State (Synchronous local state first)
+  const [dbLikedIds, setDbLikedIds] = useState<string[]>(() => getLikedIds());
+  const [dbBookmarkedIds, setDbBookmarkedIds] = useState<string[]>(() => getBookmarkedIds());
 
   // Supabase Auth State
   const [authSession, setAuthSession] = useState<any>(null);
@@ -124,6 +125,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const studentStats = getStudentStats();
   const streakDays = getUserStreakDays();
   const bookmarkedIds = Array.from(new Set([...getBookmarkedIds(), ...dbBookmarkedIds]));
+  const likedIds = Array.from(new Set([...getLikedIds(), ...dbLikedIds]));
   const completedExamIds = getCompletedExamIds();
   const userId = getUserUniqueId();
 
@@ -135,11 +137,142 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const averageAccuracy = realMetrics.totalQuestions > 0 ? `${toBengaliNumeral(realMetrics.overallAccuracy)}%` : '০০%';
   const userRollNumber = userProfile?.roll_number || userProfile?.student_id || getUserRollNumber(userProfile?.phone);
 
-  // Load real saved questions
-  const bookmarkedQuestions = SAMPLE_QUESTIONS.filter(q => bookmarkedIds.includes(String(q.id)));
-  const likedQuestions = SAMPLE_QUESTIONS.filter(q => dbLikedIds.includes(String(q.id)));
   const savedWrongQuestions = getSavedWrongQuestions();
   const savedExamHistory = getSavedExamHistory();
+
+  // Aggregate All Known Questions from All Sources
+  const getAllKnownQuestions = (): Question[] => {
+    const questionMap = new Map<string, Question>();
+
+    // 1. Explicitly saved bookmarked questions
+    getSavedBookmarkedQuestions().forEach((q) => {
+      if (q && q.id) questionMap.set(String(q.id), q);
+    });
+
+    // 2. Explicitly saved liked questions
+    getSavedLikedQuestions().forEach((q) => {
+      if (q && q.id) questionMap.set(String(q.id), q);
+    });
+
+    // 3. Question cache from localStorage
+    try {
+      const rawCache = localStorage.getItem('miniquiz_questions_cache');
+      if (rawCache) {
+        const cached = JSON.parse(rawCache);
+        if (Array.isArray(cached)) {
+          cached.forEach((q) => {
+            if (q && q.id) questionMap.set(String(q.id), q);
+          });
+        }
+      }
+    } catch {}
+
+    // 4. Questions from Exam History
+    savedExamHistory.forEach((h) => {
+      if (Array.isArray(h.userAnswers)) {
+        h.userAnswers.forEach((ans: any) => {
+          if (ans && ans.questionId) {
+            const qId = String(ans.questionId);
+            if (!questionMap.has(qId)) {
+              questionMap.set(qId, {
+                id: ans.questionId,
+                question: ans.questionText || '',
+                option_a: ans.options?.option_a || '',
+                option_b: ans.options?.option_b || '',
+                option_c: ans.options?.option_c || '',
+                option_d: ans.options?.option_d || '',
+                correct_answer: ans.correctOption || 'option_a',
+                explanation: ans.explanation || '',
+                subject: h.selectedSubject || 'মডেল টেস্ট',
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // 5. Questions from Wrong Bank
+    savedWrongQuestions.forEach((w) => {
+      if (w && w.questionId) {
+        const qId = String(w.questionId);
+        if (!questionMap.has(qId)) {
+          questionMap.set(qId, {
+            id: w.questionId,
+            question: w.questionText || '',
+            option_a: w.options?.option_a || '',
+            option_b: w.options?.option_b || '',
+            option_c: w.options?.option_c || '',
+            option_d: w.options?.option_d || '',
+            correct_answer: w.correctOption || 'option_a',
+            explanation: w.explanation || '',
+            subject: w.subject || 'ভুল প্রশ্ন',
+          });
+        }
+      }
+    });
+
+    // 6. SAMPLE_QUESTIONS
+    SAMPLE_QUESTIONS.forEach((q) => {
+      if (q && q.id && !questionMap.has(String(q.id))) {
+        questionMap.set(String(q.id), q);
+      }
+    });
+
+    return Array.from(questionMap.values());
+  };
+
+  const allKnownQuestions = getAllKnownQuestions();
+
+  // Load real saved questions
+  const bookmarkedQuestions: Question[] = bookmarkedIds.map((id) => {
+    const found = allKnownQuestions.find((q) => String(q.id) === String(id));
+    if (found) return found;
+    return {
+      id,
+      question: `সংরক্ষিত প্রশ্ন #${id}`,
+      option_a: 'ক',
+      option_b: 'খ',
+      option_c: 'গ',
+      option_d: 'ঘ',
+      correct_answer: 'option_a',
+      explanation: 'বিস্তারিত দেখতে প্রশ্ন কার্ডে যান।',
+      subject: 'সাধারণ',
+    };
+  });
+
+  const likedQuestions: Question[] = likedIds.map((id) => {
+    const found = allKnownQuestions.find((q) => String(q.id) === String(id));
+    if (found) return found;
+    return {
+      id,
+      question: `পছন্দকৃত প্রশ্ন #${id}`,
+      option_a: 'ক',
+      option_b: 'খ',
+      option_c: 'গ',
+      option_d: 'ঘ',
+      correct_answer: 'option_a',
+      explanation: 'বিস্তারিত দেখতে প্রশ্ন কার্ডে যান।',
+      subject: 'সাধারণ',
+    };
+  });
+
+  // Listen to Likes & Bookmarks sync events
+  useEffect(() => {
+    const handleLikesSync = () => {
+      setDbLikedIds(getLikedIds());
+    };
+    const handleBookmarksSync = () => {
+      setDbBookmarkedIds(getBookmarkedIds());
+    };
+
+    window.addEventListener('tamreen_likes_updated', handleLikesSync);
+    window.addEventListener('tamreen_bookmarks_updated', handleBookmarksSync);
+
+    return () => {
+      window.removeEventListener('tamreen_likes_updated', handleLikesSync);
+      window.removeEventListener('tamreen_bookmarks_updated', handleBookmarksSync);
+    };
+  }, []);
 
   // Sync likes and bookmarks from Supabase/Server
   useEffect(() => {
@@ -712,7 +845,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <div className="mt-3">
                       <h4 className="text-sm font-black text-slate-900 dark:text-white">পছন্দকৃত প্রশ্ন</h4>
                       <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        লাইক দেওয়া প্রশ্নসমূহ ({toBengaliNumeral(dbLikedIds.length)})
+                        লাইক দেওয়া প্রশ্নসমূহ ({toBengaliNumeral(likedIds.length)})
                       </p>
                     </div>
                   </button>

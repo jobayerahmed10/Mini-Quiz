@@ -32,7 +32,14 @@ import {
   getUserProfile,
   getUserUniqueId,
   toBengaliNumeral,
-  toggleBookmarkId
+  toggleBookmarkId,
+  getBookmarkedIds,
+  getLikedIds,
+  getLocalQuestionLikeCount,
+  setLocalQuestionLikeCount,
+  toggleLikedId,
+  saveBookmarkedQuestion,
+  saveLikedQuestion
 } from '../lib/utils';
 import { AuthModal } from './AuthModal';
 
@@ -56,10 +63,10 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
   const userId = getUserUniqueId();
   const isRegistered = isUserRegistered();
 
-  // States
-  const [likeCount, setLikeCount] = useState<number>(0);
-  const [isLiked, setIsLiked] = useState<boolean>(false);
-  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
+  // Instant synchronous initial states
+  const [likeCount, setLikeCount] = useState<number>(() => getLocalQuestionLikeCount(qId));
+  const [isLiked, setIsLiked] = useState<boolean>(() => getLikedIds().includes(qId));
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(() => getBookmarkedIds().includes(qId));
   const [showExplanation, setShowExplanation] = useState<boolean>(defaultExpanded || showOfficialExplanation);
   
   // Community Explanations
@@ -78,28 +85,72 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
   const [reportSuccessMsg, setReportSuccessMsg] = useState<string | null>(null);
 
   const [newExplanationText, setNewExplanationText] = useState<string>('');
+  const [customAuthorName, setCustomAuthorName] = useState<string>(user?.name || '');
   const [isSubmittingExplanation, setIsSubmittingExplanation] = useState<boolean>(false);
   const [explanationSuccessMsg, setExplanationSuccessMsg] = useState<string | null>(null);
 
-  // Initial Load
+  const handleAuthCheck = (): boolean => {
+    if (!isRegistered && !userId) {
+      if (onRequireAuth) {
+        onRequireAuth();
+      } else {
+        setShowAuthModal(true);
+      }
+      return false;
+    }
+    return true;
+  };
+
+  // Listen to global sync events across tabs / cards
+  useEffect(() => {
+    const handleLikesUpdated = () => {
+      const likedList = getLikedIds();
+      setIsLiked(likedList.includes(qId));
+      setLikeCount(getLocalQuestionLikeCount(qId));
+    };
+
+    const handleBookmarksUpdated = () => {
+      const bmList = getBookmarkedIds();
+      setIsBookmarked(bmList.includes(qId));
+    };
+
+    window.addEventListener('tamreen_likes_updated', handleLikesUpdated);
+    window.addEventListener('tamreen_bookmarks_updated', handleBookmarksUpdated);
+
+    return () => {
+      window.removeEventListener('tamreen_likes_updated', handleLikesUpdated);
+      window.removeEventListener('tamreen_bookmarks_updated', handleBookmarksUpdated);
+    };
+  }, [qId]);
+
+  // Initial Load from Supabase/Server API
   useEffect(() => {
     let isMounted = true;
 
-    // Check likes
+    // Check likes count
     fetchQuestionLikesCount(qId).then((cnt) => {
-      if (isMounted) setLikeCount(cnt);
+      if (isMounted) {
+        setLikeCount(cnt);
+        setLocalQuestionLikeCount(qId, cnt);
+      }
     });
 
     if (userId) {
       fetchUserLikedQuestionIds(userId).then((likedIds) => {
-        if (isMounted && likedIds.includes(qId)) {
-          setIsLiked(true);
+        if (isMounted && Array.isArray(likedIds)) {
+          if (likedIds.includes(qId)) {
+            setIsLiked(true);
+            saveLikedQuestion(question);
+          }
         }
       });
 
       fetchUserBookmarkedQuestionIds(userId).then((bmIds) => {
-        if (isMounted && bmIds.includes(qId)) {
-          setIsBookmarked(true);
+        if (isMounted && Array.isArray(bmIds)) {
+          if (bmIds.includes(qId)) {
+            setIsBookmarked(true);
+            saveBookmarkedQuestion(question);
+          }
         }
       });
     }
@@ -123,69 +174,52 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
     }
   }, [showExplanation, qId]);
 
-  const handleAuthCheck = (): boolean => {
-    if (!isRegistered) {
-      if (onRequireAuth) {
-        onRequireAuth();
-      } else {
-        setShowAuthModal(true);
-      }
-      return false;
-    }
-    return true;
-  };
-
-  // 1. Handle Like
+  // 1. Handle Like (Instant + Server Sync)
   const handleLike = async () => {
-    if (!handleAuthCheck()) return;
-
-    // Optimistic UI
-    const prevLiked = isLiked;
-    const prevCount = likeCount;
-    const nextLiked = !prevLiked;
-    const nextCount = nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1);
-
+    // Instant local update
+    const { isLiked: nextLiked, newCount: nextCount } = toggleLikedId(qId, question);
     setIsLiked(nextLiked);
     setLikeCount(nextCount);
 
+    // Sync to Supabase & Server
     try {
       const res = await toggleQuestionLikeInSupabase(qId, userId, user?.name);
+      if (typeof res.newCount === 'number') {
+        setLikeCount(res.newCount);
+        setLocalQuestionLikeCount(qId, res.newCount);
+      }
       setIsLiked(res.isLiked);
-      setLikeCount(res.newCount);
-    } catch {
-      // Revert if error
-      setIsLiked(prevLiked);
-      setLikeCount(prevCount);
+    } catch (err) {
+      console.warn('Like sync background error:', err);
     }
   };
 
-  // 2. Handle Bookmark
+  // 2. Handle Bookmark (Instant + Server Sync)
   const handleBookmark = async () => {
-    if (!handleAuthCheck()) return;
+    // Instant local update
+    const nextBm = toggleBookmarkId(qId, question);
+    setIsBookmarked(nextBm);
 
-    const prevBm = isBookmarked;
-    setIsBookmarked(!prevBm);
-    toggleBookmarkId(qId);
-
+    // Sync to Supabase & Server
     try {
       const res = await toggleQuestionBookmarkInSupabase(qId, userId);
       setIsBookmarked(res.isBookmarked);
-    } catch {
-      setIsBookmarked(prevBm);
+    } catch (err) {
+      console.warn('Bookmark sync background error:', err);
     }
   };
 
   // 3. Handle Report Submit
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!handleAuthCheck()) return;
+    if (!reportReason.trim()) return;
 
     setIsSubmittingReport(true);
     try {
       const res = await submitQuestionReportToSupabase({
         question_id: qId,
         user_id: userId,
-        user_name: user?.name,
+        user_name: user?.name || customAuthorName || 'শিক্ষার্থী',
         phone: user?.phone,
         email: user?.email,
         reason: reportReason,
@@ -193,13 +227,17 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
       });
 
       if (res.success) {
-        setReportSuccessMsg('আপনার রিপোর্ট সফলভাবে জমা হয়েছে। ধন্যবাদ!');
+        setReportSuccessMsg('আপনার রিপোর্টটি সফলভাবে জমা হয়েছে। দ্রুত পর্যালোচনা করা হবে।');
         setTimeout(() => {
           setShowReportModal(false);
           setReportSuccessMsg(null);
           setReportDetails('');
-        }, 1800);
+        }, 2000);
+      } else {
+        alert(res.error || 'রিপোর্ট জমা দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
       }
+    } catch {
+      alert('নেটওয়ার্ক সমস্যার কারণে রিপোর্ট জমা দেওয়া যায়নি।');
     } finally {
       setIsSubmittingReport(false);
     }
@@ -211,26 +249,32 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
     if (!handleAuthCheck()) return;
     if (!newExplanationText.trim()) return;
 
+    const authorName = user?.name || customAuthorName || 'শিক্ষার্থী';
     setIsSubmittingExplanation(true);
+
     try {
       const res = await submitQuestionCommunityExplanation({
         question_id: qId,
         user_id: userId,
-        author_name: user?.name || 'শিক্ষার্থী',
+        author_name: authorName,
         author_avatar: user?.avatar,
         explanation: newExplanationText.trim(),
       });
 
       if (res.success && res.newExplanation) {
-        setExplanations((prev) => [res.newExplanation!, ...prev]);
+        setExplanations([res.newExplanation, ...explanations]);
         setShowExplanation(true);
-        setExplanationSuccessMsg('আপনার ব্যাখ্যা সফলভাবে যোগ করা হয়েছে!');
+        setExplanationSuccessMsg('আপনার ব্যাখ্যাটি সফলভাবে প্রকাশিত হয়েছে!');
         setTimeout(() => {
           setShowAddExplanationModal(false);
           setExplanationSuccessMsg(null);
           setNewExplanationText('');
-        }, 1500);
+        }, 1800);
+      } else {
+        alert(res.error || 'ব্যাখ্যা যোগ করতে সমস্যা হয়েছে।');
       }
+    } catch {
+      alert('নেটওয়ার্ক সমস্যার কারণে ব্যাখ্যা যোগ করা যায়নি।');
     } finally {
       setIsSubmittingExplanation(false);
     }
