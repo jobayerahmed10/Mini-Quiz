@@ -182,7 +182,13 @@ ON public.profiles FOR ALL USING (true);
 
 CREATE TABLE IF NOT EXISTS public.exam_results (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id TEXT,
+  user_name TEXT,
+  full_name TEXT,
+  roll_number TEXT,
+  student_id TEXT,
+  guest_name TEXT,
+  guest_id TEXT,
   exam_id TEXT NOT NULL,
   score NUMERIC NOT NULL DEFAULT 0,
   total_marks NUMERIC NOT NULL DEFAULT 0,
