@@ -814,6 +814,22 @@ export default function App() {
               questionCount={sharedExamData.questionCount}
               negativeMark={sharedExamData.negativeMark}
               onClose={() => setSharedExamData(null)}
+              onReviewAnswers={() => {
+                const targetExam = sharedExamData;
+                setSharedExamData(null);
+                handleReviewAnswers({
+                  subject: targetExam.subject || 'সকল বিষয়',
+                  examId: targetExam.examId,
+                  examType: targetExam.title,
+                  timeMinutes: targetExam.timeMinutes || 5,
+                  questionCount: targetExam.questionCount || 20,
+                });
+              }}
+              onOpenLeaderboard={() => {
+                const targetExam = sharedExamData;
+                setSharedExamData(null);
+                handleOpenLeaderboard(targetExam.examId || targetExam.title);
+              }}
               onStartExam={(studentName) => {
                 const targetExam = sharedExamData;
                 setSharedExamData(null);

@@ -16,9 +16,12 @@ import {
   GraduationCap,
   Sparkles,
   ShieldCheck,
-  Award
+  Award,
+  Trophy,
+  FileText
 } from 'lucide-react';
-import { toBengaliNumeral, getUserProfile, saveUserProfile } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, saveUserProfile, isExamCompleted } from '../lib/utils';
+import { fetchUserCompletedExamsFromSupabase } from '../lib/supabase';
 
 export interface SharedExamEntranceCardProps {
   examId?: string;
@@ -32,6 +35,8 @@ export interface SharedExamEntranceCardProps {
   negativeMark?: string | number;
   onStartExam: (studentName: string) => void;
   onClose?: () => void;
+  onReviewAnswers?: () => void;
+  onOpenLeaderboard?: () => void;
   isStandalone?: boolean;
 }
 
@@ -47,12 +52,38 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
   negativeMark = '-০.২৫',
   onStartExam,
   onClose,
+  onReviewAnswers,
+  onOpenLeaderboard,
   isStandalone = false,
 }) => {
   const existingProfile = getUserProfile();
   const [studentName, setStudentName] = useState<string>(existingProfile?.name || '');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [hasCompleted, setHasCompleted] = useState<boolean>(() => isExamCompleted(examId, title));
+
+  // Sync completed exam status from Supabase and Server API
+  useEffect(() => {
+    let isMounted = true;
+    setHasCompleted(isExamCompleted(examId, title));
+
+    fetchUserCompletedExamsFromSupabase().then((completedList) => {
+      if (!isMounted) return;
+      const targetId = (examId || '').trim().toLowerCase();
+      const targetTitle = (title || '').trim().toLowerCase();
+      const isDone = completedList.some((id) => {
+        const cleanId = String(id || '').trim().toLowerCase();
+        return cleanId === targetId || cleanId === targetTitle || (targetId && cleanId.includes(targetId));
+      });
+      if (isDone) {
+        setHasCompleted(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [examId, title]);
 
   // Sync existing profile name if available
   useEffect(() => {
@@ -265,68 +296,131 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
             </div>
           </div>
 
-          {/* Student Name Form */}
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 font-hind">
-                <User className="w-4 h-4 text-indigo-500" />
-                <span>আপনার নাম (Your Name)</span>
-                <span className="text-rose-500">*</span>
-              </label>
-
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
+          {/* If Exam is Already Completed -> Show Retest Prevention State with Solutions & Leaderboard */}
+          {hasCompleted ? (
+            <div className="space-y-3.5 pt-1">
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/80 text-center space-y-1.5 shadow-xs">
+                <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white mx-auto shadow-xs">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <input
-                  type="text"
-                  value={studentName}
-                  onChange={(e) => {
-                    setStudentName(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  placeholder="আপনার পূর্ণ নাম লিখুন (যেমন: আব্দুল্লাহ)"
-                  className="w-full pl-10 pr-4 py-3 sm:py-3.5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-900/60 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/15 text-slate-900 dark:text-white text-sm font-bold placeholder:text-slate-400 transition-all outline-hidden shadow-inner"
-                  autoFocus
-                />
+                <h3 className="text-sm sm:text-base font-black text-emerald-900 dark:text-emerald-300 font-hind">
+                  আপনি এই পরীক্ষাটি ইতোমধ্যে সম্পন্ন করেছেন
+                </h3>
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  পরীক্ষার উত্তরমালা, বিস্তারিত ব্যাখ্যা এবং জাতীয় মেধাতালিকা নিচে দেখুন।
+                </p>
               </div>
 
-              {errorMessage ? (
-                <p className="text-xs font-bold text-rose-500 dark:text-rose-400 animate-shake">
-                  {errorMessage}
-                </p>
-              ) : (
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  💡 এই নামটি পরীক্ষার জাতীয় মেধা তালিকায় (Leaderboard) প্রদর্শিত হবে।
-                </p>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {onReviewAnswers && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClose) onClose();
+                      onReviewAnswers();
+                    }}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-[#0b705c] hover:bg-[#085a49] text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>ব্যাখ্যা সহ উত্তর</span>
+                  </button>
+                )}
+
+                {onOpenLeaderboard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClose) onClose();
+                      onOpenLeaderboard();
+                    }}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    <span>জাতীয় মেধাতালিকা</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Share Link Box */}
+              <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'লিংক কপি হয়েছে!' : 'বন্ধুদের সাথে পরীক্ষা লিংক শেয়ার করুন'}</span>
+                </button>
+
+                <span className="text-[11px] font-semibold text-slate-400">
+                  আত-তামরীন একাডেমি
+                </span>
+              </div>
             </div>
+          ) : (
+            /* Student Name Form */
+            <form onSubmit={handleFormSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 font-hind">
+                  <User className="w-4 h-4 text-indigo-500" />
+                  <span>আপনার নাম (Your Name)</span>
+                  <span className="text-rose-500">*</span>
+                </label>
 
-            {/* Big Vibrant START EXAM Action Button */}
-            <button
-              type="submit"
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#4F46E5] via-[#4338CA] to-[#312E81] hover:from-[#4338CA] hover:to-[#232066] active:scale-98 text-white font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-[0_8px_25px_rgba(79,70,229,0.35)] transition-all cursor-pointer border border-indigo-400/30"
-            >
-              <Rocket className="w-5 h-5 text-amber-300 animate-bounce" />
-              <span>🚀 পরীক্ষা শুরু করুন</span>
-            </button>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={studentName}
+                    onChange={(e) => {
+                      setStudentName(e.target.value);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
+                    placeholder="আপনার পূর্ণ নাম লিখুন (যেমন: আব্দুল্লাহ)"
+                    className="w-full pl-10 pr-4 py-3 sm:py-3.5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-900/60 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/15 text-slate-900 dark:text-white text-sm font-bold placeholder:text-slate-400 transition-all outline-hidden shadow-inner"
+                    autoFocus
+                  />
+                </div>
 
-            {/* Quick Share Link Box */}
-            <div className="pt-1 flex items-center justify-between gap-2">
+                {errorMessage ? (
+                  <p className="text-xs font-bold text-rose-500 dark:text-rose-400 animate-shake">
+                    {errorMessage}
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    💡 এই নামটি পরীক্ষার জাতীয় মেধা তালিকায় (Leaderboard) প্রদর্শিত হবে।
+                  </p>
+                )}
+              </div>
+
+              {/* Big Vibrant START EXAM Action Button */}
               <button
-                type="button"
-                onClick={handleCopyLink}
-                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 cursor-pointer"
+                type="submit"
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#4F46E5] via-[#4338CA] to-[#312E81] hover:from-[#4338CA] hover:to-[#232066] active:scale-98 text-white font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-[0_8px_25px_rgba(79,70,229,0.35)] transition-all cursor-pointer border border-indigo-400/30"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'লিংক কপি হয়েছে!' : 'বন্ধুদের সাথে পরীক্ষা লিংক শেয়ার করুন'}</span>
+                <Rocket className="w-5 h-5 text-amber-300 animate-bounce" />
+                <span>🚀 পরীক্ষা শুরু করুন</span>
               </button>
 
-              <span className="text-[11px] font-semibold text-slate-400">
-                আত-তামরীন একাডেমি
-              </span>
-            </div>
-          </form>
+              {/* Quick Share Link Box */}
+              <div className="pt-1 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'লিংক কপি হয়েছে!' : 'বন্ধুদের সাথে পরীক্ষা লিংক শেয়ার করুন'}</span>
+                </button>
+
+                <span className="text-[11px] font-semibold text-slate-400">
+                  আত-তামরীন একাডেমি
+                </span>
+              </div>
+            </form>
+          )}
 
         </div>
       </div>

@@ -888,6 +888,51 @@ app.post('/api/exam_results', (req, res) => {
   }
 });
 
+/**
+ * Endpoint to check and return all completed exam IDs for a user or guest
+ */
+app.get('/api/exam/completed', (req, res) => {
+  try {
+    const rawUserId = String(req.query.userId || '').trim();
+    const rawGuestId = String(req.query.guestId || '').trim();
+
+    const completedExamIdsSet = new Set<string>();
+
+    serverExamResultsStore.forEach((r) => {
+      const uMatch = rawUserId && r.user_id && (r.user_id === rawUserId || r.user_id.toLowerCase() === rawUserId.toLowerCase());
+      const gMatch = rawGuestId && (r.user_id === rawGuestId || (r as any).guest_id === rawGuestId);
+      if (uMatch || gMatch) {
+        if (r.exam_id) completedExamIdsSet.add(String(r.exam_id).trim());
+        if (r.exam_title) completedExamIdsSet.add(String(r.exam_title).trim());
+      }
+    });
+
+    serverLeaderboardStore.forEach((e) => {
+      const uMatch = rawUserId && e.user_id && (e.user_id === rawUserId || e.user_id.toLowerCase() === rawUserId.toLowerCase());
+      if (uMatch) {
+        if (e.exam_id) completedExamIdsSet.add(String(e.exam_id).trim());
+        if (e.exam_title) completedExamIdsSet.add(String(e.exam_title).trim());
+      }
+    });
+
+    serverUserProgressStore.forEach((p) => {
+      const uMatch = rawUserId && p.userId && (p.userId === rawUserId || p.userId.toLowerCase() === rawUserId.toLowerCase());
+      if (uMatch && Array.isArray(p.completedExams)) {
+        p.completedExams.forEach((id) => {
+          if (id) completedExamIdsSet.add(String(id).trim());
+        });
+      }
+    });
+
+    return res.json({
+      success: true,
+      completedExamIds: Array.from(completedExamIdsSet),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
 // RPC API: Get leaderboard for a specific exam
 app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
   try {

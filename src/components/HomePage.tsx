@@ -125,6 +125,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Load latest exams from Supabase or cache
   const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
 
+  const [serverCompletedIds, setServerCompletedIds] = useState<string[]>([]);
+
   useEffect(() => {
     const refreshExams = (force: boolean = false) => {
       fetchExamsFromSupabase(force).then((res) => {
@@ -134,6 +136,11 @@ export const HomePage: React.FC<HomePageProps> = ({
       });
       getDistinctExamParticipantCounts().then((counts) => {
         setExamineeCounts(counts || {});
+      });
+      import('../lib/supabase').then(mod => {
+        mod.fetchUserCompletedExamsFromSupabase().then(ids => {
+          setServerCompletedIds(ids.map(String));
+        }).catch(() => {});
       });
     };
 
@@ -156,7 +163,11 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Filter out any exam that the student has already taken; display at most 5 new exams
   const allLiveExams = exams.length > 0 ? exams : defaultLiveExams;
-  const uncompletedLiveExams = allLiveExams.filter((exam) => !isExamCompleted(exam.id, exam.title));
+  const uncompletedLiveExams = allLiveExams.filter((exam) => {
+    const isCompletedLocally = isExamCompleted(exam.id, exam.title);
+    const isCompletedOnServer = serverCompletedIds.includes(String(exam.id)) || serverCompletedIds.includes(String(exam.title));
+    return !isCompletedLocally && !isCompletedOnServer;
+  });
   const displayLiveExams = uncompletedLiveExams.slice(0, 5);
 
   const handleAttemptExam = (opts: {

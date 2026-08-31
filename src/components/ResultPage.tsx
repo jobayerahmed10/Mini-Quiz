@@ -169,23 +169,11 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         const currentUserId = getUserUniqueId();
         const examIdToFetch = result.examId || result.selectedSubject || 'general';
 
-        // 1. Fetch real leaderboard entries from RPC and server
-        const [rpcEntries, generalEntries] = await Promise.all([
-          getExamLeaderboard(examIdToFetch),
-          fetchLeaderboardEntriesFromSupabase(examIdToFetch),
-        ]);
+        // 1. Fetch real leaderboard entries from RPC
+        const rpcEntries = await getExamLeaderboard(examIdToFetch);
 
         // Map real participants by unique user ID or distinct guest key
-        const candidatesMap = new Map<string, {
-          name: string;
-          avatar?: string;
-          isUser: boolean;
-          isGuest?: boolean;
-          correct: number;
-          wrong: number;
-          score: number;
-          userId?: string;
-        }>();
+        const candidatesMap = new Map<string, any>();
 
         // Add from RPC
         for (const item of rpcEntries) {
@@ -219,58 +207,10 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             correct: Number(item.correct_answers ?? item.score ?? 0),
             wrong: Number(item.wrong_answers ?? 0),
             score: Number(item.score ?? 0),
+            timeTakenSeconds: Number(item.time_taken_seconds ?? 0),
+            submittedAt: item.submitted_at || new Date().toISOString(),
             userId: item.user_id,
           });
-        }
-
-        // Add from general entries if matching exam
-        for (const entry of generalEntries) {
-          const eId = (entry.exam_id || '').toLowerCase().trim();
-          const eTitle = (entry.exam_title || '').toLowerCase().trim();
-          const target = examIdToFetch.toLowerCase().trim();
-          const isMatch =
-            !target || target === 'all' ||
-            eId === target || eTitle === target ||
-            (eId && (eId.includes(target) || target.includes(eId))) ||
-            (eTitle && (eTitle.includes(target) || target.includes(eTitle)));
-
-          if (isMatch) {
-            const rawName = (entry.guest_name || entry.full_name || entry.user_name || '').trim();
-            if (!rawName) continue;
-            const isUser = Boolean(
-              currentUserId &&
-              entry.user_id &&
-              entry.user_id === currentUserId &&
-              !entry.user_id.startsWith('guest_') &&
-              !entry.user_id.startsWith('anon_') &&
-              !entry.is_guest
-            );
-            const isGuest = Boolean(
-              entry.is_guest ||
-              !entry.user_id ||
-              entry.user_id.startsWith('guest_') ||
-              entry.user_id.startsWith('anon_') ||
-              Boolean(entry.guest_name) ||
-              rawName.includes('গেস্ট')
-            );
-            const key = (isUser && entry.user_id)
-              ? entry.user_id.trim()
-              : (entry.guest_name || rawName || entry.user_id || entry.id).toLowerCase();
-
-            const existing = candidatesMap.get(key);
-            if (!existing || entry.score > existing.score) {
-              candidatesMap.set(key, {
-                name: rawName,
-                avatar: isUser ? (currentUserAvatar || entry.user_avatar) : entry.user_avatar,
-                isUser,
-                isGuest,
-                correct: Number(entry.correct_count ?? entry.score ?? 0),
-                wrong: Number(entry.wrong_count ?? 0),
-                score: Number(entry.score ?? 0),
-                userId: entry.user_id,
-              });
-            }
-          }
         }
 
         // Always ensure current user's latest submission is included
@@ -280,8 +220,10 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           ? currentUserId
           : effectiveCurrentUserName.toLowerCase();
 
+        const timeTakenSeconds = result.timeTakenSeconds || 0;
+        
         const existingUser = candidatesMap.get(userKey);
-        if (!existingUser || obtainedMarksVal >= existingUser.score) {
+        if (!existingUser || obtainedMarksVal > existingUser.score || (obtainedMarksVal === existingUser.score && timeTakenSeconds < existingUser.timeTakenSeconds)) {
           candidatesMap.set(userKey, {
             name: effectiveCurrentUserName,
             avatar: currentUserAvatar,
@@ -290,16 +232,19 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             correct: result.correctCount,
             wrong: result.wrongCount,
             score: obtainedMarksVal,
+            timeTakenSeconds: timeTakenSeconds,
+            submittedAt: new Date().toISOString(),
             userId: currentUserId,
           });
         }
 
         const allCandidates = Array.from(candidatesMap.values());
 
-        // Sort descending by score, then by correct count
+        // Sort: 1. Higher score first, 2. Lower timeTakenSeconds first, 3. Earlier submittedAt
         allCandidates.sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
-          return b.correct - a.correct;
+          if (a.timeTakenSeconds !== b.timeTakenSeconds) return a.timeTakenSeconds - b.timeTakenSeconds;
+          return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
         });
 
         // Theme colors for cards matching Screenshot 3

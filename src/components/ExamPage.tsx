@@ -119,12 +119,12 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     }
   };
 
-  const [, setCompletedUpdateTrigger] = useState(0);
+  const [serverCompletedIds, setServerCompletedIds] = useState<string[]>([]);
 
   const loadExams = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
     try {
-      const [res, distinctCounts] = await Promise.all([
+      const [res, distinctCounts, completedList] = await Promise.all([
         fetchExamsFromSupabase(forceRefresh),
         getDistinctExamParticipantCounts(),
         fetchUserCompletedExamsFromSupabase().catch(() => []),
@@ -137,7 +137,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       }
 
       setExamineeCounts(distinctCounts || {});
-      setCompletedUpdateTrigger((prev) => prev + 1);
+      setServerCompletedIds(completedList.map(String));
     } catch (err) {
       console.warn('loadExams error:', err);
     } finally {
@@ -562,7 +562,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                 })()}
 
                 {/* Action Buttons: Before exam -> Only 'পরীক্ষা দিন' full width. After exam -> 'ব্যাখ্যা সহ উত্তর' + 'মেধাতালিকা' */}
-                {isExamCompleted(exam.id, exam.title) ? (
+                {isExamCompleted(exam.id, exam.title) || serverCompletedIds.includes(String(exam.id)) || serverCompletedIds.includes(String(exam.title)) ? (
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => {
@@ -648,6 +648,26 @@ export const ExamPage: React.FC<ExamPageProps> = ({
               questionCount={previewEntranceExam.question_count || 20}
               negativeMark="-০.২৫"
               onClose={() => setPreviewEntranceExam(null)}
+              onReviewAnswers={() => {
+                const targetExam = previewEntranceExam;
+                setPreviewEntranceExam(null);
+                if (onReviewAnswers) {
+                  onReviewAnswers({
+                    examId: targetExam.id,
+                    subject: targetExam.subject,
+                    questionCount: targetExam.question_count,
+                    timeMinutes: targetExam.time_minutes,
+                    examType: targetExam.title,
+                  });
+                }
+              }}
+              onOpenLeaderboard={() => {
+                const targetExam = previewEntranceExam;
+                setPreviewEntranceExam(null);
+                if (onOpenLeaderboard) {
+                  onOpenLeaderboard(targetExam.id);
+                }
+              }}
               onStartExam={(studentName) => {
                 const targetExam = previewEntranceExam;
                 setPreviewEntranceExam(null);

@@ -127,33 +127,38 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
   useEffect(() => {
     let isMounted = true;
 
-    // Check likes count
+    // Synchronize local states immediately on id change
+    setIsLiked(getLikedIds().includes(qId));
+    setIsBookmarked(getBookmarkedIds().includes(qId));
+    setLikeCount(getLocalQuestionLikeCount(qId));
+
+    // Check likes count from backend
     fetchQuestionLikesCount(qId).then((cnt) => {
-      if (isMounted) {
+      if (isMounted && typeof cnt === 'number') {
         setLikeCount(cnt);
         setLocalQuestionLikeCount(qId, cnt);
       }
     });
 
-    if (userId) {
-      fetchUserLikedQuestionIds(userId).then((likedIds) => {
-        if (isMounted && Array.isArray(likedIds)) {
-          if (likedIds.includes(qId)) {
-            setIsLiked(true);
-            saveLikedQuestion(question);
-          }
+    // Check user liked questions
+    fetchUserLikedQuestionIds(userId).then((likedIds) => {
+      if (isMounted && Array.isArray(likedIds)) {
+        if (likedIds.includes(qId)) {
+          setIsLiked(true);
+          saveLikedQuestion(question);
         }
-      });
+      }
+    });
 
-      fetchUserBookmarkedQuestionIds(userId).then((bmIds) => {
-        if (isMounted && Array.isArray(bmIds)) {
-          if (bmIds.includes(qId)) {
-            setIsBookmarked(true);
-            saveBookmarkedQuestion(question);
-          }
+    // Check user bookmarked questions
+    fetchUserBookmarkedQuestionIds(userId).then((bmIds) => {
+      if (isMounted && Array.isArray(bmIds)) {
+        if (bmIds.includes(qId)) {
+          setIsBookmarked(true);
+          saveBookmarkedQuestion(question);
         }
-      });
-    }
+      }
+    });
 
     return () => {
       isMounted = false;

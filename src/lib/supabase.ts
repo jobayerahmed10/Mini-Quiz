@@ -17,7 +17,11 @@ import {
   getUserProfile, 
   getGuestDeviceId, 
   addCompletedExamId, 
-  getCompletedExamIds 
+  getCompletedExamIds,
+  getLikedIds,
+  getBookmarkedIds,
+  getLocalQuestionLikeCount,
+  setLocalQuestionLikeCount
 } from './utils';
 
 /**
@@ -989,6 +993,7 @@ export interface ExamLeaderboardItem {
   wrong_answers: number;
   time_taken_seconds: number;
   is_guest?: boolean;
+  submitted_at?: string;
 }
 
 export interface FreeOverallLeaderboardItem {
@@ -1164,27 +1169,26 @@ export async function submitExamResultToSupabase(params: {
     }
 
     // 3B. Insert into exam_results as requested
+    const submissionData = {
+      exam_id: String(params.exam_id),
+      user_id: isGuest ? null : (params.user_id || null),
+      user_name: effectiveName || 'গেস্ট',
+      total_marks: Number(params.total_marks),
+      obtained_marks: Number(params.score),
+      correct_answers: Number(params.correct_answers),
+      wrong_answers: Number(params.wrong_answers),
+      time_taken: Number(timeTaken)
+    };
+
     const { data, error } = await supabaseInstance
       .from('exam_results')
-      .insert([
-        {
-          exam_id: params.exam_id,
-          user_id: params.user_id || null,
-          guest_id: isGuest ? params.user_id : null,
-          user_name: effectiveName || 'গেস্ট ইউজার',
-          score: params.score,
-          correct_count: params.correct_answers,
-          wrong_count: params.wrong_answers,
-          time_taken: timeTaken,
-          total_marks: params.total_marks,
-          exam_title: params.exam_title,
-          submitted_at: submittedAt,
-          is_free: params.is_free ?? true,
-        },
-      ]);
+      .insert([submissionData]);
 
     if (error) {
-      console.log(error);
+      console.error("Exam Submit Error:", error.message);
+      if (typeof window !== 'undefined') {
+        alert("রেজাল্ট সেভ করতে সমস্যা হয়েছে: " + error.message);
+      }
       return { success: false, error: error.message };
     }
 
@@ -1222,11 +1226,23 @@ export async function submitExamResultToSupabase(params: {
  * Automatically synchronizes with local storage.
  */
 export async function fetchUserCompletedExamsFromSupabase(userId?: string): Promise<string[]> {
-  const currentUId = userId || getUserUniqueId();
+  let authUserId: string | undefined;
+  if (supabaseInstance) {
+    try {
+      const { data } = await supabaseInstance.auth.getSession();
+      if (data?.session?.user?.id) {
+        authUserId = data.session.user.id;
+      }
+    } catch {}
+  }
+
+  const currentUId = userId || authUserId || getUserUniqueId();
   const prof = getUserProfile();
   const guestDevId = getGuestDeviceId();
   const candidateIds = Array.from(new Set([
+    authUserId,
     currentUId,
+    userId,
     prof?.student_id,
     prof?.phone,
     guestDevId,
@@ -1263,7 +1279,24 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
     }
   }
 
-  // 2. Also check local storage completed list
+  // 2. Also check Server API completed exams
+  try {
+    const srvRes = await fetch(`/api/exam/completed?userId=${encodeURIComponent(currentUId || '')}&guestId=${encodeURIComponent(guestDevId || '')}`);
+    if (srvRes.ok) {
+      const srvJson = await srvRes.json();
+      if (srvJson?.success && Array.isArray(srvJson.completedExamIds)) {
+        srvJson.completedExamIds.forEach((id: string) => {
+          const clean = String(id).trim();
+          if (clean) {
+            completedExamIds.push(clean);
+            addCompletedExamId(clean);
+          }
+        });
+      }
+    }
+  } catch {}
+
+  // 3. Also check local storage completed list
   const localCompleted = getCompletedExamIds();
   localCompleted.forEach((id) => {
     if (!completedExamIds.includes(id)) {
@@ -1341,74 +1374,34 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
 export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboardItem[]> {
   if (!examId || examId === 'all') return [];
 
-  // 1. Try Supabase RPC first if available
+  // 1. Direct Supabase Query from `exam_results` table sorted by obtained_marks DESC, time_taken ASC
   if (supabaseInstance) {
     try {
-      let rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
-        p_exam_id: examId,
-      });
+      const cleanExamId = examId.trim();
+      
+      // Query exam_results directly as requested
+      let query = supabaseInstance
+        .from('exam_results')
+        .select('*')
+        .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
+        .order('obtained_marks', { ascending: false })
+        .order('time_taken', { ascending: true });
 
-      if (rpcRes.error) {
-        rpcRes = await supabaseInstance.rpc('get_exam_leaderboard', {
-          exam_id: examId,
-        });
-      }
+      const directRes = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
+      let data = directRes.data;
+      let error = directRes.error;
 
-      if (!rpcRes.error && Array.isArray(rpcRes.data) && rpcRes.data.length > 0) {
-        return rpcRes.data.map((row: any, idx: number) => ({
-          rank: Number(row.rank || idx + 1),
-          user_id: String(row.user_id || ''),
-          full_name: String(row.full_name || 'পরীক্ষার্থী'),
-          avatar_url: row.avatar_url ? String(row.avatar_url) : undefined,
-          score: Number(row.score ?? row.correct_answers ?? 0),
-          total_marks: Number(row.total_marks ?? (Number(row.correct_answers || 0) + Number(row.wrong_answers || 0))),
-          correct_answers: Number(row.correct_answers ?? row.score ?? 0),
-          wrong_answers: Number(row.wrong_answers ?? 0),
-          time_taken_seconds: Number(row.time_taken_seconds ?? 0),
-        }));
-      }
-    } catch (rpcErr) {
-      console.warn('Supabase get_exam_leaderboard RPC error:', rpcErr);
-    }
-
-    // 2. Direct Supabase Query from `global_leaderboard` view or `exam_results` table sorted by score DESC
-    try {
-      let data: any = null;
-      let error: any = null;
-
-      // 2A. Try 'global_leaderboard' VIEW first
-      try {
-        let viewQuery = supabaseInstance
-          .from('global_leaderboard')
-          .select('*')
-          .order('score', { ascending: false });
-
-        if (examId && examId !== 'all') {
-          const cleanExamId = examId.trim();
-          viewQuery = viewQuery.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
-        }
-
-        const viewRes = await fetchWithTimeout(Promise.resolve(viewQuery), 4000, { data: null, error: null } as any);
-        if (!viewRes.error && Array.isArray(viewRes.data) && viewRes.data.length > 0) {
-          data = viewRes.data;
-        }
-      } catch {}
-
-      // 2B. If VIEW not present, query `exam_results` table
-      if (!data || data.length === 0) {
-        let query = supabaseInstance
+      // Fallback for older entries using score
+      if (error || !data || data.length === 0) {
+        let queryFallback = supabaseInstance
           .from('exam_results')
           .select('*')
-          .order('score', { ascending: false });
-
-        if (examId && examId !== 'all') {
-          const cleanExamId = examId.trim();
-          query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
-        }
-
-        const directRes = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
-        data = directRes.data;
-        error = directRes.error;
+          .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
+          .order('score', { ascending: false })
+          .order('time_taken', { ascending: true });
+        const fallbackRes = await fetchWithTimeout(Promise.resolve(queryFallback), 6000, { data: null, error: null } as any);
+        data = fallbackRes.data || [];
+        error = fallbackRes.error;
       }
 
       if (!error && Array.isArray(data) && data.length > 0) {
@@ -1438,15 +1431,15 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '').trim().toLowerCase();
           
           const existing = bestMap.get(uKey);
-          const scoreVal = Number(row.score ?? row.correct_answers ?? row.correct_count ?? 0);
-          const timeVal = Number(row.time_taken_seconds ?? row.time_taken ?? 999999);
+          const scoreVal = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
+          const timeVal = Number(row.time_taken ?? row.time_taken_seconds ?? 999999);
           const rowDate = new Date(row.submitted_at || row.created_at || 0).getTime();
 
           if (!existing) {
             bestMap.set(uKey, row);
           } else {
-            const existScore = Number(existing.score ?? existing.correct_answers ?? existing.correct_count ?? 0);
-            const existTime = Number(existing.time_taken_seconds ?? existing.time_taken ?? 999999);
+            const existScore = Number(existing.obtained_marks ?? existing.score ?? existing.correct_answers ?? existing.correct_count ?? 0);
+            const existTime = Number(existing.time_taken ?? existing.time_taken_seconds ?? 999999);
             const existDate = new Date(existing.submitted_at || existing.created_at || 0).getTime();
 
             if (scoreVal > existScore) {
@@ -1463,24 +1456,24 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
         // Sort: 1. Score DESC, 2. Time Taken ASC, 3. Submitted At ASC
         const sortedRows = Array.from(bestMap.values()).sort((a, b) => {
-          const scoreA = Number(a.score ?? a.correct_answers ?? a.correct_count ?? 0);
-          const scoreB = Number(b.score ?? b.correct_answers ?? b.correct_count ?? 0);
+          const scoreA = Number(a.obtained_marks ?? a.score ?? a.correct_answers ?? a.correct_count ?? 0);
+          const scoreB = Number(b.obtained_marks ?? b.score ?? b.correct_answers ?? b.correct_count ?? 0);
           if (scoreB !== scoreA) return scoreB - scoreA;
-          const timeA = Number(a.time_taken_seconds ?? a.time_taken ?? 999999);
-          const timeB = Number(b.time_taken_seconds ?? b.time_taken ?? 999999);
+          const timeA = Number(a.time_taken ?? a.time_taken_seconds ?? 999999);
+          const timeB = Number(b.time_taken ?? b.time_taken_seconds ?? 999999);
           if (timeA !== timeB) return timeA - timeB;
           return new Date(a.submitted_at || 0).getTime() - new Date(b.submitted_at || 0).getTime();
         });
 
         return sortedRows.map((row: any, idx: number) => {
           const prof = profilesMap.get(row.user_id);
-          const fullName = row.guest_name || row.full_name || row.user_name || prof?.full_name || 'পরীক্ষার্থী';
+          const fullName = row.user_name || row.guest_name || row.full_name || prof?.full_name || 'পরীক্ষার্থী';
           const avatarUrl = row.avatar_url || prof?.avatar_url;
-          const score = Number(row.score ?? row.correct_answers ?? row.correct_count ?? 0);
+          const score = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
           const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
           const wrongAnswers = Number(row.wrong_answers ?? row.wrong_count ?? 0);
-          const timeTaken = Number(row.time_taken_seconds ?? row.time_taken ?? 0);
+          const timeTaken = Number(row.time_taken ?? row.time_taken_seconds ?? 0);
           const uId = String(row.user_id || '');
           const isGuest = Boolean(
             row.is_guest === true ||
@@ -4060,6 +4053,30 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
 // =========================================================================
 
 /**
+ * Helper to get the effective authenticated Supabase user ID or client identifier
+ */
+export async function getEffectiveAuthUserId(fallbackUserId?: string): Promise<string> {
+  if (supabaseInstance) {
+    try {
+      const { data } = await supabaseInstance.auth.getSession();
+      if (data?.session?.user?.id) {
+        return data.session.user.id;
+      }
+    } catch {}
+  }
+  if (fallbackUserId && fallbackUserId.trim()) {
+    return fallbackUserId.trim();
+  }
+  if (typeof window !== 'undefined') {
+    const savedId = localStorage.getItem('tamreen_user_id');
+    if (savedId && savedId.trim()) return savedId.trim();
+  }
+  const prof = getUserProfile();
+  if (prof?.student_id) return prof.student_id;
+  return getUserUniqueId();
+}
+
+/**
  * Fetch total likes count for a specific question
  */
 export async function fetchQuestionLikesCount(questionId: string | number): Promise<number> {
@@ -4071,6 +4088,7 @@ export async function fetchQuestionLikesCount(questionId: string | number): Prom
         .select('*', { count: 'exact', head: true })
         .eq('question_id', qId);
       if (!error && typeof count === 'number') {
+        setLocalQuestionLikeCount(qId, count);
         return count;
       }
     } catch {}
@@ -4082,42 +4100,52 @@ export async function fetchQuestionLikesCount(questionId: string | number): Prom
     if (res.ok) {
       const json = await res.json();
       if (json.success && typeof json.likeCount === 'number') {
+        setLocalQuestionLikeCount(qId, json.likeCount);
         return json.likeCount;
       }
     }
   } catch {}
 
-  return 0;
+  return getLocalQuestionLikeCount(qId);
 }
 
 /**
  * Fetch all question IDs liked by a user
  */
-export async function fetchUserLikedQuestionIds(userId: string): Promise<string[]> {
-  if (!userId) return [];
-  const uId = String(userId).trim();
+export async function fetchUserLikedQuestionIds(userId?: string): Promise<string[]> {
+  const uId = await getEffectiveAuthUserId(userId);
+  const candidateIds = Array.from(new Set([
+    uId,
+    userId,
+    getUserUniqueId(),
+    getUserProfile()?.student_id
+  ].filter(Boolean) as string[]));
 
-  // Try local cache first for instant UI response
-  let cached: string[] = [];
-  try {
-    const raw = localStorage.getItem(`tamreen_liked_ids_${uId}`);
-    if (raw) cached = JSON.parse(raw);
-  } catch {}
+  // Get local cache
+  const cached = getLikedIds();
 
-  if (supabaseInstance) {
+  if (supabaseInstance && candidateIds.length > 0) {
     try {
+      const orFilter = candidateIds.map((id) => `user_id.eq.${id}`).join(',');
       const { data, error } = await supabaseInstance
         .from('question_likes')
         .select('question_id')
-        .eq('user_id', uId);
+        .or(orFilter);
       if (!error && Array.isArray(data)) {
-        const ids = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        const dbIds = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        const combined = Array.from(new Set([...cached, ...dbIds]));
         try {
-          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(ids));
+          localStorage.setItem('tamreen_user_liked_question_ids', JSON.stringify(combined));
+          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(combined));
         } catch {}
-        return ids;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: combined } }));
+        }
+        return combined;
       }
-    } catch {}
+    } catch (err) {
+      console.warn('Supabase fetchUserLikedQuestionIds notice:', err);
+    }
   }
 
   // Fallback to server API
@@ -4126,11 +4154,16 @@ export async function fetchUserLikedQuestionIds(userId: string): Promise<string[
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.likedQuestionIds)) {
-        const ids = json.likedQuestionIds.map(String);
+        const srvIds = json.likedQuestionIds.map((id: any) => String(id).trim()).filter(Boolean);
+        const combined = Array.from(new Set([...cached, ...srvIds]));
         try {
-          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(ids));
+          localStorage.setItem('tamreen_user_liked_question_ids', JSON.stringify(combined));
+          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(combined));
         } catch {}
-        return ids;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: combined } }));
+        }
+        return combined;
       }
     }
   } catch {}
@@ -4143,31 +4176,35 @@ export async function fetchUserLikedQuestionIds(userId: string): Promise<string[
  */
 export async function toggleQuestionLikeInSupabase(
   questionId: string | number,
-  userId: string,
+  userId?: string,
   userName?: string
 ): Promise<{ isLiked: boolean; newCount: number }> {
   const qId = String(questionId).trim();
-  const uId = String(userId).trim();
+  const uId = await getEffectiveAuthUserId(userId);
+  const clientName = userName || getUserProfile()?.name || 'শিক্ষার্থী';
 
-  // Update local cache optimistically
-  let currentLiked: string[] = [];
-  try {
-    const raw = localStorage.getItem(`tamreen_liked_ids_${uId}`);
-    if (raw) currentLiked = JSON.parse(raw);
-  } catch {}
-
+  // 1. Update local cache optimistically
+  const currentLiked = getLikedIds();
   const isCurrentlyLiked = currentLiked.includes(qId);
   const nextLiked = isCurrentlyLiked
     ? currentLiked.filter((id) => id !== qId)
     : [...currentLiked, qId];
 
   try {
+    localStorage.setItem('tamreen_user_liked_question_ids', JSON.stringify(nextLiked));
     localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(nextLiked));
   } catch {}
 
   let finalIsLiked = !isCurrentlyLiked;
-  let finalCount = 0;
+  let finalCount = getLocalQuestionLikeCount(qId);
+  finalCount = isCurrentlyLiked ? Math.max(0, finalCount - 1) : finalCount + 1;
+  setLocalQuestionLikeCount(qId, finalCount);
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked } }));
+  }
+
+  // 2. Sync to Supabase
   if (supabaseInstance) {
     try {
       if (isCurrentlyLiked) {
@@ -4183,7 +4220,7 @@ export async function toggleQuestionLikeInSupabase(
           {
             question_id: qId,
             user_id: uId,
-            user_name: userName || 'শিক্ষার্থী',
+            user_name: clientName,
             created_at: new Date().toISOString(),
           },
         ]);
@@ -4197,18 +4234,19 @@ export async function toggleQuestionLikeInSupabase(
         .eq('question_id', qId);
       if (typeof count === 'number') {
         finalCount = count;
+        setLocalQuestionLikeCount(qId, finalCount);
       }
     } catch (sbErr) {
       console.warn('Supabase toggle like error, using server fallback:', sbErr);
     }
   }
 
-  // Always sync to server API
+  // 3. Always sync to server API
   try {
     const res = await fetch('/api/questions/like', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question_id: qId, user_id: uId, user_name: userName }),
+      body: JSON.stringify({ question_id: qId, user_id: uId, user_name: clientName }),
     });
     if (res.ok) {
       const json = await res.json();
@@ -4216,6 +4254,7 @@ export async function toggleQuestionLikeInSupabase(
         finalIsLiked = json.isLiked;
         if (typeof json.likeCount === 'number') {
           finalCount = json.likeCount;
+          setLocalQuestionLikeCount(qId, finalCount);
         }
       }
     }
@@ -4227,31 +4266,39 @@ export async function toggleQuestionLikeInSupabase(
 /**
  * Fetch all question IDs bookmarked by a user from Supabase / server
  */
-export async function fetchUserBookmarkedQuestionIds(userId: string): Promise<string[]> {
-  if (!userId) return [];
-  const uId = String(userId).trim();
+export async function fetchUserBookmarkedQuestionIds(userId?: string): Promise<string[]> {
+  const uId = await getEffectiveAuthUserId(userId);
+  const candidateIds = Array.from(new Set([
+    uId,
+    userId,
+    getUserUniqueId(),
+    getUserProfile()?.student_id
+  ].filter(Boolean) as string[]));
 
   // Try local storage cache
-  let cached: string[] = [];
-  try {
-    const raw = localStorage.getItem('tamreen_bookmarked_ids');
-    if (raw) cached = JSON.parse(raw);
-  } catch {}
+  const cached = getBookmarkedIds();
 
-  if (supabaseInstance) {
+  if (supabaseInstance && candidateIds.length > 0) {
     try {
+      const orFilter = candidateIds.map((id) => `user_id.eq.${id}`).join(',');
       const { data, error } = await supabaseInstance
         .from('question_bookmarks')
         .select('question_id')
-        .eq('user_id', uId);
+        .or(orFilter);
       if (!error && Array.isArray(data)) {
-        const ids = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        const dbIds = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        const combined = Array.from(new Set([...cached, ...dbIds]));
         try {
-          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(ids));
+          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(combined));
         } catch {}
-        return ids;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids: combined } }));
+        }
+        return combined;
       }
-    } catch {}
+    } catch (sbErr) {
+      console.warn('Supabase fetchUserBookmarkedQuestionIds notice:', sbErr);
+    }
   }
 
   // Fallback to server API
@@ -4260,11 +4307,15 @@ export async function fetchUserBookmarkedQuestionIds(userId: string): Promise<st
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.bookmarkedQuestionIds)) {
-        const ids = json.bookmarkedQuestionIds.map(String);
+        const srvIds = json.bookmarkedQuestionIds.map((id: any) => String(id).trim()).filter(Boolean);
+        const combined = Array.from(new Set([...cached, ...srvIds]));
         try {
-          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(ids));
+          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(combined));
         } catch {}
-        return ids;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids: combined } }));
+        }
+        return combined;
       }
     }
   } catch {}
@@ -4277,17 +4328,12 @@ export async function fetchUserBookmarkedQuestionIds(userId: string): Promise<st
  */
 export async function toggleQuestionBookmarkInSupabase(
   questionId: string | number,
-  userId: string
+  userId?: string
 ): Promise<{ isBookmarked: boolean }> {
   const qId = String(questionId).trim();
-  const uId = String(userId).trim();
+  const uId = await getEffectiveAuthUserId(userId);
 
-  let currentBookmarked: string[] = [];
-  try {
-    const raw = localStorage.getItem('tamreen_bookmarked_ids');
-    if (raw) currentBookmarked = JSON.parse(raw);
-  } catch {}
-
+  const currentBookmarked = getBookmarkedIds();
   const isCurrentlyBookmarked = currentBookmarked.includes(qId);
   const nextBookmarked = isCurrentlyBookmarked
     ? currentBookmarked.filter((id) => id !== qId)
@@ -4296,6 +4342,10 @@ export async function toggleQuestionBookmarkInSupabase(
   try {
     localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(nextBookmarked));
   } catch {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids: nextBookmarked } }));
+  }
 
   let finalIsBookmarked = !isCurrentlyBookmarked;
 
