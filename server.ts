@@ -98,9 +98,10 @@ interface ServerLeaderboardEntry {
   id: string;
   exam_id: string;
   exam_title: string;
-  user_id?: string;
+  user_id?: string | null;
   user_name: string;
-  guest_name?: string;
+  guest_name?: string | null;
+  guest_id?: string | null;
   full_name?: string;
   is_guest?: boolean;
   user_avatar?: string;
@@ -118,9 +119,11 @@ interface ServerExamResult {
   exam_id: string;
   exam_title?: string;
   is_free?: boolean;
-  user_id: string;
+  user_id?: string | null;
+  user_name?: string;
   full_name: string;
-  guest_name?: string;
+  guest_name?: string | null;
+  guest_id?: string | null;
   is_guest?: boolean;
   avatar_url?: string;
   roll_number?: string;
@@ -810,22 +813,28 @@ app.post('/api/exam_results', (req, res) => {
     }
 
     const examResultId = item.id || `er_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const effectiveGuestName = item.guest_name || (item.is_guest ? (item.full_name || item.userName || item.name) : undefined);
     const isGuest = Boolean(
       item.is_guest !== undefined
         ? item.is_guest
-        : (Boolean(effectiveGuestName) || !item.user_id || String(item.user_id).startsWith('guest_') || String(item.user_id).startsWith('anon_'))
+        : (Boolean(item.guest_name) || !item.user_id || String(item.user_id).startsWith('guest_') || String(item.user_id).startsWith('anon_'))
     );
-    const effectiveFullName = effectiveGuestName || String(item.full_name || item.userName || item.name || 'পরীক্ষার্থী');
+
+    const registeredUserId = !isGuest ? (item.user_id && !String(item.user_id).startsWith('guest_') && !String(item.user_id).startsWith('anon_') ? String(item.user_id).trim() : null) : null;
+    const guestId = isGuest ? String(item.guest_id || item.roll_number || item.student_id || (item.user_id && String(item.user_id).startsWith('guest_') ? item.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim() : null;
+    const guestName = isGuest ? String(item.guest_name || item.full_name || item.userName || item.name || 'গেস্ট পরীক্ষার্থী').trim() : null;
+    const registeredName = !isGuest ? String(item.full_name || item.user_name || item.userName || item.name || 'পরীক্ষার্থী').trim() : null;
+    const effectiveName = registeredName || guestName || 'পরীক্ষার্থী';
 
     const newRecord: ServerExamResult = {
       id: examResultId,
       exam_id: String(item.exam_id || item.examId || 'general'),
       exam_title: item.exam_title || item.examTitle || 'মডেল টেস্ট',
       is_free: item.is_free !== undefined ? Boolean(item.is_free) : true,
-      user_id: String(item.user_id || item.userId || (isGuest ? `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}` : `user_${Date.now()}`)),
-      full_name: effectiveFullName,
-      guest_name: effectiveGuestName,
+      user_id: registeredUserId,
+      user_name: effectiveName,
+      full_name: effectiveName,
+      guest_name: guestName,
+      guest_id: guestId,
       is_guest: isGuest,
       avatar_url: item.avatar_url || item.avatar || item.user_avatar || '',
       roll_number: item.roll_number || item.student_id || item.user_roll || undefined,
@@ -985,20 +994,28 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
       return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
     });
 
-    const formatted = list.map((r, idx) => ({
-      rank: idx + 1,
-      user_id: r.user_id,
-      full_name: r.guest_name || r.full_name,
-      guest_name: r.guest_name,
-      is_guest: r.is_guest,
-      avatar_url: r.avatar_url || '',
-      roll_number: r.roll_number,
-      score: r.score,
-      total_marks: r.total_marks,
-      correct_answers: r.correct_answers,
-      wrong_answers: r.wrong_answers,
-      time_taken_seconds: r.time_taken_seconds,
-    }));
+    const formatted = list.map((r, idx) => {
+      const isReg = Boolean(r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_'));
+      const isGuest = !isReg;
+      const fullName = r.user_name || r.full_name || r.guest_name || 'Anonymous';
+      const rollNumber = r.roll_number || r.guest_id || 'N/A';
+      return {
+        rank: idx + 1,
+        user_id: r.user_id || undefined,
+        full_name: fullName,
+        user_name: fullName,
+        guest_name: isGuest ? (r.guest_name || fullName) : undefined,
+        guest_id: r.guest_id || undefined,
+        is_guest: isGuest,
+        avatar_url: r.avatar_url || '',
+        roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
+        score: r.score,
+        total_marks: r.total_marks,
+        correct_answers: r.correct_answers,
+        wrong_answers: r.wrong_answers,
+        time_taken_seconds: r.time_taken_seconds,
+      };
+    });
 
     return res.json({ success: true, data: formatted });
   } catch (err: any) {

@@ -1096,6 +1096,7 @@ export async function submitExamResultToSupabase(params: {
   user_id: string;
   full_name: string;
   guest_name?: string;
+  guest_id?: string;
   is_guest?: boolean;
   avatar_url?: string;
   score: number;
@@ -1188,13 +1189,20 @@ export async function submitExamResultToSupabase(params: {
     }
 
     // 3B. Insert into exam_results directly with user_id NULL for guests, Auth UUID/registered ID for registered users
+    const guestId = isGuest
+      ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
+      : null;
+    const guestName = isGuest ? effectiveName : null;
+    const userName = !isGuest ? effectiveName : (guestName || 'গেস্ট পরীক্ষার্থী');
+
     const submissionData = {
       exam_id: String(params.exam_id),
       exam_title: params.exam_title || 'মডেল টেস্ট',
       user_id: registeredUserId,
-      guest_name: isGuest ? effectiveName : null,
-      user_name: effectiveName || 'পরীক্ষার্থী',
+      user_name: userName,
       full_name: effectiveName || 'পরীক্ষার্থী',
+      guest_name: guestName,
+      guest_id: guestId,
       total_marks: Number(params.total_marks),
       total_questions: Number(params.total_marks),
       score: Number(params.score),
@@ -1471,20 +1479,19 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         });
 
         return sortedRows.map((row: any, idx: number) => {
-          const prof = profilesMap.get(row.user_id);
           const uId = row.user_id ? String(row.user_id).trim() : null;
-          const isGuest = Boolean(
-            !uId ||
-            row.is_guest === true ||
-            Boolean(row.guest_name) ||
-            uId.startsWith('guest_') ||
-            uId.startsWith('anon_')
-          );
-          const fullName = !isGuest
-            ? (prof?.full_name || row.full_name || row.user_name || 'শিক্ষার্থী')
-            : (row.guest_name || row.full_name || row.user_name || 'গেস্ট পরীক্ষার্থী');
-          const avatarUrl = !isGuest ? (prof?.avatar_url || row.avatar_url) : row.avatar_url;
-          const rollNumber = prof?.roll_number || prof?.student_id || row.roll_number || row.student_id;
+          const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
+          const prof = isRegistered ? profilesMap.get(uId) : null;
+          const isGuest = !isRegistered;
+
+          // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
+          const fullName = prof?.full_name || row.user_name || row.guest_name || row.full_name || 'Anonymous';
+          
+          // ID/Roll fallback: profiles.roll_number ?? exam_results.guest_id ?? 'N/A'
+          const rawRollOrId = prof?.roll_number || prof?.student_id || row.guest_id || row.roll_number || row.student_id;
+          const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
+
+          const avatarUrl = isRegistered ? (prof?.avatar_url || row.avatar_url) : row.avatar_url;
           const score = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
           const totalMarks = Number(row.total_marks ?? row.total_questions ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
@@ -1493,12 +1500,14 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
           return {
             rank: idx + 1,
-            user_id: uId,
+            user_id: uId || undefined,
             full_name: fullName,
+            user_name: fullName,
             guest_name: isGuest ? (row.guest_name || fullName) : undefined,
+            guest_id: row.guest_id || undefined,
             avatar_url: avatarUrl,
-            roll_number: rollNumber,
-            student_id: rollNumber,
+            roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
+            student_id: rollNumber !== 'N/A' ? rollNumber : undefined,
             score,
             total_marks: totalMarks,
             correct_answers: correctAnswers,
@@ -1633,12 +1642,12 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
         if (filtered.length > 0) {
           // Fetch profiles
           const userIds = Array.from(new Set(filtered.map((r: any) => r.user_id).filter(Boolean)));
-          let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+          let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
           if (userIds.length > 0) {
             try {
               const { data: profs } = await supabaseInstance
                 .from('profiles')
-                .select('id, full_name, avatar_url')
+                .select('id, full_name, avatar_url, roll_number, student_id')
                 .in('id', userIds);
               if (profs && Array.isArray(profs)) {
                 profs.forEach((p: any) => {
@@ -1648,41 +1657,47 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
             } catch {}
           }
 
-          // Group by user_id
+          // Group by user_id for registered users, or guest_id / guest_name for guests
           const userAggMap = new Map<string, {
-            user_id: string;
+            user_id?: string;
             full_name: string;
             avatar_url?: string;
+            roll_number?: string;
+            guest_id?: string;
+            is_guest: boolean;
             total_points: number;
             free_exam_count: number;
             percentageSum: number;
           }>();
 
           for (const r of filtered) {
-            const uId = String(r.user_id || '');
-            const isGuest = Boolean(
-              r.is_guest === true ||
-              Boolean(r.guest_name) ||
-              !uId ||
-              uId.startsWith('guest_') ||
-              uId.startsWith('anon_') ||
-              (r.full_name || '').includes('গেস্ট') ||
-              (r.full_name || '').includes('Guest')
-            );
-            const prof = profilesMap.get(uId);
-            const name = r.guest_name || r.full_name || r.user_name || prof?.full_name || 'পরীক্ষার্থী';
-            const avatar = r.avatar_url || prof?.avatar_url;
+            const uId = r.user_id ? String(r.user_id).trim() : null;
+            const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
+            const prof = isRegistered ? profilesMap.get(uId) : null;
+            const isGuest = !isRegistered;
+
+            // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
+            const name = prof?.full_name || r.user_name || r.guest_name || r.full_name || 'Anonymous';
+            
+            // ID/Roll fallback: profiles.roll_number ?? exam_results.guest_id ?? 'N/A'
+            const rawRollOrId = prof?.roll_number || prof?.student_id || r.guest_id || r.roll_number || r.student_id;
+            const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
+
+            const avatar = isRegistered ? (prof?.avatar_url || r.avatar_url) : r.avatar_url;
             const points = Number(r.correct_answers ?? r.score ?? 0);
             const totalQ = Number(r.total_marks ?? (Number(r.correct_answers || 0) + Number(r.wrong_answers || 0)) ?? 0);
             const percentage = totalQ > 0 ? (points / totalQ) * 100 : 100;
 
-            const aggKey = (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')) ? uId : (r.guest_name || name);
+            const aggKey = isRegistered ? uId! : String(r.guest_id || r.guest_name || name).trim().toLowerCase();
             const existing = userAggMap.get(aggKey);
             if (!existing) {
               userAggMap.set(aggKey, {
-                user_id: uId,
+                user_id: uId || undefined,
                 full_name: name,
                 avatar_url: avatar,
+                roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
+                guest_id: r.guest_id || undefined,
+                is_guest: isGuest,
                 total_points: points,
                 free_exam_count: 1,
                 percentageSum: percentage,
@@ -1696,22 +1711,17 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
           }
 
           const userList = Array.from(userAggMap.values()).map((u) => {
-            const uId = String(u.user_id || '');
-            const isGuest = Boolean(
-              !uId ||
-              uId.startsWith('guest_') ||
-              uId.startsWith('anon_') ||
-              u.full_name.includes('গেস্ট') ||
-              u.full_name.includes('Guest')
-            );
             return {
-              user_id: u.user_id,
+              user_id: u.user_id || '',
               full_name: u.full_name,
               avatar_url: u.avatar_url,
+              roll_number: u.roll_number,
+              student_id: u.roll_number,
+              guest_id: u.guest_id,
               total_points: u.total_points,
               free_exam_count: u.free_exam_count,
               average_percentage: u.free_exam_count > 0 ? Math.round(u.percentageSum / u.free_exam_count) : 0,
-              is_guest: isGuest,
+              is_guest: u.is_guest,
             };
           });
 
@@ -1939,20 +1949,19 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
         }
 
         dbEntries = data.map((item: any) => {
-          const prof = profilesMap.get(item.user_id);
-          const rawGuest = item.guest_name;
-          const uId = String(item.user_id || '');
-          const isGuest = Boolean(
-            item.is_guest === true ||
-            Boolean(rawGuest) ||
-            !uId ||
-            uId.startsWith('guest_') ||
-            uId.startsWith('anon_') ||
-            (item.full_name || item.user_name || '').includes('গেস্ট') ||
-            (item.full_name || item.user_name || '').includes('Guest')
-          );
-          const name = rawGuest || item.full_name || item.user_name || prof?.full_name || 'পরীক্ষার্থী';
-          const avatar = item.avatar_url || prof?.avatar_url;
+          const uId = item.user_id ? String(item.user_id).trim() : null;
+          const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
+          const prof = isRegistered ? profilesMap.get(uId) : null;
+          const isGuest = !isRegistered;
+
+          // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
+          const name = prof?.full_name || item.user_name || item.guest_name || item.full_name || 'Anonymous';
+          
+          // ID/Roll fallback: profiles.roll_number ?? exam_results.guest_id ?? 'N/A'
+          const rawRollOrId = prof?.roll_number || prof?.student_id || item.guest_id || item.roll_number || item.student_id;
+          const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
+
+          const avatar = isRegistered ? (prof?.avatar_url || item.avatar_url) : item.avatar_url;
           const score = Number(item.score ?? item.correct_answers ?? item.correct_count ?? 0);
           const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers ?? item.correct_count ?? 0) + Number(item.wrong_answers ?? item.wrong_count ?? 0)) ?? 0);
           const correctCount = Number(item.correct_answers ?? item.correct_count ?? item.score ?? 0);
@@ -1963,11 +1972,14 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
             id: String(item.id || `er_${Math.random()}`),
             exam_id: String(item.exam_id || 'general'),
             exam_title: String(item.exam_title || 'মডেল টেস্ট'),
-            user_id: item.user_id ? String(item.user_id) : undefined,
+            user_id: uId || undefined,
             user_name: name,
-            guest_name: rawGuest || (isGuest ? name : undefined),
-            full_name: item.full_name || name,
+            guest_name: isGuest ? (item.guest_name || name) : undefined,
+            guest_id: item.guest_id || undefined,
+            full_name: name,
             user_avatar: avatar,
+            roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
+            student_id: rollNumber !== 'N/A' ? rollNumber : undefined,
             score,
             total_questions: totalQuestions,
             correct_count: correctCount,
