@@ -4982,3 +4982,252 @@ export async function customPhoneRegister(
     return { success: false, error: err.message || 'একটি ত্রুটি ঘটেছে।' };
   }
 }
+
+/**
+ * ============================================================================
+ * BLOG POSTS SUPABASE & LOCAL CACHE INTEGRATION
+ * ============================================================================
+ */
+
+import { INITIAL_BLOG_POSTS } from '../data/blogData';
+import { BlogPost, BlogCategory } from '../types';
+
+const BLOGS_CACHE_KEY = 'tamreen_blogs_cache';
+const BLOG_BOOKMARKS_KEY = 'tamreen_blog_bookmarks';
+
+export function getLocalBookmarkedBlogIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(BLOG_BOOKMARKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function toggleBlogBookmark(blogId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const current = getLocalBookmarkedBlogIds();
+    let updated: string[];
+    let isBookmarked = false;
+    if (current.includes(blogId)) {
+      updated = current.filter(id => id !== blogId);
+      isBookmarked = false;
+    } else {
+      updated = [...current, blogId];
+      isBookmarked = true;
+    }
+    localStorage.setItem(BLOG_BOOKMARKS_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('tamreen_blog_bookmark_changed', { detail: { blogId, isBookmarked } }));
+    return isBookmarked;
+  } catch {
+    return false;
+  }
+}
+
+export function getCachedBlogs(): BlogPost[] {
+  if (typeof window === 'undefined') return INITIAL_BLOG_POSTS;
+  try {
+    const raw = localStorage.getItem(BLOGS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return INITIAL_BLOG_POSTS;
+}
+
+export function setCachedBlogs(blogs: BlogPost[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BLOGS_CACHE_KEY, JSON.stringify(blogs));
+  } catch {}
+}
+
+export function generateSlug(title: string): string {
+  const sanitized = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s\u0980-\u09FF-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return sanitized ? `${sanitized}-${Date.now().toString(36).substring(4)}` : `blog-${Date.now()}`;
+}
+
+export async function fetchBlogPosts(): Promise<BlogPost[]> {
+  let blogs: BlogPost[] = getCachedBlogs();
+
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('blogs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const mapped: BlogPost[] = data.map((item: any) => ({
+          id: String(item.id),
+          slug: item.slug || generateSlug(item.title || 'blog'),
+          title: item.title || '',
+          thumbnail: item.thumbnail || item.thumbnail_url || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
+          excerpt: item.excerpt || item.description || '',
+          content: item.content || item.full_content || '',
+          category: (item.category || 'নিবন্ধন প্রস্তুতি') as BlogCategory,
+          author: item.author || 'আত-তামরীন একাডেমি',
+          published_date: item.published_date || '৩১ আগস্ট ২০২৬',
+          reading_time_minutes: Number(item.reading_time_minutes || item.reading_time || 5),
+          status: item.status === 'draft' ? 'draft' : 'published',
+          created_at: item.created_at || new Date().toISOString(),
+          updated_at: item.updated_at,
+          views_count: Number(item.views_count || 0),
+          is_featured: Boolean(item.is_featured),
+        }));
+
+        blogs = mapped;
+        setCachedBlogs(mapped);
+        return blogs;
+      }
+    } catch (err) {
+      console.warn('Supabase blogs fetch notice:', err);
+    }
+  }
+
+  return blogs;
+}
+
+export async function saveBlogPost(postData: Partial<BlogPost> & { title: string; content: string; category: BlogCategory }): Promise<{ success: boolean; post?: BlogPost; error?: string }> {
+  try {
+    const slug = postData.slug || generateSlug(postData.title);
+    const newPost: BlogPost = {
+      id: postData.id || `blog_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      slug,
+      title: postData.title,
+      thumbnail: postData.thumbnail || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
+      excerpt: postData.excerpt || postData.content.substring(0, 140) + '...',
+      content: postData.content,
+      category: postData.category,
+      author: postData.author || 'আত-তামরীন টিম',
+      published_date: postData.published_date || new Intl.DateTimeFormat('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()),
+      reading_time_minutes: postData.reading_time_minutes || Math.max(1, Math.ceil(postData.content.split(/\s+/).length / 150)),
+      status: postData.status || 'published',
+      created_at: postData.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      views_count: postData.views_count || 0,
+      is_featured: postData.is_featured || false,
+    };
+
+    // Update local cache
+    const currentBlogs = getCachedBlogs();
+    const existingIndex = currentBlogs.findIndex(b => b.id === newPost.id || (postData.id && b.id === postData.id));
+    let updatedList: BlogPost[];
+    if (existingIndex >= 0) {
+      updatedList = [...currentBlogs];
+      updatedList[existingIndex] = newPost;
+    } else {
+      updatedList = [newPost, ...currentBlogs];
+    }
+    setCachedBlogs(updatedList);
+
+    // Save to Supabase if available
+    if (supabaseInstance) {
+      try {
+        const payload: any = {
+          id: newPost.id,
+          slug: newPost.slug,
+          title: newPost.title,
+          thumbnail: newPost.thumbnail,
+          excerpt: newPost.excerpt,
+          content: newPost.content,
+          category: newPost.category,
+          author: newPost.author,
+          published_date: newPost.published_date,
+          reading_time_minutes: newPost.reading_time_minutes,
+          status: newPost.status,
+          updated_at: newPost.updated_at,
+          views_count: newPost.views_count,
+          is_featured: newPost.is_featured,
+        };
+
+        const { error } = await supabaseInstance
+          .from('blogs')
+          .upsert(payload, { onConflict: 'id' });
+
+        if (error) {
+          console.warn('Supabase blog upsert warning:', error.message);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase blog upsert notice:', dbErr);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_blogs_updated', { detail: { post: newPost } }));
+    }
+
+    return { success: true, post: newPost };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'ব্লগ সংরক্ষণ করতে সমস্যা হয়েছে।' };
+  }
+}
+
+export async function deleteBlogPost(id: string): Promise<boolean> {
+  try {
+    const currentBlogs = getCachedBlogs();
+    const updated = currentBlogs.filter(b => b.id !== id);
+    setCachedBlogs(updated);
+
+    if (supabaseInstance) {
+      try {
+        await supabaseInstance
+          .from('blogs')
+          .delete()
+          .eq('id', id);
+      } catch (e) {
+        console.warn('Supabase delete blog notice:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_blogs_updated'));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function uploadBlogThumbnail(file: File): Promise<string> {
+  if (supabaseInstance) {
+    try {
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `blog_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const filePath = `thumbnails/${fileName}`;
+
+      const { data, error } = await supabaseInstance.storage
+        .from('blog-thumbnails')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+      if (!error && data) {
+        const { data: pubUrlData } = supabaseInstance.storage
+          .from('blog-thumbnails')
+          .getPublicUrl(filePath);
+        if (pubUrlData?.publicUrl) {
+          return pubUrlData.publicUrl;
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase storage upload notice:', e);
+    }
+  }
+
+  // Fallback to FileReader base64 Data URL
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

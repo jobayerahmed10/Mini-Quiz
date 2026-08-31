@@ -3,7 +3,7 @@ import {
   FileCheck2, 
   BookOpen, 
   Sparkles, 
-  Briefcase, 
+  Newspaper, 
   Layers 
 } from 'lucide-react';
 import { TabRoute } from '../types';
@@ -39,11 +39,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       badgeColor: 'bg-[#F59E0B] text-slate-950 font-bold',
     },
     {
-      id: 'circulars' as TabRoute,
-      label: 'সার্কুলার',
-      icon: Briefcase,
-      badge: 'ভর্তি',
-      badgeColor: 'bg-[#EF4444] text-white',
+      id: 'blogs' as TabRoute,
+      label: 'ব্লগ',
+      icon: Newspaper,
     },
     {
       id: 'subjects' as TabRoute,

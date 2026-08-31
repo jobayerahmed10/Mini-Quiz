@@ -62,7 +62,32 @@ export interface QuizResult {
   negativeMarks?: number;
 }
 
-export type TabRoute = 'home' | 'exam' | 'courses' | 'ustad_ai' | 'circulars' | 'subjects';
+export type TabRoute = 'home' | 'exam' | 'courses' | 'ustad_ai' | 'blogs' | 'circulars' | 'subjects';
+
+export type BlogCategory = 
+  | 'নিবন্ধন প্রস্তুতি'
+  | 'প্রাইমারি প্রস্তুতি'
+  | 'বিসিএস প্রস্তুতি'
+  | '১১-২০ গ্রেড প্রস্তুতি'
+  | 'জব সার্কুলার';
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  thumbnail: string;
+  excerpt: string;
+  content: string;
+  category: BlogCategory;
+  author: string;
+  published_date: string;
+  reading_time_minutes: number;
+  status: 'published' | 'draft';
+  created_at?: string;
+  updated_at?: string;
+  views_count?: number;
+  is_featured?: boolean;
+}
 
 export type PageRoute = 'home' | 'practice' | 'result' | 'leaderboard' | 'profile' | 'question_detail';
 

@@ -7,6 +7,7 @@ import { ExamPage } from './components/ExamPage';
 import { LeaderboardPage } from './components/LeaderboardPage';
 import { CoursesPage } from './components/CoursesPage';
 import { UstadAiPage } from './components/UstadAiPage';
+import { BlogPage } from './components/BlogPage';
 import { JobCircularsPage } from './components/JobCircularsPage';
 import { SubjectsPage } from './components/SubjectsPage';
 import { ProfileModal } from './components/ProfileModal';
@@ -792,10 +793,8 @@ export default function App() {
               <UstadAiPage />
             )}
 
-            {activeTab === 'circulars' && (
-              <JobCircularsPage
-                onStartModelTestForCategory={(cat) => handleStartPractice(cat)}
-              />
+            {(activeTab === 'blogs' || (activeTab as any) === 'circulars') && (
+              <BlogPage searchQuery={searchQuery} />
             )}
 
             {activeTab === 'subjects' && (

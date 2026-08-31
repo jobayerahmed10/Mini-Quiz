@@ -4,7 +4,7 @@ import {
   BarChart3, Settings, Upload, Crown, Flame, Target, CheckCircle2, 
   ChevronRight, BookOpen, Bookmark, AlertTriangle, RotateCcw, 
   LayoutGrid, Mail, Star, ExternalLink, SlidersHorizontal, ArrowLeft,
-  LogIn, LogOut
+  LogIn, LogOut, FileText
 } from 'lucide-react';
 import { 
   saveUserProfile, UserProfile, getUserProfile, getStudentStats, 
@@ -18,6 +18,7 @@ import {
   supabaseUpdateUserProfile
 } from '../lib/supabase';
 import { AuthModal } from './AuthModal';
+import { AdminBlogModal } from './AdminBlogModal';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Supabase Auth State
   const [authSession, setAuthSession] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showAdminBlogModal, setShowAdminBlogModal] = useState<boolean>(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
 
   useEffect(() => {
@@ -376,6 +378,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <ChevronRight className="w-5 h-5 text-amber-600" />
               </button>
 
+              {/* Item: Admin Blog Management */}
+              <button
+                onClick={() => setShowAdminBlogModal(true)}
+                className="w-full p-3.5 sm:p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-[#046A38] dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#046A38] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-sm font-black block">ব্লগ ম্যানেজমেন্ট</span>
+                    <span className="text-[10px] font-bold text-emerald-700/80 dark:text-emerald-400">নতুন ব্লগ তৈরি, সম্পাদনা ও প্রকাশ করুন</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-emerald-600" />
+              </button>
+
               {/* Item 9: Settings */}
               <button
                 onClick={() => {
@@ -690,6 +709,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           setPhone(profile.phone);
           if (profile.avatar) setAvatar(profile.avatar);
           setShowAuthModal(false);
+        }}
+      />
+
+      {/* Admin Blog Management Modal */}
+      <AdminBlogModal
+        isOpen={showAdminBlogModal}
+        onClose={() => setShowAdminBlogModal(false)}
+        onPostSaved={() => {
+          // Handled
         }}
       />
     </div>

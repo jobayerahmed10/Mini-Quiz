@@ -17,6 +17,7 @@ import {
   Home,
   FileText,
   BookOpen,
+  Newspaper,
   Briefcase,
   Layers,
   LogIn,
@@ -665,18 +666,17 @@ export const Header: React.FC<HeaderProps> = ({
             <span>তামরীন এআই</span>
           </button>
 
-          {/* 5. সার্কুলার */}
+          {/* 5. ব্লগ */}
           <button
-            onClick={() => handleSubTabClick('circulars')}
+            onClick={() => handleSubTabClick('blogs')}
             className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === 'circulars' && currentPage === 'home'
+              activeTab === 'blogs' && currentPage === 'home'
                 ? 'bg-[#046A38] text-white shadow-[0_3px_10px_rgba(4,106,56,0.35)]'
                 : 'neu-pill text-slate-700 dark:text-slate-300 hover:scale-[1.02]'
             }`}
           >
-            <Briefcase className={`w-3.5 h-3.5 ${activeTab === 'circulars' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
-            <span>সার্কুলার</span>
-            <span className="text-[9px] font-black px-1.5 py-0.2 bg-[#EF4444] text-white rounded-full">ভর্তি</span>
+            <Newspaper className={`w-3.5 h-3.5 ${activeTab === 'blogs' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
+            <span>ব্লগ</span>
           </button>
 
           {/* 6. বিষয়ভিত্তিক */}
