@@ -15,6 +15,7 @@ import {
   getUserRollNumber, 
   getUserUniqueId, 
   getUserProfile, 
+  isUserRegistered,
   getGuestDeviceId, 
   addCompletedExamId, 
   getCompletedExamIds,
@@ -1167,23 +1168,27 @@ export async function submitExamResultToSupabase(params: {
     const isValidUuid = (str?: string | null) =>
       Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-    let authUserId: string | null = null;
+    let authUser: any = null;
     try {
       const { data: { user } } = await supabaseInstance.auth.getUser();
       if (user?.id) {
-        authUserId = user.id;
+        authUser = user;
       }
     } catch {}
 
     const userProfile = getUserProfile();
+    const authUserId = authUser?.id || null;
+    const authFullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name;
+
     const rawCandidateId = authUserId || (userProfile as any)?.id || params.user_id;
-    // Only pass user_id to Supabase if it is a valid UUID to prevent PostgreSQL type errors
-    const dbUserId = (!isGuest && isValidUuid(rawCandidateId))
+    // Only pass user_id to Supabase if it is a valid Auth UUID to prevent PostgreSQL type errors
+    const isRegistered = Boolean((authUserId || isUserRegistered()) && isValidUuid(rawCandidateId));
+    const dbUserId = (isRegistered && isValidUuid(rawCandidateId))
       ? String(rawCandidateId).trim()
       : null;
 
-    let registeredRollNumber: string | null = params.roll_number || params.student_id || null;
-    let registeredFullName: string = effectiveName || 'পরীক্ষার্থী';
+    let registeredRollNumber: string | null = params.roll_number || params.student_id || userProfile?.roll_number || userProfile?.student_id || null;
+    let registeredFullName: string = authFullName || userProfile?.name || effectiveName || 'শিক্ষার্থী';
 
     // 3A. Fetch and Upsert Profile ONLY for registered users with a valid UUID
     if (dbUserId) {
@@ -1206,7 +1211,7 @@ export async function submitExamResultToSupabase(params: {
         const profileData: any = {
           id: dbUserId,
           full_name: registeredFullName,
-          avatar_url: params.avatar_url || null,
+          avatar_url: params.avatar_url || userProfile?.avatar || null,
           updated_at: submittedAt,
         };
         if (registeredRollNumber) {
@@ -1223,16 +1228,16 @@ export async function submitExamResultToSupabase(params: {
     }
 
     // 3B. Insert into exam_results directly with user_id (UUID or null)
-    const guestId = isGuest
+    const guestId = !dbUserId
       ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
       : null;
-    const guestName = isGuest ? effectiveName : null;
-    const userName = !isGuest ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
+    const guestName = !dbUserId ? (params.guest_name || effectiveName || 'গেস্ট পরীক্ষার্থী') : null;
+    const userName = dbUserId ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
 
     const submissionData = {
       exam_id: String(params.exam_id),
       exam_title: params.exam_title || 'মডেল টেস্ট',
-      user_id: dbUserId,
+      user_id: dbUserId, // Valid Auth UUID or null
       user_name: userName,
       full_name: registeredFullName,
       guest_name: guestName,
@@ -1251,7 +1256,7 @@ export async function submitExamResultToSupabase(params: {
       time_taken_seconds: Number(timeTaken),
       submitted_at: submittedAt,
       is_free: params.is_free ?? true,
-      is_guest: isGuest,
+      is_guest: !dbUserId,
     };
 
     const { error } = await supabaseInstance
@@ -1429,10 +1434,10 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       const cleanExamId = examId.trim();
       const escapedExamId = cleanExamId.replace(/"/g, '\\"');
       
-      // Query exam_results directly as requested with quoted values for PostgREST compatibility
+      // Query exam_results directly with LEFT JOIN to profiles on user_id
       let query = supabaseInstance
         .from('exam_results')
-        .select('*')
+        .select('*, profiles(full_name, avatar_url, roll_number, student_id)')
         .or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`)
         .order('score', { ascending: false })
         .order('time_taken', { ascending: true });
@@ -1441,7 +1446,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       let data = directRes.data;
       let error = directRes.error;
 
-      // Fallback for older entries using time_taken_seconds if time_taken fails
+      // Fallback for query without embed if join query fails or returns empty
       if (error || !data || data.length === 0) {
         let queryFallback = supabaseInstance
           .from('exam_results')
@@ -1455,7 +1460,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       }
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        // Fetch profiles to map names, avatars, and roll numbers
+        // Fetch profiles separately as a backup to map names, avatars, and roll numbers
         const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
         let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
         if (userIds.length > 0) {
@@ -1519,17 +1524,19 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         return sortedRows.map((row: any, idx: number) => {
           const uId = row.user_id ? String(row.user_id).trim() : null;
           const isRegistered = Boolean(row.is_guest === false || (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')));
-          const prof = (isRegistered && uId) ? profilesMap.get(uId) : null;
+          const profFromEmbed = row.profiles && typeof row.profiles === 'object' ? row.profiles : null;
+          const profFromMap = (isRegistered && uId) ? profilesMap.get(uId) : null;
           const isGuest = !isRegistered;
 
-          // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.full_name ?? exam_results.guest_name ?? 'Anonymous'
-          const fullName = prof?.full_name || row.full_name || row.user_name || row.guest_name || 'পরীক্ষার্থী';
+          // Strict Name Priority: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
+          const profileName = profFromEmbed?.full_name || profFromMap?.full_name;
+          const fullName = profileName || row.user_name || row.guest_name || row.full_name || 'Anonymous';
           
           // ID/Roll fallback: profiles.roll_number ?? exam_results.roll_number ?? exam_results.guest_id ?? 'N/A'
-          const rawRollOrId = prof?.roll_number || prof?.student_id || row.roll_number || row.student_id || row.guest_id;
+          const rawRollOrId = profFromEmbed?.roll_number || profFromEmbed?.student_id || profFromMap?.roll_number || profFromMap?.student_id || row.roll_number || row.student_id || row.guest_id;
           const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
-          const avatarUrl = isRegistered ? (prof?.avatar_url || row.avatar_url) : row.avatar_url;
+          const avatarUrl = isRegistered ? (profFromEmbed?.avatar_url || profFromMap?.avatar_url || row.avatar_url) : row.avatar_url;
           const score = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
           const totalMarks = Number(row.total_marks ?? row.total_questions ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
@@ -1540,7 +1547,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             rank: idx + 1,
             user_id: uId || undefined,
             full_name: fullName,
-            user_name: fullName,
+            user_name: row.user_name || fullName,
             guest_name: isGuest ? (row.guest_name || fullName) : undefined,
             guest_id: row.guest_id || undefined,
             avatar_url: avatarUrl,
