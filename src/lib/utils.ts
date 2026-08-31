@@ -223,11 +223,11 @@ export function getUserRollNumber(phone?: string): string {
     // Generate clean unique 6-digit roll
     const cleanDigits = (phone || '').replace(/[^0-9]/g, '');
     const suffix = cleanDigits.length >= 6 ? cleanDigits.slice(-6) : Math.floor(100000 + Math.random() * 900000);
-    const newRoll = `STD-${suffix}`;
+    const newRoll = `TM-${suffix}`;
     localStorage.setItem(USER_ROLL_KEY, newRoll);
     return newRoll;
   } catch {
-    return `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+    return `TM-${Math.floor(100000 + Math.random() * 900000)}`;
   }
 }
 
@@ -248,6 +248,21 @@ export function isUserRegistered(): boolean {
   }
 }
 
+export function isValidUUID(id?: string | null): boolean {
+  if (!id || typeof id !== 'string') return false;
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id.trim());
+}
+
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export function getGuestDeviceId(): string {
   try {
     let devId = localStorage.getItem('tamreen_guest_device_id');
@@ -263,19 +278,19 @@ export function getGuestDeviceId(): string {
 
 export function getUserUniqueId(): string {
   try {
-    let uId = localStorage.getItem('tamreen_user_id');
     const prof = getUserProfile();
-    if (prof?.isRegistered && prof?.student_id) {
-      return prof.student_id;
-    }
-    if (!uId) {
-      if (prof?.student_id) {
-        uId = prof.student_id;
-      } else {
-        uId = getGuestDeviceId();
+    if (prof) {
+      const pid = (prof as any).id || prof.roll_number || prof.student_id;
+      if (pid && String(pid).trim().length > 0) {
+        return String(pid).trim();
       }
-      localStorage.setItem('tamreen_user_id', uId);
     }
+    let uId = localStorage.getItem('tamreen_user_id');
+    if (uId && uId.trim().length > 0 && uId !== 'undefined' && uId !== 'null') {
+      return uId.trim();
+    }
+    uId = getGuestDeviceId();
+    localStorage.setItem('tamreen_user_id', uId);
     return uId;
   } catch {
     return getGuestDeviceId();

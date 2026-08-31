@@ -330,9 +330,9 @@ app.post('/api/auth/register', (req, res) => {
       cleanEmail = `${cleanPhoneNorm}@attamreen.academy`;
     }
 
-    // Generate or use existing Student ID / Roll Number (e.g. STD-782910)
-    const phoneRoll = cleanPhoneNorm ? `STD-${cleanPhoneNorm.slice(-6)}` : '';
-    const finalStudentId = roll_number || rollNumber || student_id || phoneRoll || `STD-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Generate or use existing Student ID / Roll Number (e.g. TM-111111)
+    const phoneRoll = cleanPhoneNorm ? `TM-${cleanPhoneNorm.slice(-6)}` : '';
+    const finalStudentId = roll_number || rollNumber || student_id || phoneRoll || `TM-${Math.floor(100000 + Math.random() * 900000)}`;
     const finalUserId = id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     // Find existing account by phone or email
