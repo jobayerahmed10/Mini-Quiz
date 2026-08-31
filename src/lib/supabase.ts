@@ -1099,6 +1099,8 @@ export async function submitExamResultToSupabase(params: {
   guest_id?: string;
   is_guest?: boolean;
   avatar_url?: string;
+  roll_number?: string;
+  student_id?: string;
   score: number;
   total_marks: number;
   correct_answers: number;
@@ -1172,20 +1174,44 @@ export async function submitExamResultToSupabase(params: {
       ? String(authUserId || params.user_id).trim()
       : null;
 
-    // 3A. Upsert Profile ONLY for registered users
-    try {
-      if (registeredUserId) {
+    let registeredRollNumber: string | null = params.roll_number || params.student_id || null;
+    let registeredFullName: string = effectiveName || 'পরীক্ষার্থী';
+
+    // 3A. Fetch and Upsert Profile ONLY for registered users
+    if (registeredUserId) {
+      try {
+        const { data: prof } = await supabaseInstance
+          .from('profiles')
+          .select('full_name, roll_number, student_id')
+          .eq('id', registeredUserId)
+          .maybeSingle();
+
+        if (prof) {
+          if (prof.roll_number || prof.student_id) {
+            registeredRollNumber = String(prof.roll_number || prof.student_id);
+          }
+          if (prof.full_name && prof.full_name !== 'শিক্ষার্থী' && prof.full_name !== 'পরীক্ষার্থী') {
+            registeredFullName = prof.full_name;
+          }
+        }
+
+        const profileData: any = {
+          id: registeredUserId,
+          full_name: registeredFullName,
+          avatar_url: params.avatar_url || null,
+          updated_at: submittedAt,
+        };
+        if (registeredRollNumber) {
+          profileData.roll_number = registeredRollNumber;
+          profileData.student_id = registeredRollNumber;
+        }
+
         await supabaseInstance
           .from('profiles')
-          .upsert({
-            id: registeredUserId,
-            full_name: effectiveName,
-            avatar_url: params.avatar_url || null,
-            updated_at: submittedAt,
-          }, { onConflict: 'id' });
+          .upsert(profileData, { onConflict: 'id' });
+      } catch (profErr) {
+        console.warn('Profiles upsert warning:', profErr);
       }
-    } catch (profErr) {
-      console.warn('Profiles upsert warning:', profErr);
     }
 
     // 3B. Insert into exam_results directly with user_id NULL for guests, Auth UUID/registered ID for registered users
@@ -1193,16 +1219,18 @@ export async function submitExamResultToSupabase(params: {
       ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
       : null;
     const guestName = isGuest ? effectiveName : null;
-    const userName = !isGuest ? effectiveName : (guestName || 'গেস্ট পরীক্ষার্থী');
+    const userName = !isGuest ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
 
     const submissionData = {
       exam_id: String(params.exam_id),
       exam_title: params.exam_title || 'মডেল টেস্ট',
       user_id: registeredUserId,
       user_name: userName,
-      full_name: effectiveName || 'পরীক্ষার্থী',
+      full_name: registeredFullName,
       guest_name: guestName,
       guest_id: guestId,
+      roll_number: registeredRollNumber,
+      student_id: registeredRollNumber,
       total_marks: Number(params.total_marks),
       total_questions: Number(params.total_marks),
       score: Number(params.score),
