@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Share2, Copy, Check, BookOpen, HelpCircle, Sparkles, Zap, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { Question } from '../types';
 import { fetchQuestionBySlugOrId } from '../lib/supabase';
+import { QuestionActionFooter } from './QuestionActionFooter';
 
 interface QuestionDetailPageProps {
   slugOrId: string;
@@ -253,19 +254,11 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
           </button>
         )}
 
-        {/* Explanation Section */}
-        {showExplanation && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-3 animate-fade-in">
-            <div className="flex items-center gap-2 text-[#0b705c] dark:text-emerald-400 font-extrabold text-xs sm:text-sm">
-              <BookOpen className="w-4 h-4" />
-              <span>উত্তর ও বিস্তারিত ব্যাখ্যা:</span>
-            </div>
-
-            <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed font-hind whitespace-pre-line">
-              {question.explanation || 'এই প্রশ্নটির জন্য নির্দিষ্ট উত্তর বিশ্লেষণ প্রদান করা হয়েছে। আরও অনুশীলনের জন্য পরীক্ষা দিন।'}
-            </p>
-          </div>
-        )}
+        {/* Full Interactive Action Footer (Likes, Bookmarks, Reports, Explanations) */}
+        <QuestionActionFooter
+          question={question}
+          defaultExpanded={showExplanation}
+        />
       </div>
 
       {/* Action Footer Callouts */}

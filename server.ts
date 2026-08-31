@@ -17,6 +17,50 @@ const LEADERBOARD_FILE_PATH = path.join(process.cwd(), 'leaderboard_store.json')
 const EXAM_RESULTS_FILE_PATH = path.join(process.cwd(), 'exam_results_store.json');
 const REGISTERED_USERS_FILE_PATH = path.join(process.cwd(), 'registered_users_store.json');
 const USER_PROGRESS_FILE_PATH = path.join(process.cwd(), 'user_progress_store.json');
+const QUESTION_LIKES_FILE_PATH = path.join(process.cwd(), 'question_likes_store.json');
+const QUESTION_BOOKMARKS_FILE_PATH = path.join(process.cwd(), 'question_bookmarks_store.json');
+const QUESTION_REPORTS_FILE_PATH = path.join(process.cwd(), 'question_reports_store.json');
+const QUESTION_EXPLANATIONS_FILE_PATH = path.join(process.cwd(), 'question_explanations_store.json');
+
+export interface ServerQuestionLike {
+  id: string;
+  question_id: string;
+  user_id: string;
+  user_name?: string;
+  created_at: string;
+}
+
+export interface ServerQuestionBookmark {
+  id: string;
+  question_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface ServerQuestionReport {
+  id: string;
+  question_id: string;
+  user_id?: string;
+  user_name?: string;
+  phone?: string;
+  email?: string;
+  reason: string;
+  details?: string;
+  status: 'pending' | 'reviewed' | 'resolved';
+  created_at: string;
+}
+
+export interface ServerQuestionExplanation {
+  id: string;
+  question_id: string;
+  user_id?: string;
+  author_name: string;
+  author_avatar?: string;
+  explanation: string;
+  likes_count?: number;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
 
 export interface ServerUserAccount {
   id: string;
@@ -90,6 +134,10 @@ let serverLeaderboardStore: ServerLeaderboardEntry[] = [];
 let serverExamResultsStore: ServerExamResult[] = [];
 let serverRegisteredUsersStore: ServerUserAccount[] = [];
 let serverUserProgressStore: ServerUserProgress[] = [];
+let serverQuestionLikesStore: ServerQuestionLike[] = [];
+let serverQuestionBookmarksStore: ServerQuestionBookmark[] = [];
+let serverQuestionReportsStore: ServerQuestionReport[] = [];
+let serverQuestionExplanationsStore: ServerQuestionExplanation[] = [];
 
 // Load existing stores from disk on startup
 try {
@@ -132,6 +180,46 @@ try {
   console.warn('Could not load exam_results_store.json:', err);
 }
 
+try {
+  if (fs.existsSync(QUESTION_LIKES_FILE_PATH)) {
+    const raw = fs.readFileSync(QUESTION_LIKES_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverQuestionLikesStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load question_likes_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(QUESTION_BOOKMARKS_FILE_PATH)) {
+    const raw = fs.readFileSync(QUESTION_BOOKMARKS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverQuestionBookmarksStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load question_bookmarks_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(QUESTION_REPORTS_FILE_PATH)) {
+    const raw = fs.readFileSync(QUESTION_REPORTS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverQuestionReportsStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load question_reports_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(QUESTION_EXPLANATIONS_FILE_PATH)) {
+    const raw = fs.readFileSync(QUESTION_EXPLANATIONS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) serverQuestionExplanationsStore = parsed;
+  }
+} catch (err) {
+  console.warn('Could not load question_explanations_store.json:', err);
+}
+
 function saveRegisteredUsersStoreToDisk() {
   try {
     fs.writeFileSync(REGISTERED_USERS_FILE_PATH, JSON.stringify(serverRegisteredUsersStore, null, 2), 'utf-8');
@@ -161,6 +249,38 @@ function saveExamResultsStoreToDisk() {
     fs.writeFileSync(EXAM_RESULTS_FILE_PATH, JSON.stringify(serverExamResultsStore, null, 2), 'utf-8');
   } catch (err) {
     console.warn('Could not write exam_results_store.json:', err);
+  }
+}
+
+function saveQuestionLikesStoreToDisk() {
+  try {
+    fs.writeFileSync(QUESTION_LIKES_FILE_PATH, JSON.stringify(serverQuestionLikesStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write question_likes_store.json:', err);
+  }
+}
+
+function saveQuestionBookmarksStoreToDisk() {
+  try {
+    fs.writeFileSync(QUESTION_BOOKMARKS_FILE_PATH, JSON.stringify(serverQuestionBookmarksStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write question_bookmarks_store.json:', err);
+  }
+}
+
+function saveQuestionReportsStoreToDisk() {
+  try {
+    fs.writeFileSync(QUESTION_REPORTS_FILE_PATH, JSON.stringify(serverQuestionReportsStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write question_reports_store.json:', err);
+  }
+}
+
+function saveQuestionExplanationsStoreToDisk() {
+  try {
+    fs.writeFileSync(QUESTION_EXPLANATIONS_FILE_PATH, JSON.stringify(serverQuestionExplanationsStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write question_explanations_store.json:', err);
   }
 }
 
@@ -1077,6 +1197,209 @@ app.post('/api/leaderboard/clear', (req, res) => {
     return res.json({ success: true, message: 'Leaderboard cleared successfully' });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Server error clearing leaderboard' });
+  }
+});
+
+// ==========================================
+// Question Likes, Bookmarks, Reports & Explanations API
+// ==========================================
+
+// Toggle or fetch question likes
+app.post('/api/questions/like', (req, res) => {
+  try {
+    const { question_id, user_id, user_name } = req.body;
+    if (!question_id || !user_id) {
+      return res.status(400).json({ error: 'question_id and user_id are required' });
+    }
+
+    const qId = String(question_id).trim();
+    const uId = String(user_id).trim();
+    const existingIndex = serverQuestionLikesStore.findIndex(
+      (item) => item.question_id === qId && item.user_id === uId
+    );
+
+    let isLiked = false;
+    if (existingIndex >= 0) {
+      // Remove like (unlike)
+      serverQuestionLikesStore.splice(existingIndex, 1);
+      isLiked = false;
+    } else {
+      // Add like
+      serverQuestionLikesStore.push({
+        id: `like_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        question_id: qId,
+        user_id: uId,
+        user_name: user_name ? String(user_name).trim() : undefined,
+        created_at: new Date().toISOString(),
+      });
+      isLiked = true;
+    }
+
+    saveQuestionLikesStoreToDisk();
+
+    const likeCount = serverQuestionLikesStore.filter((item) => item.question_id === qId).length;
+    return res.json({ success: true, isLiked, likeCount });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error processing question like' });
+  }
+});
+
+app.get('/api/questions/likes', (req, res) => {
+  try {
+    const { userId, questionId } = req.query;
+    if (userId && typeof userId === 'string') {
+      const uId = userId.trim();
+      const likedQuestionIds = serverQuestionLikesStore
+        .filter((item) => item.user_id === uId)
+        .map((item) => item.question_id);
+      return res.json({ success: true, likedQuestionIds });
+    }
+
+    if (questionId && typeof questionId === 'string') {
+      const qId = questionId.trim();
+      const likeCount = serverQuestionLikesStore.filter((item) => item.question_id === qId).length;
+      return res.json({ success: true, questionId: qId, likeCount });
+    }
+
+    return res.json({ success: true, likes: serverQuestionLikesStore });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error fetching question likes' });
+  }
+});
+
+// Toggle or fetch question bookmarks
+app.post('/api/questions/bookmark', (req, res) => {
+  try {
+    const { question_id, user_id } = req.body;
+    if (!question_id || !user_id) {
+      return res.status(400).json({ error: 'question_id and user_id are required' });
+    }
+
+    const qId = String(question_id).trim();
+    const uId = String(user_id).trim();
+    const existingIndex = serverQuestionBookmarksStore.findIndex(
+      (item) => item.question_id === qId && item.user_id === uId
+    );
+
+    let isBookmarked = false;
+    if (existingIndex >= 0) {
+      // Remove bookmark
+      serverQuestionBookmarksStore.splice(existingIndex, 1);
+      isBookmarked = false;
+    } else {
+      // Add bookmark
+      serverQuestionBookmarksStore.push({
+        id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        question_id: qId,
+        user_id: uId,
+        created_at: new Date().toISOString(),
+      });
+      isBookmarked = true;
+    }
+
+    saveQuestionBookmarksStoreToDisk();
+    return res.json({ success: true, isBookmarked });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error processing question bookmark' });
+  }
+});
+
+app.get('/api/questions/bookmarks', (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const uId = userId.trim();
+    const bookmarkedQuestionIds = serverQuestionBookmarksStore
+      .filter((item) => item.user_id === uId)
+      .map((item) => item.question_id);
+
+    return res.json({ success: true, bookmarkedQuestionIds });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error fetching question bookmarks' });
+  }
+});
+
+// Question reports
+app.post('/api/questions/report', (req, res) => {
+  try {
+    const { question_id, user_id, user_name, phone, email, reason, details } = req.body;
+    if (!question_id || !reason) {
+      return res.status(400).json({ error: 'question_id and reason are required' });
+    }
+
+    const report: ServerQuestionReport = {
+      id: `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      question_id: String(question_id).trim(),
+      user_id: user_id ? String(user_id).trim() : undefined,
+      user_name: user_name ? String(user_name).trim() : undefined,
+      phone: phone ? String(phone).trim() : undefined,
+      email: email ? String(email).trim() : undefined,
+      reason: String(reason).trim(),
+      details: details ? String(details).trim() : undefined,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+
+    serverQuestionReportsStore.unshift(report);
+    saveQuestionReportsStoreToDisk();
+
+    return res.json({ success: true, reportId: report.id });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error submitting question report' });
+  }
+});
+
+app.get('/api/questions/reports', (req, res) => {
+  return res.json({ success: true, reports: serverQuestionReportsStore });
+});
+
+// Question explanations
+app.get('/api/questions/explanations', (req, res) => {
+  try {
+    const { question_id } = req.query;
+    if (!question_id || typeof question_id !== 'string') {
+      return res.json({ success: true, explanations: serverQuestionExplanationsStore });
+    }
+
+    const qId = question_id.trim();
+    const explanations = serverQuestionExplanationsStore.filter(
+      (item) => item.question_id === qId && item.status !== 'rejected'
+    );
+
+    return res.json({ success: true, explanations });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error fetching explanations' });
+  }
+});
+
+app.post('/api/questions/explanations', (req, res) => {
+  try {
+    const { question_id, user_id, author_name, author_avatar, explanation } = req.body;
+    if (!question_id || !explanation || !author_name) {
+      return res.status(400).json({ error: 'question_id, author_name, and explanation are required' });
+    }
+
+    const newExpl: ServerQuestionExplanation = {
+      id: `expl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      question_id: String(question_id).trim(),
+      user_id: user_id ? String(user_id).trim() : undefined,
+      author_name: String(author_name).trim(),
+      author_avatar: author_avatar ? String(author_avatar).trim() : undefined,
+      explanation: String(explanation).trim(),
+      likes_count: 0,
+      status: 'approved',
+      created_at: new Date().toISOString(),
+    };
+
+    serverQuestionExplanationsStore.unshift(newExpl);
+    saveQuestionExplanationsStoreToDisk();
+
+    return res.json({ success: true, item: newExpl });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error adding explanation' });
   }
 });
 

@@ -5,7 +5,7 @@ import {
   LayoutGrid, Settings, Upload, ArrowLeft, BarChart3, HelpCircle, 
   CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck,
   LogIn, LogOut, Bell, Edit3, Target, Award, Headset, MessageSquare, 
-  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone, Users, MessageCircle
+  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone, Users, MessageCircle, Heart
 } from 'lucide-react';
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
@@ -13,18 +13,21 @@ import {
   getBookmarkedIds, toggleBookmarkId, isUserRegistered, clearUserProfile, UserProfile,
   compressAndResizeAvatar, getCompletedExamIds, getExamResult,
   getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
-  removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion
+  removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
   supabaseGetSession, 
   supabaseSignOut, 
   supabaseOnAuthStateChange,
-  supabaseUpdateUserProfile
+  supabaseUpdateUserProfile,
+  fetchUserLikedQuestionIds,
+  fetchUserBookmarkedQuestionIds
 } from '../lib/supabase';
 import { CourseEnrollmentRecord, Question } from '../types';
 import { AuthModal } from './AuthModal';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
+import { QuestionActionFooter } from './QuestionActionFooter';
 import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
 import { FontFamilyType } from './Header';
 
@@ -95,6 +98,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [showBookmarksModal, setShowBookmarksModal] = useState<boolean>(false);
+  const [showLikedQuestionsModal, setShowLikedQuestionsModal] = useState<boolean>(false);
   const [showWrongBankModal, setShowWrongBankModal] = useState<boolean>(false);
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState<boolean>(false);
@@ -107,6 +111,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [copiedRoll, setCopiedRoll] = useState(false);
 
+  // Dynamic Likes & Bookmarks State
+  const [dbLikedIds, setDbLikedIds] = useState<string[]>([]);
+  const [dbBookmarkedIds, setDbBookmarkedIds] = useState<string[]>([]);
+
   // Supabase Auth State
   const [authSession, setAuthSession] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
@@ -115,8 +123,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentStats = getStudentStats();
   const streakDays = getUserStreakDays();
-  const bookmarkedIds = getBookmarkedIds();
+  const bookmarkedIds = Array.from(new Set([...getBookmarkedIds(), ...dbBookmarkedIds]));
   const completedExamIds = getCompletedExamIds();
+  const userId = getUserUniqueId();
 
   // Real Real-time metrics
   const realMetrics = calculateRealUserMetrics();
@@ -128,8 +137,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
   // Load real saved questions
   const bookmarkedQuestions = SAMPLE_QUESTIONS.filter(q => bookmarkedIds.includes(String(q.id)));
+  const likedQuestions = SAMPLE_QUESTIONS.filter(q => dbLikedIds.includes(String(q.id)));
   const savedWrongQuestions = getSavedWrongQuestions();
   const savedExamHistory = getSavedExamHistory();
+
+  // Sync likes and bookmarks from Supabase/Server
+  useEffect(() => {
+    if (userId) {
+      fetchUserLikedQuestionIds(userId).then(ids => {
+        if (Array.isArray(ids)) setDbLikedIds(ids);
+      });
+      fetchUserBookmarkedQuestionIds(userId).then(ids => {
+        if (Array.isArray(ids)) setDbBookmarkedIds(ids);
+      });
+    }
+  }, [userId, showBookmarksModal, showLikedQuestionsModal]);
 
   useEffect(() => {
     supabaseGetSession().then((session) => {
@@ -671,12 +693,31 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <div className="mt-3">
                       <h4 className="text-sm font-black text-slate-900 dark:text-white">বুকমার্ক</h4>
                       <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        গুরুত্বপূর্ণ প্রশ্ন সংরক্ষণ করুন ({toBengaliNumeral(bookmarkedIds.length)})
+                        সংরক্ষিত প্রশ্নসমূহ ({toBengaliNumeral(bookmarkedIds.length)})
                       </p>
                     </div>
                   </button>
 
-                  {/* 4. পারফরম্যান্স */}
+                  {/* 4. পছন্দকৃত প্রশ্ন (Likes) */}
+                  <button
+                    onClick={() => setShowLikedQuestionsModal(true)}
+                    className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/80 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                        <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-rose-600 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white">পছন্দকৃত প্রশ্ন</h4>
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                        লাইক দেওয়া প্রশ্নসমূহ ({toBengaliNumeral(dbLikedIds.length)})
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* 5. পারফরম্যান্স */}
                   <button
                     onClick={() => setShowPerformanceModal(true)}
                     className="p-3.5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/20 hover:bg-purple-100/80 dark:hover:bg-purple-950/40 border border-purple-200/80 dark:border-purple-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
@@ -1221,7 +1262,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full space-y-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
                   <Bookmark className="w-4 h-4" />
                 </div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
@@ -1230,7 +1271,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               <button
                 onClick={() => setShowBookmarksModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1241,28 +1282,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="text-center py-10 space-y-2">
                   <Bookmark className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
                   <p className="text-sm font-bold text-slate-500">এখনও কোনো প্রশ্ন বুকমার্ক করা হয়নি</p>
-                  <p className="text-xs text-slate-400">পরীক্ষা দেওয়ার সময় 🔖 আইকনে ক্লিক করে প্রশ্ন সংরক্ষণ করুন</p>
+                  <p className="text-xs text-slate-400">প্রশ্ন কার্ডের 🔖 বুকমার্ক আইকনে ক্লিক করে প্রশ্ন সংরক্ষণ করুন</p>
                 </div>
               ) : (
                 bookmarkedQuestions.map((q, idx) => (
-                  <div key={q.id || idx} className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-2">
+                  <div key={q.id || idx} className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-xs font-black text-[#0b705c] dark:text-emerald-400">প্রশ্ন #{toBengaliNumeral(idx + 1)} • {q.subject}</span>
-                      <button
-                        onClick={() => {
-                          toggleBookmarkId(String(q.id));
-                          setSuccessMsg('বুকমার্ক সরানো হয়েছে');
-                          setTimeout(() => setSuccessMsg(''), 1000);
-                        }}
-                        className="text-slate-400 hover:text-red-500 text-xs font-bold"
-                      >
-                        মুছে ফেলুন
-                      </button>
+                      <span className="text-[11px] font-semibold text-slate-400">আইডি: #{q.id}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-white">{q.question}</p>
-                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-snug">{q.question}</p>
+                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-900/60">
                       সঠিক উত্তর: {q[q.correct_answer as keyof Question] || q.option_a}
                     </div>
+                    {/* Action Footer */}
+                    <QuestionActionFooter question={q} />
                   </div>
                 ))
               )}
@@ -1270,7 +1304,63 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             <button
               onClick={() => setShowBookmarksModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer shrink-0"
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer shrink-0"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4.5. LIKED QUESTIONS MODAL */}
+      {showLikedQuestionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  পছন্দকৃত প্রশ্নসমূহ ({toBengaliNumeral(likedQuestions.length)}টি)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowLikedQuestionsModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {likedQuestions.length === 0 ? (
+                <div className="text-center py-10 space-y-2">
+                  <Heart className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
+                  <p className="text-sm font-bold text-slate-500">এখনও কোনো প্রশ্ন লাইক করা হয়নি</p>
+                  <p className="text-xs text-slate-400">প্রশ্ন ভালো লাগলে ❤️ হার্ট আইকনে ক্লিক করে লাইক দিন</p>
+                </div>
+              ) : (
+                likedQuestions.map((q, idx) => (
+                  <div key={q.id || idx} className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-black text-rose-600 dark:text-rose-400">প্রশ্ন #{toBengaliNumeral(idx + 1)} • {q.subject}</span>
+                      <span className="text-[11px] font-semibold text-slate-400">আইডি: #{q.id}</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-snug">{q.question}</p>
+                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-900/60">
+                      সঠিক উত্তর: {q[q.correct_answer as keyof Question] || q.option_a}
+                    </div>
+                    {/* Action Footer */}
+                    <QuestionActionFooter question={q} />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowLikedQuestionsModal(false)}
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer shrink-0"
             >
               বন্ধ করুন
             </button>

@@ -6,7 +6,8 @@ import {
   CourseSheet,
   CourseExam,
   CourseRoutineItem,
-  CourseSyllabusItem
+  CourseSyllabusItem,
+  QuestionCommunityExplanation
 } from '../types';
 import { detectQuestionSubject, MAIN_SUBJECT_POSTS, MainSubjectPost } from './subjects';
 import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
@@ -4053,3 +4054,485 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
 
   return cached || fallback;
 }
+
+// =========================================================================
+// QUESTION INTERACTIONS: LIKES, BOOKMARKS, REPORTS & COMMUNITY EXPLANATIONS
+// =========================================================================
+
+/**
+ * Fetch total likes count for a specific question
+ */
+export async function fetchQuestionLikesCount(questionId: string | number): Promise<number> {
+  const qId = String(questionId).trim();
+  if (supabaseInstance) {
+    try {
+      const { count, error } = await supabaseInstance
+        .from('question_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('question_id', qId);
+      if (!error && typeof count === 'number') {
+        return count;
+      }
+    } catch {}
+  }
+
+  // Fallback to server API
+  try {
+    const res = await fetch(`/api/questions/likes?questionId=${encodeURIComponent(qId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && typeof json.likeCount === 'number') {
+        return json.likeCount;
+      }
+    }
+  } catch {}
+
+  return 0;
+}
+
+/**
+ * Fetch all question IDs liked by a user
+ */
+export async function fetchUserLikedQuestionIds(userId: string): Promise<string[]> {
+  if (!userId) return [];
+  const uId = String(userId).trim();
+
+  // Try local cache first for instant UI response
+  let cached: string[] = [];
+  try {
+    const raw = localStorage.getItem(`tamreen_liked_ids_${uId}`);
+    if (raw) cached = JSON.parse(raw);
+  } catch {}
+
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_likes')
+        .select('question_id')
+        .eq('user_id', uId);
+      if (!error && Array.isArray(data)) {
+        const ids = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        try {
+          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(ids));
+        } catch {}
+        return ids;
+      }
+    } catch {}
+  }
+
+  // Fallback to server API
+  try {
+    const res = await fetch(`/api/questions/likes?userId=${encodeURIComponent(uId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.likedQuestionIds)) {
+        const ids = json.likedQuestionIds.map(String);
+        try {
+          localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(ids));
+        } catch {}
+        return ids;
+      }
+    }
+  } catch {}
+
+  return cached;
+}
+
+/**
+ * Toggle like for a question (Add or Remove)
+ */
+export async function toggleQuestionLikeInSupabase(
+  questionId: string | number,
+  userId: string,
+  userName?: string
+): Promise<{ isLiked: boolean; newCount: number }> {
+  const qId = String(questionId).trim();
+  const uId = String(userId).trim();
+
+  // Update local cache optimistically
+  let currentLiked: string[] = [];
+  try {
+    const raw = localStorage.getItem(`tamreen_liked_ids_${uId}`);
+    if (raw) currentLiked = JSON.parse(raw);
+  } catch {}
+
+  const isCurrentlyLiked = currentLiked.includes(qId);
+  const nextLiked = isCurrentlyLiked
+    ? currentLiked.filter((id) => id !== qId)
+    : [...currentLiked, qId];
+
+  try {
+    localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(nextLiked));
+  } catch {}
+
+  let finalIsLiked = !isCurrentlyLiked;
+  let finalCount = 0;
+
+  if (supabaseInstance) {
+    try {
+      if (isCurrentlyLiked) {
+        // Delete like
+        await supabaseInstance
+          .from('question_likes')
+          .delete()
+          .match({ question_id: qId, user_id: uId });
+        finalIsLiked = false;
+      } else {
+        // Insert like
+        await supabaseInstance.from('question_likes').insert([
+          {
+            question_id: qId,
+            user_id: uId,
+            user_name: userName || 'শিক্ষার্থী',
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        finalIsLiked = true;
+      }
+
+      // Fetch updated count
+      const { count } = await supabaseInstance
+        .from('question_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('question_id', qId);
+      if (typeof count === 'number') {
+        finalCount = count;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase toggle like error, using server fallback:', sbErr);
+    }
+  }
+
+  // Always sync to server API
+  try {
+    const res = await fetch('/api/questions/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: qId, user_id: uId, user_name: userName }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success) {
+        finalIsLiked = json.isLiked;
+        if (typeof json.likeCount === 'number') {
+          finalCount = json.likeCount;
+        }
+      }
+    }
+  } catch {}
+
+  return { isLiked: finalIsLiked, newCount: finalCount };
+}
+
+/**
+ * Fetch all question IDs bookmarked by a user from Supabase / server
+ */
+export async function fetchUserBookmarkedQuestionIds(userId: string): Promise<string[]> {
+  if (!userId) return [];
+  const uId = String(userId).trim();
+
+  // Try local storage cache
+  let cached: string[] = [];
+  try {
+    const raw = localStorage.getItem('tamreen_bookmarked_ids');
+    if (raw) cached = JSON.parse(raw);
+  } catch {}
+
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_bookmarks')
+        .select('question_id')
+        .eq('user_id', uId);
+      if (!error && Array.isArray(data)) {
+        const ids = data.map((item: any) => String(item.question_id).trim()).filter(Boolean);
+        try {
+          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(ids));
+        } catch {}
+        return ids;
+      }
+    } catch {}
+  }
+
+  // Fallback to server API
+  try {
+    const res = await fetch(`/api/questions/bookmarks?userId=${encodeURIComponent(uId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.bookmarkedQuestionIds)) {
+        const ids = json.bookmarkedQuestionIds.map(String);
+        try {
+          localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(ids));
+        } catch {}
+        return ids;
+      }
+    }
+  } catch {}
+
+  return cached;
+}
+
+/**
+ * Toggle bookmark for a question in Supabase & Server
+ */
+export async function toggleQuestionBookmarkInSupabase(
+  questionId: string | number,
+  userId: string
+): Promise<{ isBookmarked: boolean }> {
+  const qId = String(questionId).trim();
+  const uId = String(userId).trim();
+
+  let currentBookmarked: string[] = [];
+  try {
+    const raw = localStorage.getItem('tamreen_bookmarked_ids');
+    if (raw) currentBookmarked = JSON.parse(raw);
+  } catch {}
+
+  const isCurrentlyBookmarked = currentBookmarked.includes(qId);
+  const nextBookmarked = isCurrentlyBookmarked
+    ? currentBookmarked.filter((id) => id !== qId)
+    : [...currentBookmarked, qId];
+
+  try {
+    localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(nextBookmarked));
+  } catch {}
+
+  let finalIsBookmarked = !isCurrentlyBookmarked;
+
+  if (supabaseInstance) {
+    try {
+      if (isCurrentlyBookmarked) {
+        await supabaseInstance
+          .from('question_bookmarks')
+          .delete()
+          .match({ question_id: qId, user_id: uId });
+        finalIsBookmarked = false;
+      } else {
+        await supabaseInstance.from('question_bookmarks').insert([
+          {
+            question_id: qId,
+            user_id: uId,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        finalIsBookmarked = true;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase toggle bookmark error, fallback to server:', sbErr);
+    }
+  }
+
+  // Always sync to server API
+  try {
+    const res = await fetch('/api/questions/bookmark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: qId, user_id: uId }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && typeof json.isBookmarked === 'boolean') {
+        finalIsBookmarked = json.isBookmarked;
+      }
+    }
+  } catch {}
+
+  return { isBookmarked: finalIsBookmarked };
+}
+
+/**
+ * Submit a question report to Supabase & Server
+ */
+export async function submitQuestionReportToSupabase(report: {
+  question_id: string | number;
+  user_id?: string;
+  user_name?: string;
+  phone?: string;
+  email?: string;
+  reason: string;
+  details?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const payload = {
+    question_id: String(report.question_id).trim(),
+    user_id: report.user_id ? String(report.user_id).trim() : null,
+    user_name: report.user_name || 'শিক্ষার্থী',
+    phone: report.phone || null,
+    email: report.email || null,
+    reason: report.reason,
+    details: report.details || null,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  if (supabaseInstance) {
+    try {
+      const { error } = await supabaseInstance.from('question_reports').insert([payload]);
+      if (!error) {
+        // Also fire and forget to server
+        fetch('/api/questions/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+        return { success: true };
+      }
+    } catch (err: any) {
+      console.warn('Supabase submit question report error:', err);
+    }
+  }
+
+  // Server API fallback
+  try {
+    const res = await fetch('/api/questions/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success) return { success: true };
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'রিপোর্ট জমা দিতে সমস্যা হয়েছে।' };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Fetch community explanations for a question from Supabase & Server
+ */
+export async function fetchQuestionCommunityExplanations(
+  questionId: string | number
+): Promise<QuestionCommunityExplanation[]> {
+  const qId = String(questionId).trim();
+
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_explanations')
+        .select('*')
+        .eq('question_id', qId)
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        return data.map((item: any) => ({
+          id: String(item.id),
+          question_id: String(item.question_id),
+          user_id: item.user_id ? String(item.user_id) : undefined,
+          author_name: String(item.author_name || 'শিক্ষার্থী'),
+          author_avatar: item.author_avatar ? String(item.author_avatar) : undefined,
+          explanation: String(item.explanation || ''),
+          likes_count: Number(item.likes_count || 0),
+          status: (item.status || 'approved') as any,
+          created_at: String(item.created_at || new Date().toISOString()),
+        }));
+      }
+    } catch (err) {
+      console.warn('Supabase fetch explanations error:', err);
+    }
+  }
+
+  // Server API fallback
+  try {
+    const res = await fetch(`/api/questions/explanations?question_id=${encodeURIComponent(qId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.explanations)) {
+        return json.explanations;
+      }
+    }
+  } catch {}
+
+  return [];
+}
+
+/**
+ * Submit a community explanation to Supabase & Server
+ */
+export async function submitQuestionCommunityExplanation(explanation: {
+  question_id: string | number;
+  user_id?: string;
+  author_name: string;
+  author_avatar?: string;
+  explanation: string;
+}): Promise<{ success: boolean; newExplanation?: QuestionCommunityExplanation; error?: string }> {
+  const payload = {
+    question_id: String(explanation.question_id).trim(),
+    user_id: explanation.user_id ? String(explanation.user_id).trim() : null,
+    author_name: explanation.author_name.trim() || 'শিক্ষার্থী',
+    author_avatar: explanation.author_avatar || null,
+    explanation: explanation.explanation.trim(),
+    likes_count: 0,
+    status: 'approved',
+    created_at: new Date().toISOString(),
+  };
+
+  let savedItem: QuestionCommunityExplanation | undefined;
+
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_explanations')
+        .insert([payload])
+        .select();
+
+      if (!error && Array.isArray(data) && data[0]) {
+        const item = data[0];
+        savedItem = {
+          id: String(item.id),
+          question_id: String(item.question_id),
+          user_id: item.user_id ? String(item.user_id) : undefined,
+          author_name: String(item.author_name),
+          author_avatar: item.author_avatar ? String(item.author_avatar) : undefined,
+          explanation: String(item.explanation),
+          likes_count: Number(item.likes_count || 0),
+          status: item.status || 'approved',
+          created_at: String(item.created_at),
+        };
+      }
+    } catch (err) {
+      console.warn('Supabase submit explanation error:', err);
+    }
+  }
+
+  // Also send to server API
+  try {
+    const res = await fetch('/api/questions/explanations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.item) {
+        if (!savedItem) savedItem = json.item;
+        return { success: true, newExplanation: savedItem };
+      }
+    }
+  } catch (err: any) {
+    if (!savedItem) {
+      return { success: false, error: err?.message || 'ব্যাখ্যা সংরক্ষণ করা সম্ভব হয়নি।' };
+    }
+  }
+
+  if (savedItem) {
+    return { success: true, newExplanation: savedItem };
+  }
+
+  // Construct local fallback object if network saved
+  const fallbackItem: QuestionCommunityExplanation = {
+    id: `expl_${Date.now()}`,
+    question_id: String(explanation.question_id),
+    user_id: explanation.user_id,
+    author_name: explanation.author_name,
+    author_avatar: explanation.author_avatar,
+    explanation: explanation.explanation,
+    likes_count: 0,
+    status: 'approved',
+    created_at: new Date().toISOString(),
+  };
+
+  return { success: true, newExplanation: fallbackItem };
+}
+

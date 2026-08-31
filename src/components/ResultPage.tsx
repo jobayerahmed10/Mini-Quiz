@@ -15,7 +15,7 @@ import {
   ShieldAlert,
   Award
 } from 'lucide-react';
-import { QuizResult, UserAnswer } from '../types';
+import { QuizResult, UserAnswer, Question } from '../types';
 import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
 import { 
   fetchLeaderboardEntriesFromSupabase, 
@@ -23,6 +23,7 @@ import {
   getExamLeaderboard,
   ExamLeaderboardItem
 } from '../lib/supabase';
+import { QuestionActionFooter } from './QuestionActionFooter';
 
 interface ResultPageProps {
   result: QuizResult;
@@ -863,18 +864,25 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     );
                   })()}
 
-                  {/* Explanation Card */}
-                  {answer.explanation && (
-                    <div className="mt-3 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 space-y-1">
-                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-300">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                        <span>ব্যাখ্যা:</span>
-                      </div>
-                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                        {answer.explanation}
-                      </p>
-                    </div>
-                  )}
+                  {/* Question Actions Footer (Likes, Bookmarks, Reports, Explanations) */}
+                  {(() => {
+                    const questionObj: Question = {
+                      id: answer.questionId,
+                      question: answer.questionText,
+                      option_a: answer.options.option_a,
+                      option_b: answer.options.option_b,
+                      option_c: answer.options.option_c,
+                      option_d: answer.options.option_d,
+                      correct_answer: answer.correctOption,
+                      explanation: answer.explanation,
+                    };
+                    return (
+                      <QuestionActionFooter
+                        question={questionObj}
+                        defaultExpanded={false}
+                      />
+                    );
+                  })()}
                 </div>
               );
             })}

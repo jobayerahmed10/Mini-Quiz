@@ -195,4 +195,45 @@ export interface CourseEnrollmentRecord {
   created_at?: string;
 }
 
+export interface QuestionLike {
+  id?: string;
+  question_id: string | number;
+  user_id: string;
+  user_name?: string;
+  created_at?: string;
+}
+
+export interface QuestionBookmark {
+  id?: string;
+  question_id: string | number;
+  user_id: string;
+  created_at?: string;
+}
+
+export interface QuestionReport {
+  id?: string;
+  question_id: string | number;
+  user_id?: string;
+  user_name?: string;
+  phone?: string;
+  email?: string;
+  reason: string;
+  details?: string;
+  status?: 'pending' | 'reviewed' | 'resolved';
+  created_at?: string;
+}
+
+export interface QuestionCommunityExplanation {
+  id: string;
+  question_id: string | number;
+  user_id?: string;
+  author_name: string;
+  author_avatar?: string;
+  explanation: string;
+  likes_count?: number;
+  status?: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
+
+
 
