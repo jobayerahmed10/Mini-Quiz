@@ -1171,13 +1171,17 @@ export async function submitExamResultToSupabase(params: {
     // 3B. Insert into exam_results as requested
     const submissionData = {
       exam_id: String(params.exam_id),
+      exam_title: params.exam_title || 'মডেল টেস্ট',
       user_id: isGuest ? null : (params.user_id || null),
+      guest_id: isGuest ? params.user_id : null,
       user_name: effectiveName || 'গেস্ট',
       total_marks: Number(params.total_marks),
-      obtained_marks: Number(params.score),
-      correct_answers: Number(params.correct_answers),
-      wrong_answers: Number(params.wrong_answers),
-      time_taken: Number(timeTaken)
+      score: Number(params.score),
+      correct_count: Number(params.correct_answers),
+      wrong_count: Number(params.wrong_answers),
+      time_taken: Number(timeTaken),
+      submitted_at: submittedAt,
+      is_free: params.is_free ?? true,
     };
 
     const { data, error } = await supabaseInstance
@@ -1374,7 +1378,7 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
 export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboardItem[]> {
   if (!examId || examId === 'all') return [];
 
-  // 1. Direct Supabase Query from `exam_results` table sorted by obtained_marks DESC, time_taken ASC
+  // 1. Direct Supabase Query from `exam_results` table sorted by score DESC, time_taken ASC
   if (supabaseInstance) {
     try {
       const cleanExamId = examId.trim();
@@ -1384,21 +1388,21 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         .from('exam_results')
         .select('*')
         .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
-        .order('obtained_marks', { ascending: false })
+        .order('score', { ascending: false })
         .order('time_taken', { ascending: true });
 
       const directRes = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
       let data = directRes.data;
       let error = directRes.error;
 
-      // Fallback for older entries using score
+      // Fallback for older entries using time_taken_seconds if time_taken fails
       if (error || !data || data.length === 0) {
         let queryFallback = supabaseInstance
           .from('exam_results')
           .select('*')
           .or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`)
           .order('score', { ascending: false })
-          .order('time_taken', { ascending: true });
+          .order('time_taken_seconds', { ascending: true });
         const fallbackRes = await fetchWithTimeout(Promise.resolve(queryFallback), 6000, { data: null, error: null } as any);
         data = fallbackRes.data || [];
         error = fallbackRes.error;
