@@ -431,10 +431,11 @@ export default function App() {
   const handleFinishQuiz = async (userAnswers: UserAnswer[], timeTakenSeconds: number = 0) => {
     const totalQuestions = userAnswers.length;
     const correctCount = userAnswers.filter((a) => a.isCorrect).length;
-    const wrongCount = totalQuestions - correctCount;
-    // 0.25 negative marking for wrong answers if desired, or standard score
+    // Count only questions where an option was selected but was incorrect
+    const wrongCount = userAnswers.filter((a) => a.selectedOption !== null && !a.isCorrect).length;
     const negativeMarks = Number((wrongCount * 0.25).toFixed(2));
-    const score = Math.max(0, Number((correctCount - negativeMarks).toFixed(2)));
+    const calculatedScore = Math.max(0, Number((correctCount - negativeMarks).toFixed(2)));
+    const finalScore = wrongCount > 0 ? calculatedScore : correctCount;
     const percentage = Math.round((correctCount / (totalQuestions || 1)) * 100);
 
     const examId = activeExamId || selectedSubject || 'general';
@@ -444,7 +445,7 @@ export default function App() {
       totalQuestions,
       correctCount,
       wrongCount,
-      score: correctCount,
+      score: finalScore,
       percentage,
       userAnswers,
       completedAt: new Date().toISOString(),
@@ -466,7 +467,7 @@ export default function App() {
     const effectiveName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
     const guestName = isGuest ? effectiveName : undefined;
     const userAvatar = userProfile?.avatar;
-    const userRoll = userProfile?.roll_number || userProfile?.student_id || getUserRollNumber(userProfile?.phone);
+    const userRoll = userProfile?.roll_number || userProfile?.student_id;
     const userId = isRegistered 
       ? (userRoll || (userProfile as any)?.id || getUserUniqueId()) 
       : `guest_${(rawName || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
@@ -482,7 +483,7 @@ export default function App() {
       full_name: effectiveName,
       is_guest: isGuest,
       user_avatar: userAvatar,
-      score: correctCount,
+      score: finalScore,
       total_questions: totalQuestions,
       correct_count: correctCount,
       wrong_count: wrongCount,
@@ -502,7 +503,7 @@ export default function App() {
       guest_name: guestName,
       is_guest: isGuest,
       avatar_url: userAvatar,
-      score: correctCount,
+      score: finalScore,
       total_marks: totalQuestions,
       correct_answers: correctCount,
       wrong_answers: wrongCount,

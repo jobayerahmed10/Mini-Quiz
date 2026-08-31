@@ -65,29 +65,44 @@ export const OPTION_BENGLI_LABEL: Record<string, string> = {
 /**
  * Normalizes any variation of correct_answer from database into standard 'option_a' | 'option_b' | 'option_c' | 'option_d'
  */
-export function normalizeCorrectOption(rawCorrect: string, optionA: string, optionB: string, optionC: string, optionD: string): 'option_a' | 'option_b' | 'option_c' | 'option_d' {
+export function normalizeCorrectOption(
+  rawCorrect: string | null | undefined,
+  optionA: string,
+  optionB: string,
+  optionC: string,
+  optionD: string
+): 'option_a' | 'option_b' | 'option_c' | 'option_d' {
   if (!rawCorrect) return 'option_a';
-  const trimmed = rawCorrect.trim().toLowerCase();
+  
+  const rawStr = String(rawCorrect).trim();
+  const lower = rawStr.toLowerCase();
+  // Clean parentheses, brackets, dots, colons, trailing/leading whitespace e.g. "(ক)", "ক)", "a.", "1.", "[b]"
+  const cleaned = lower.replace(/^[\(\[\s]+|[\)\]\.\:\s]+$/g, '').trim();
 
-  // Explicit option keys
-  if (trimmed === 'option_a' || trimmed === 'optiona' || trimmed === 'a' || trimmed === 'ক' || trimmed === '1') {
-    return 'option_a';
-  }
-  if (trimmed === 'option_b' || trimmed === 'optionb' || trimmed === 'b' || trimmed === 'খ' || trimmed === '2') {
-    return 'option_b';
-  }
-  if (trimmed === 'option_c' || trimmed === 'optionc' || trimmed === 'c' || trimmed === 'গ' || trimmed === '3') {
-    return 'option_c';
-  }
-  if (trimmed === 'option_d' || trimmed === 'optiond' || trimmed === 'd' || trimmed === 'ঘ' || trimmed === '4') {
-    return 'option_d';
-  }
+  // 1. Direct option key match
+  if (['option_a', 'optiona', 'a', 'ক', '1', 'ans_a', 'answera', 'answer_a'].includes(cleaned)) return 'option_a';
+  if (['option_b', 'optionb', 'b', 'খ', '2', 'ans_b', 'answerb', 'answer_b'].includes(cleaned)) return 'option_b';
+  if (['option_c', 'optionc', 'c', 'গ', '3', 'ans_c', 'answerc', 'answer_c'].includes(cleaned)) return 'option_c';
+  if (['option_d', 'optiond', 'd', 'ঘ', '4', 'ans_d', 'answerd', 'answer_d'].includes(cleaned)) return 'option_d';
+  if (cleaned === '0') return 'option_a';
 
-  // Exact option text match
-  if (rawCorrect === optionA) return 'option_a';
-  if (rawCorrect === optionB) return 'option_b';
-  if (rawCorrect === optionC) return 'option_c';
-  if (rawCorrect === optionD) return 'option_d';
+  // 2. Exact option text match (Normalized text matching)
+  const normRaw = rawStr.toLowerCase().replace(/\s+/g, ' ');
+  const normA = String(optionA || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normB = String(optionB || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normC = String(optionC || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normD = String(optionD || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+  if (normRaw && normA && normRaw === normA) return 'option_a';
+  if (normRaw && normB && normRaw === normB) return 'option_b';
+  if (normRaw && normC && normRaw === normC) return 'option_c';
+  if (normRaw && normD && normRaw === normD) return 'option_d';
+
+  // 3. Substring matching if rawCorrect contains option text or vice versa
+  if (normRaw && normA && (normRaw.includes(normA) || normA.includes(normRaw))) return 'option_a';
+  if (normRaw && normB && (normRaw.includes(normB) || normB.includes(normRaw))) return 'option_b';
+  if (normRaw && normC && (normRaw.includes(normC) || normC.includes(normRaw))) return 'option_c';
+  if (normRaw && normD && (normRaw.includes(normD) || normD.includes(normRaw))) return 'option_d';
 
   return 'option_a';
 }

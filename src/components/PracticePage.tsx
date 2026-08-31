@@ -284,7 +284,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const handleSubmitExam = () => {
     // Construct UserAnswer list for all questions
     const finalAnswers: UserAnswer[] = filteredQuestions.map((q) => {
-      const selectedOption = userSelections[q.id] || null;
+      const selectedOption = userSelections[q.id] || userSelections[String(q.id)] || (typeof q.id === 'number' ? userSelections[q.id] : null) || null;
       const correctOptionKey = normalizeCorrectOption(
         q.correct_answer,
         q.option_a,
@@ -292,7 +292,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         q.option_c,
         q.option_d
       );
-      const isCorrect = selectedOption === correctOptionKey;
+      const isCorrect = Boolean(selectedOption && selectedOption === correctOptionKey);
       const currentSubjectTag = detectQuestionSubject(q);
 
       return {
@@ -305,7 +305,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           option_c: q.option_c,
           option_d: q.option_d,
         },
-        selectedOption: selectedOption as 'option_a' | 'option_b' | 'option_c' | 'option_d',
+        selectedOption: selectedOption as 'option_a' | 'option_b' | 'option_c' | 'option_d' | null,
         correctOption: correctOptionKey,
         isCorrect,
         explanation: q.explanation,

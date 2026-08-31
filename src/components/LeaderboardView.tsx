@@ -83,8 +83,8 @@ function getRankTheme(rank: number) {
 }
 
 function formatMarkDisplay(item: LeaderboardDisplayItem) {
-  const totalQ = item.totalQuestions > 0 ? item.totalQuestions : 10;
-  let scoreVal = item.score;
+  const totalQ = item.totalQuestions > 0 ? item.totalQuestions : ((item.correctCount + item.wrongCount) > 0 ? (item.correctCount + item.wrongCount) : 5);
+  let scoreVal = item.score !== undefined && item.score !== null ? item.score : item.correctCount;
   if (item.wrongCount > 0 && scoreVal === item.correctCount) {
     scoreVal = Math.max(0, Number((item.correctCount - item.wrongCount * 0.25).toFixed(2)));
   }
@@ -482,7 +482,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               isCurrentUser: isCurr,
               isGuest,
               testCount: 1,
-              avgAccuracy: totalQ > 0 ? Math.round((Number(row.score || row.correct_answers) / totalQ) * 100) : 100,
+              avgAccuracy: totalQ > 0 ? Math.round((Number(row.correct_answers ?? row.score) / totalQ) * 100) : 100,
               points: Number(row.score ?? row.correct_answers ?? 0),
               totalQuestions: totalQ,
               correctCount: Number(row.correct_answers ?? row.score ?? 0),
