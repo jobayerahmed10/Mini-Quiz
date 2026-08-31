@@ -12,7 +12,8 @@ import {
   Loader2, 
   Sparkles,
   ShieldCheck,
-  BookOpen
+  BookOpen,
+  X
 } from 'lucide-react';
 import { AtTamreenLogo } from './AtTamreenLogo';
 import { customPhoneLogin, customPhoneRegister } from '../lib/supabase';
@@ -146,7 +147,17 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
   };
 
   return (
-    <div className={`w-full max-w-5xl mx-auto flex flex-col md:flex-row overflow-hidden bg-white dark:bg-slate-900 shadow-2xl rounded-3xl ${className}`}>
+    <div className={`w-full max-w-5xl mx-auto flex flex-col md:flex-row overflow-hidden bg-white dark:bg-slate-900 shadow-2xl rounded-3xl relative ${className}`}>
+      {/* Close Button */}
+      {onCancel && !isStandalone && (
+        <button 
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-50 p-2 bg-slate-100/50 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-full transition-colors focus:outline-none"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Left Banner Section */}
       <div className="hidden md:flex md:w-5/12 bg-emerald-900 p-8 flex-col justify-between relative overflow-hidden shrink-0">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
