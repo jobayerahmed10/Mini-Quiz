@@ -972,6 +972,8 @@ export interface LeaderboardEntry {
   guest_name?: string;
   full_name?: string;
   user_avatar?: string;
+  roll_number?: string;
+  student_id?: string;
   score: number;
   total_questions: number;
   correct_count: number;
@@ -988,6 +990,8 @@ export interface ExamLeaderboardItem {
   full_name: string;
   guest_name?: string;
   avatar_url?: string;
+  roll_number?: string;
+  student_id?: string;
   score: number;
   total_marks: number;
   correct_answers: number;
@@ -1003,6 +1007,8 @@ export interface FreeOverallLeaderboardItem {
   full_name: string;
   guest_name?: string;
   avatar_url?: string;
+  roll_number?: string;
+  student_id?: string;
   total_points: number;
   free_exam_count: number;
   average_percentage: number;

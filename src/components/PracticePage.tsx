@@ -285,8 +285,9 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     // Construct UserAnswer list for all questions
     const finalAnswers: UserAnswer[] = filteredQuestions.map((q) => {
       const selectedOption = userSelections[q.id] || userSelections[String(q.id)] || (typeof q.id === 'number' ? userSelections[q.id] : null) || null;
+      const rawCorrect = (q as any).correct_answer ?? (q as any).correct_option ?? (q as any).answer ?? (q as any).correct ?? (q as any).right_answer ?? (q as any).correctAnswer ?? (q as any).correctOption;
       const correctOptionKey = normalizeCorrectOption(
-        q.correct_answer,
+        rawCorrect,
         q.option_a,
         q.option_b,
         q.option_c,

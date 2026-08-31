@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X, BookOpen } from 'lucide-react';
-import { toBengaliNumeral, getUserProfile, getUserUniqueId } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered } from '../lib/utils';
 import { 
   LeaderboardEntry, 
   fetchLeaderboardEntriesFromSupabase, 
@@ -22,6 +22,7 @@ export interface LeaderboardDisplayItem {
   userAvatar?: string;
   isCurrentUser: boolean;
   isGuest?: boolean;
+  rollNumber?: string;
   
   testCount: number;      // e.g., 1টি পরীক্ষা or ৪টি পরীক্ষা
   avgAccuracy: number;    // e.g., 6% or 1%
@@ -185,26 +186,30 @@ export function computeLeaderboard(
       }
     }
 
+    const userProf = getUserProfile();
+    const isReg = isUserRegistered();
+    const userRoll = userProf?.roll_number || userProf?.student_id;
+
     const itemsList: LeaderboardDisplayItem[] = Array.from(userBestMap.values()).map((e) => {
       const eUserId = (e.user_id || '').trim();
       const isCurr = Boolean(
-        currentUserId && eUserId && eUserId === currentUserId && !eUserId.startsWith('guest_') && !eUserId.startsWith('anon_')
+        currentUserId && (
+          (eUserId && (eUserId === currentUserId || (userRoll && eUserId === userRoll))) ||
+          (isReg && userProf?.name && (e.user_name || e.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+        )
       );
 
+      const rollNumber = e.roll_number || e.student_id || (isCurr && userRoll ? userRoll : undefined);
       const isGuest = Boolean(
-        e.is_guest ||
-        !eUserId ||
-        eUserId.startsWith('guest_') ||
-        eUserId.startsWith('anon_') ||
-        Boolean(e.guest_name) ||
-        (e.user_name || '').includes('গেস্ট') ||
-        (e.user_name || '').includes('Guest')
+        e.is_guest !== undefined
+          ? e.is_guest
+          : (!isCurr && (!eUserId || eUserId.startsWith('guest_') || eUserId.startsWith('anon_')))
       );
 
-      const rawClean = (e.guest_name || e.full_name || e.user_name || '').trim();
-      const displayName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
-        ? rawClean
-        : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
+      const rawClean = (e.full_name || e.user_name || e.guest_name || '').trim();
+      const displayName = (isCurr && isReg && userProf?.name)
+        ? userProf.name
+        : ((rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)') ? rawClean : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));
 
       const totalQ = Number(e.total_questions || (e.correct_count + e.wrong_count) || 0);
 
@@ -215,6 +220,7 @@ export function computeLeaderboard(
         userAvatar: isCurr ? (currentUserAvatar || e.user_avatar) : e.user_avatar,
         isCurrentUser: isCurr,
         isGuest,
+        rollNumber,
         testCount: 1,
         avgAccuracy: Math.round(e.accuracy || 0),
         points: Number(e.score || e.correct_count || 0),
@@ -452,25 +458,33 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         // A. Call secure Exam-Specific Leaderboard RPC / Direct Query
         const examRows = await getExamLeaderboard(selectedExamId);
         if (examRows && examRows.length > 0) {
+          const userProf = getUserProfile();
+          const isReg = isUserRegistered();
+          const userRoll = userProf?.roll_number || userProf?.student_id;
+
           // Global mapping without personal user filtering
           const mapped: LeaderboardDisplayItem[] = examRows.map((row, idx) => {
             const rowUserId = (row.user_id || '').trim();
+            const rowRoll = row.roll_number || row.student_id;
             const isCurr = Boolean(
-              currentUserId && rowUserId && rowUserId === currentUserId && !rowUserId.startsWith('guest_') && !rowUserId.startsWith('anon_')
+              currentUserId && (
+                (rowUserId && (rowUserId === currentUserId || (userRoll && rowUserId === userRoll))) ||
+                (isReg && userProf?.name && (row.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+              )
             );
+
+            const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
             const isGuest = Boolean(
-              row.is_guest ||
-              !rowUserId ||
-              rowUserId.startsWith('guest_') ||
-              rowUserId.startsWith('anon_') ||
-              Boolean(row.guest_name) ||
-              (row.full_name || '').includes('গেস্ট') ||
-              (row.full_name || '').includes('Guest')
+              row.is_guest !== undefined
+                ? row.is_guest
+                : (!isCurr && (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_')))
             );
-            const rawClean = (row.guest_name || row.full_name || '').trim();
-            const cleanName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
-              ? rawClean
-              : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
+
+            const rawClean = (row.full_name || row.guest_name || '').trim();
+            const cleanName = (isCurr && isReg && userProf?.name)
+              ? userProf.name
+              : ((rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)') ? rawClean : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));
+
             const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
             const totalQ = Number(row.total_marks || (row.correct_answers + row.wrong_answers) || 0);
 
@@ -481,6 +495,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               userAvatar: cleanAvatar,
               isCurrentUser: isCurr,
               isGuest,
+              rollNumber,
               testCount: 1,
               avgAccuracy: totalQ > 0 ? Math.round((Number(row.correct_answers ?? row.score) / totalQ) * 100) : 100,
               points: Number(row.score ?? row.correct_answers ?? 0),
@@ -501,6 +516,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         // B. Call secure Free Overall Leaderboard RPC
         const freeRows = await getFreeOverallLeaderboard(currentFilter);
         if (freeRows && freeRows.length > 0) {
+          const userProf = getUserProfile();
+          const isReg = isUserRegistered();
+          const userRoll = userProf?.roll_number || userProf?.student_id;
+
           const filteredFree = freeRows.filter((r) => {
             const rawName = (r.full_name || '').trim();
             if (!rawName) return false;
@@ -518,22 +537,25 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
           const mapped: LeaderboardDisplayItem[] = filteredFree.map((row, idx) => {
             const rowUserId = (row.user_id || '').trim();
+            const rowRoll = row.roll_number || row.student_id;
             const isCurr = Boolean(
-              currentUserId && rowUserId && rowUserId === currentUserId && !rowUserId.startsWith('guest_') && !rowUserId.startsWith('anon_')
+              currentUserId && (
+                (rowUserId && (rowUserId === currentUserId || (userRoll && rowUserId === userRoll))) ||
+                (isReg && userProf?.name && (row.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+              )
             );
+
+            const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
             const isGuest = Boolean(
-              row.is_guest ||
-              !rowUserId ||
-              rowUserId.startsWith('guest_') ||
-              rowUserId.startsWith('anon_') ||
-              Boolean(row.guest_name) ||
-              (row.full_name || '').includes('গেস্ট') ||
-              (row.full_name || '').includes('Guest')
+              row.is_guest !== undefined
+                ? row.is_guest
+                : (!isCurr && (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_')))
             );
-            const rawClean = (row.guest_name || row.full_name || '').trim();
-            const cleanName = (rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)')
-              ? rawClean
-              : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
+
+            const rawClean = (row.full_name || row.guest_name || '').trim();
+            const cleanName = (isCurr && isReg && userProf?.name)
+              ? userProf.name
+              : ((rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)') ? rawClean : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));
             const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
 
             return {
@@ -543,6 +565,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               userAvatar: cleanAvatar,
               isCurrentUser: isCurr,
               isGuest,
+              rollNumber,
               testCount: Number(row.free_exam_count || 1),
               avgAccuracy: Math.round(Number(row.average_percentage || 0)),
               points: Number(row.total_points || 0),
@@ -769,9 +792,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-[200px]">
                             {item.userName}
                           </div>
-                          {item.isGuest && (
+                          {item.isGuest ? (
                             <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
                               গেস্ট
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
+                              {item.rollNumber ? `রোল: ${item.rollNumber}` : 'রেজিস্টার্ড'}
                             </span>
                           )}
                           {item.isCurrentUser && (
@@ -1097,9 +1124,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                             <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate max-w-[130px] sm:max-w-[200px]">
                               {item.userName}
                             </h4>
-                            {item.isGuest && (
+                            {item.isGuest ? (
                               <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold">
                                 গেস্ট
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-[9px] font-bold">
+                                {item.rollNumber ? `রোল: ${item.rollNumber}` : 'রেজিস্টার্ড'}
                               </span>
                             )}
                             {item.isCurrentUser && (

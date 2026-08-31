@@ -47,7 +47,9 @@ import {
   clearUserProfile,
   saveExamToHistory,
   saveWrongAnswersFromQuiz,
-  resetExamAttemptCache
+  resetExamAttemptCache,
+  incrementTotalExamsCount,
+  getUserRollNumber
 } from './lib/utils';
 
 export default function App() {
@@ -459,6 +461,9 @@ export default function App() {
     setQuizResult(result);
     setResultViewMode('summary');
 
+    // Increment user total exams count
+    incrementTotalExamsCount();
+
     // Create & save Leaderboard Entry & Exam Result
     const userProfile = getUserProfile();
     const isRegistered = isUserRegistered();
@@ -467,7 +472,7 @@ export default function App() {
     const effectiveName = rawName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
     const guestName = isGuest ? effectiveName : undefined;
     const userAvatar = userProfile?.avatar;
-    const userRoll = userProfile?.roll_number || userProfile?.student_id;
+    const userRoll = userProfile?.roll_number || userProfile?.student_id || (isRegistered ? getUserRollNumber(userProfile?.phone) : undefined);
     const userId = isRegistered 
       ? (userRoll || (userProfile as any)?.id || getUserUniqueId()) 
       : `guest_${(rawName || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
@@ -489,6 +494,8 @@ export default function App() {
       wrong_count: wrongCount,
       accuracy: percentage,
       created_at: new Date().toISOString(),
+      roll_number: userRoll,
+      student_id: userRoll,
     };
 
     saveLeaderboardEntryToSupabase(entry);
@@ -509,7 +516,9 @@ export default function App() {
       wrong_answers: wrongCount,
       time_taken_seconds: timeTakenSeconds,
       submitted_at: entry.created_at,
-    }).then((res) => {
+      roll_number: userRoll,
+      student_id: userRoll,
+    } as any).then((res) => {
       // Mark specific active exam as completed and persist result
       if (activeExamId) {
         addCompletedExamId(activeExamId);

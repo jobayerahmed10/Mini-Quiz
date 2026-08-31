@@ -104,6 +104,7 @@ interface ServerLeaderboardEntry {
   full_name?: string;
   is_guest?: boolean;
   user_avatar?: string;
+  roll_number?: string;
   score: number;
   total_questions: number;
   correct_count: number;
@@ -122,6 +123,7 @@ interface ServerExamResult {
   guest_name?: string;
   is_guest?: boolean;
   avatar_url?: string;
+  roll_number?: string;
   score: number;
   total_marks: number;
   correct_answers: number;
@@ -826,6 +828,7 @@ app.post('/api/exam_results', (req, res) => {
       guest_name: effectiveGuestName,
       is_guest: isGuest,
       avatar_url: item.avatar_url || item.avatar || item.user_avatar || '',
+      roll_number: item.roll_number || item.student_id || item.user_roll || undefined,
       score: Number(item.score ?? item.correct_answers ?? item.correctCount ?? 0),
       total_marks: Number(item.total_marks ?? item.total_questions ?? item.totalQuestions ?? 0),
       correct_answers: Number(item.correct_answers ?? item.correct_count ?? item.correctCount ?? 0),
@@ -989,6 +992,7 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
       guest_name: r.guest_name,
       is_guest: r.is_guest,
       avatar_url: r.avatar_url || '',
+      roll_number: r.roll_number,
       score: r.score,
       total_marks: r.total_marks,
       correct_answers: r.correct_answers,

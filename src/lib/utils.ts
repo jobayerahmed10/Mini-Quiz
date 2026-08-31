@@ -66,28 +66,44 @@ export const OPTION_BENGLI_LABEL: Record<string, string> = {
  * Normalizes any variation of correct_answer from database into standard 'option_a' | 'option_b' | 'option_c' | 'option_d'
  */
 export function normalizeCorrectOption(
-  rawCorrect: string | null | undefined,
-  optionA: string,
-  optionB: string,
-  optionC: string,
-  optionD: string
+  rawCorrect: string | number | null | undefined,
+  optionA: string = '',
+  optionB: string = '',
+  optionC: string = '',
+  optionD: string = ''
 ): 'option_a' | 'option_b' | 'option_c' | 'option_d' {
-  if (!rawCorrect) return 'option_a';
-  
+  if (rawCorrect === null || rawCorrect === undefined) return 'option_a';
+
+  // 1. If it's a numeric type (0-based: 0=option_a, 1=option_b, 2=option_c, 3=option_d)
+  if (typeof rawCorrect === 'number') {
+    if (rawCorrect === 0) return 'option_a';
+    if (rawCorrect === 1) return 'option_b';
+    if (rawCorrect === 2) return 'option_c';
+    if (rawCorrect === 3) return 'option_d';
+    if (rawCorrect === 4) return 'option_d';
+  }
+
   const rawStr = String(rawCorrect).trim();
+  if (!rawStr) return 'option_a';
+
   const lower = rawStr.toLowerCase();
   // Clean parentheses, brackets, dots, colons, trailing/leading whitespace e.g. "(ক)", "ক)", "a.", "1.", "[b]"
   const cleaned = lower.replace(/^[\(\[\s]+|[\)\]\.\:\s]+$/g, '').trim();
 
-  // 1. Direct option key match
-  if (['option_a', 'optiona', 'a', 'ক', '1', 'ans_a', 'answera', 'answer_a'].includes(cleaned)) return 'option_a';
-  if (['option_b', 'optionb', 'b', 'খ', '2', 'ans_b', 'answerb', 'answer_b'].includes(cleaned)) return 'option_b';
-  if (['option_c', 'optionc', 'c', 'গ', '3', 'ans_c', 'answerc', 'answer_c'].includes(cleaned)) return 'option_c';
-  if (['option_d', 'optiond', 'd', 'ঘ', '4', 'ans_d', 'answerd', 'answer_d'].includes(cleaned)) return 'option_d';
-  if (cleaned === '0') return 'option_a';
+  // 2. Direct option key match
+  if (['option_a', 'optiona', 'a', 'ক', '0', 'ans_a', 'answera', 'answer_a'].includes(cleaned)) return 'option_a';
+  if (['option_b', 'optionb', 'b', 'খ', 'ans_b', 'answerb', 'answer_b'].includes(cleaned)) return 'option_b';
+  if (['option_c', 'optionc', 'c', 'গ', 'ans_c', 'answerc', 'answer_c'].includes(cleaned)) return 'option_c';
+  if (['option_d', 'optiond', 'd', 'ঘ', 'ans_d', 'answerd', 'answer_d'].includes(cleaned)) return 'option_d';
 
-  // 2. Exact option text match (Normalized text matching)
-  const normRaw = rawStr.toLowerCase().replace(/\s+/g, ' ');
+  // Numeric strings '1','2','3','4'
+  if (cleaned === '1') return 'option_a';
+  if (cleaned === '2') return 'option_b';
+  if (cleaned === '3') return 'option_c';
+  if (cleaned === '4') return 'option_d';
+
+  // 3. Exact option text match (Normalized text matching)
+  const normRaw = lower.replace(/\s+/g, ' ');
   const normA = String(optionA || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normB = String(optionB || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normC = String(optionC || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -98,7 +114,7 @@ export function normalizeCorrectOption(
   if (normRaw && normC && normRaw === normC) return 'option_c';
   if (normRaw && normD && normRaw === normD) return 'option_d';
 
-  // 3. Substring matching if rawCorrect contains option text or vice versa
+  // 4. Substring matching if rawCorrect contains option text or vice versa
   if (normRaw && normA && (normRaw.includes(normA) || normA.includes(normRaw))) return 'option_a';
   if (normRaw && normB && (normRaw.includes(normB) || normB.includes(normRaw))) return 'option_b';
   if (normRaw && normC && (normRaw.includes(normC) || normC.includes(normRaw))) return 'option_c';
@@ -540,6 +556,45 @@ export function resetExamAttemptCache(examIdentifier: string): void {
       localStorage.setItem(SAVED_EXAM_RESULTS_KEY, JSON.stringify(map));
     }
   } catch {}
+}
+
+const TOTAL_EXAMS_COUNT_KEY = 'tamreen_total_exams_count';
+
+export function getTotalExamsCount(): number {
+  try {
+    const val = localStorage.getItem(TOTAL_EXAMS_COUNT_KEY);
+    const count = val ? parseInt(val, 10) : 0;
+    const completedList = getCompletedExamIds();
+    return Math.max(isNaN(count) ? 0 : count, completedList.length);
+  } catch {
+    return 0;
+  }
+}
+
+export function incrementTotalExamsCount(): number {
+  try {
+    const current = getTotalExamsCount();
+    const nextCount = current + 1;
+    localStorage.setItem(TOTAL_EXAMS_COUNT_KEY, String(nextCount));
+    
+    // Also update profile object in localStorage if present
+    const profData = localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (profData) {
+      try {
+        const parsed = JSON.parse(profData);
+        parsed.total_exams = (parsed.total_exams || 0) + 1;
+        parsed.totalExams = (parsed.totalExams || 0) + 1;
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(parsed));
+      } catch {}
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_profile_updated'));
+    }
+    return nextCount;
+  } catch {
+    return 1;
+  }
 }
 
 export function getCompletedExamIds(): string[] {

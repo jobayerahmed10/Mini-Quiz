@@ -14,7 +14,7 @@ import {
   compressAndResizeAvatar, getCompletedExamIds, getExamResult,
   getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
   removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId,
-  getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions
+  getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions, getTotalExamsCount
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -131,7 +131,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
   // Real Real-time metrics
   const realMetrics = calculateRealUserMetrics();
-  const totalExamsGiven = completedExamIds.length;
+  const storedTotalCount = getTotalExamsCount();
+  const totalExamsGiven = Math.max(completedExamIds.length, storedTotalCount, (userProfile as any)?.total_exams || 0);
   const correctSolvedCount = studentStats.totalQuestionsAnswered || 0;
   const bestExamsCount = realMetrics.bestExamsCount;
   const averageAccuracy = realMetrics.totalQuestions > 0 ? `${toBengaliNumeral(realMetrics.overallAccuracy)}%` : '০০%';
