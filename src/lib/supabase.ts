@@ -4669,3 +4669,127 @@ export async function customPhoneLoginOrRegister(
     return { success: false, error: err.message || 'একটি ত্রুটি ঘটেছে।' };
   }
 }
+export async function customPhoneLogin(phone: string, password?: string): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const cleanPhone = (phone || '').trim();
+    const cleanPassword = (password || '').trim();
+    
+    if (!cleanPhone) {
+      return { success: false, error: 'মোবাইল নম্বর প্রদান করা আবশ্যক।' };
+    }
+    if (!cleanPassword) {
+      return { success: false, error: 'পাসওয়ার্ড প্রদান করা আবশ্যক।' };
+    }
+    if (!supabaseInstance) {
+      return { success: false, error: 'ডাটাবেজ সংযোগ পাওয়া যায়নি।' };
+    }
+
+    const { data: existingProfile, error: searchError } = await supabaseInstance
+      .from('profiles')
+      .select('*')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
+
+    if (searchError) console.warn('Phone lookup error:', searchError);
+
+    if (existingProfile) {
+      // Password matching
+      if (existingProfile.password && existingProfile.password !== cleanPassword) {
+         return { success: false, error: 'ভুল পাসওয়ার্ড! আবার চেষ্টা করুন' };
+      } else if (!existingProfile.password) {
+         // If for some reason the profile doesn't have a password set yet (migrated user)
+         // We might allow them to login or prompt to set password. For now, strictly check or allow if empty in DB?
+         // Let's assume strict checking as requested, if it doesn't match, return error.
+         // Actually, if they don't have a password in DB but are trying to login, they can't match.
+         // Let's just do a generic check, if existingProfile.password doesn't match the provided one:
+         if (existingProfile.password !== cleanPassword) {
+            return { success: false, error: 'ভুল পাসওয়ার্ড! আবার চেষ্টা করুন' };
+         }
+      }
+
+      const roll = existingProfile.roll_number || existingProfile.student_id || getUserRollNumber(cleanPhone);
+      return {
+        success: true,
+        user: {
+          id: existingProfile.id,
+          full_name: existingProfile.full_name,
+          phone: existingProfile.phone,
+          email: existingProfile.email,
+          role: existingProfile.role || 'student',
+          roll_number: roll,
+          student_id: roll,
+          avatar_url: existingProfile.avatar_url || ''
+        }
+      };
+    } else {
+      return { success: false, error: 'এই নম্বর দিয়ে কোনো একাউন্ট পাওয়া যায়নি। দয়া করে রেজিস্ট্রেশন করুন।' };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'একটি ত্রুটি ঘটেছে।' };
+  }
+}
+
+export async function customPhoneRegister(
+  fullName: string,
+  phone: string,
+  email?: string,
+  password?: string
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const cleanPhone = (phone || '').trim();
+    const cleanName = (fullName || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanPhone || !cleanName) {
+      return { success: false, error: 'নাম এবং মোবাইল নম্বর প্রদান করা আবশ্যক।' };
+    }
+    if (!cleanPassword || cleanPassword.length < 6) {
+      return { success: false, error: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
+    }
+    if (!supabaseInstance) {
+      return { success: false, error: 'ডাটাবেজ সংযোগ পাওয়া যায়নি।' };
+    }
+
+    const { data: existingProfile } = await supabaseInstance
+      .from('profiles')
+      .select('id, phone')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return { success: false, error: 'এই মোবাইল নম্বরটি ইতোমধ্যে ব্যবহৃত হচ্ছে। দয়া করে লগইন করুন।' };
+    }
+
+    const newId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const newRoll = getUserRollNumber(cleanPhone); // TM-XXXXXX
+    const newProfile = {
+      id: newId,
+      full_name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail || null,
+      password: cleanPassword, // Storing password directly as requested
+      role: 'student',
+      roll_number: newRoll,
+      student_id: newRoll,
+      avatar_url: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: insertError } = await supabaseInstance
+      .from('profiles')
+      .insert([newProfile]);
+
+    if (insertError) {
+      return { success: false, error: 'প্রোফাইল তৈরি করতে সমস্যা হয়েছে: ' + insertError.message };
+    }
+
+    return {
+      success: true,
+      user: newProfile
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'একটি ত্রুটি ঘটেছে।' };
+  }
+}
