@@ -429,10 +429,6 @@ export function saveUserProfile(
     localStorage.setItem(USER_ROLL_KEY, finalRoll);
     if (isRegistered) {
       localStorage.setItem('tamreen_user_auth_status', 'registered');
-      // Clear guest session attempt cache so logged in user gets fresh/new attempt capability
-      localStorage.removeItem('tamreen_completed_exams');
-      localStorage.removeItem('tamreen_exam_completion_times');
-      localStorage.removeItem('tamreen_saved_exam_results');
     }
   } catch {
     // ignore localstorage errors

@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { AtTamreenLogo } from './AtTamreenLogo';
-import { customPhoneLogin, customPhoneRegister } from '../lib/supabase';
+import { customPhoneLogin, customPhoneRegister, fetchUserCompletedExamsFromSupabase } from '../lib/supabase';
 import { saveUserProfile, UserProfile } from '../lib/utils';
 
 export type AuthMode = 'login' | 'register' | 'forgot_password' | 'password-reset' | 'password_reset';
@@ -106,23 +106,35 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
 
       // Success
       const u = res.user;
+      if (u.id) {
+        try {
+          localStorage.setItem('tamreen_user_id', u.id);
+          localStorage.setItem('tamreen_user_auth_status', 'registered');
+        } catch {}
+      }
+
+      const userRoll = u.roll_number || u.student_id;
       const saved = saveUserProfile(
         u.full_name || fullName || 'শিক্ষার্থী',
         u.phone || cleanPhone,
         u.avatar_url || '',
         true,
-        u.email || email
+        u.email || email,
+        userRoll
       );
       
       // Update local storage with roll number if available
-      if (u.roll_number || u.student_id) {
+      if (userRoll) {
          try {
            const existingRaw = localStorage.getItem('tamreen_user_profile');
            let parsed = existingRaw ? JSON.parse(existingRaw) : {};
-           parsed = { ...parsed, roll_number: u.roll_number || u.student_id };
+           parsed = { ...parsed, roll_number: userRoll, student_id: userRoll };
            localStorage.setItem('tamreen_user_profile', JSON.stringify(parsed));
          } catch(e) {}
       }
+
+      // Fetch and restore user completed exams from Supabase immediately
+      fetchUserCompletedExamsFromSupabase(u.id).catch(() => {});
 
       window.dispatchEvent(new Event('tamreen_profile_updated'));
       window.dispatchEvent(new Event('tamreen_auth_status_changed'));
