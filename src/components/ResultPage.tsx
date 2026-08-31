@@ -41,6 +41,7 @@ interface ParticipantLeaderboardItem {
   userAvatar?: string;
   isCurrentUser: boolean;
   isGuest?: boolean;
+  rollNumber?: string;
   correctCount: number;
   wrongCount: number;
   score: number;
@@ -204,6 +205,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
             isUser,
             isGuest,
+            rollNumber: item.roll_number || item.student_id,
             correct: Number(item.correct_answers ?? item.score ?? 0),
             wrong: Number(item.wrong_answers ?? 0),
             score: Number(item.score ?? 0),
@@ -320,6 +322,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             userAvatar: c.avatar,
             isCurrentUser: c.isUser,
             isGuest: c.isGuest,
+            rollNumber: c.rollNumber,
             correctCount: c.correct,
             wrongCount: c.wrong,
             score: c.score,
@@ -634,10 +637,16 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                               আপনি
                             </span>
                           )}
-                          {item.isGuest && (
+                          {item.isGuest ? (
                             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
                               গেস্ট
                             </span>
+                          ) : (
+                            item.rollNumber && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 dark:bg-sky-950/70 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-300 font-mono">
+                                রোল: {item.rollNumber}
+                              </span>
+                            )
                           )}
                         </div>
 

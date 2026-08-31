@@ -1159,8 +1159,17 @@ export async function submitExamResultToSupabase(params: {
   }
 
   try {
-    const registeredUserId = !isGuest && params.user_id ? String(params.user_id).trim() : null;
-    const guestUserId = isGuest && params.user_id ? String(params.user_id).trim() : null;
+    let authUserId: string | null = null;
+    try {
+      const { data: { user } } = await supabaseInstance.auth.getUser();
+      if (user?.id) {
+        authUserId = user.id;
+      }
+    } catch {}
+
+    const registeredUserId = (!isGuest && (authUserId || (params.user_id && !params.user_id.startsWith('guest_') && !params.user_id.startsWith('anon_'))))
+      ? String(authUserId || params.user_id).trim()
+      : null;
 
     // 3A. Upsert Profile ONLY for registered users
     try {
@@ -1178,20 +1187,27 @@ export async function submitExamResultToSupabase(params: {
       console.warn('Profiles upsert warning:', profErr);
     }
 
-    // 3B. Insert into exam_results directly with user_id for registered users and guest_id for guests
+    // 3B. Insert into exam_results directly with user_id NULL for guests, Auth UUID/registered ID for registered users
     const submissionData = {
       exam_id: String(params.exam_id),
       exam_title: params.exam_title || 'মডেল টেস্ট',
       user_id: registeredUserId,
-      guest_id: guestUserId,
-      user_name: effectiveName || 'গেস্ট',
+      guest_name: isGuest ? effectiveName : null,
+      user_name: effectiveName || 'পরীক্ষার্থী',
+      full_name: effectiveName || 'পরীক্ষার্থী',
       total_marks: Number(params.total_marks),
+      total_questions: Number(params.total_marks),
       score: Number(params.score),
+      obtained_marks: Number(params.score),
       correct_count: Number(params.correct_answers),
+      correct_answers: Number(params.correct_answers),
       wrong_count: Number(params.wrong_answers),
+      wrong_answers: Number(params.wrong_answers),
       time_taken: Number(timeTaken),
+      time_taken_seconds: Number(timeTaken),
       submitted_at: submittedAt,
       is_free: params.is_free ?? true,
+      is_guest: isGuest,
     };
 
     const { error } = await supabaseInstance
@@ -1202,28 +1218,6 @@ export async function submitExamResultToSupabase(params: {
       console.warn("Supabase Exam Submit Notice:", error.message);
       return { success: true, error: error.message };
     }
-
-    // 3C. Also insert into leaderboard_entries for dual-write compatibility if table exists
-    try {
-      await supabaseInstance
-        .from('leaderboard_entries')
-        .insert([
-          {
-            id: lbEntry.id,
-            exam_id: lbEntry.exam_id,
-            exam_title: lbEntry.exam_title,
-            user_id: registeredUserId,
-            user_name: lbEntry.user_name,
-            user_avatar: lbEntry.user_avatar || null,
-            score: lbEntry.score,
-            total_questions: lbEntry.total_questions,
-            correct_count: lbEntry.correct_count,
-            wrong_count: lbEntry.wrong_count,
-            accuracy: lbEntry.accuracy,
-            created_at: lbEntry.created_at,
-          },
-        ]);
-    } catch {}
 
     return { success: true };
   } catch (err: unknown) {
@@ -1416,14 +1410,14 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       }
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        // Fetch profiles to map names and avatars
+        // Fetch profiles to map names, avatars, and roll numbers
         const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
-        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
         if (userIds.length > 0) {
           try {
             const { data: profs } = await supabaseInstance
               .from('profiles')
-              .select('id, full_name, avatar_url')
+              .select('id, full_name, avatar_url, roll_number, student_id')
               .in('id', userIds);
             if (profs && Array.isArray(profs)) {
               profs.forEach((p: any) => {
@@ -1436,7 +1430,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         // Deduplicate best result per distinct participant
         const bestMap = new Map<string, any>();
         for (const row of data) {
-          const isReg = Boolean(row.user_id && !row.user_id.startsWith('guest_') && !row.user_id.startsWith('anon_'));
+          const isReg = Boolean(row.user_id && !String(row.user_id).startsWith('guest_') && !String(row.user_id).startsWith('anon_'));
           const uKey = isReg
             ? String(row.user_id).trim()
             : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '').trim().toLowerCase();
@@ -1478,36 +1472,40 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
         return sortedRows.map((row: any, idx: number) => {
           const prof = profilesMap.get(row.user_id);
-          const fullName = row.user_name || row.guest_name || row.full_name || prof?.full_name || 'পরীক্ষার্থী';
-          const avatarUrl = row.avatar_url || prof?.avatar_url;
+          const uId = row.user_id ? String(row.user_id).trim() : null;
+          const isGuest = Boolean(
+            !uId ||
+            row.is_guest === true ||
+            Boolean(row.guest_name) ||
+            uId.startsWith('guest_') ||
+            uId.startsWith('anon_')
+          );
+          const fullName = !isGuest
+            ? (prof?.full_name || row.full_name || row.user_name || 'শিক্ষার্থী')
+            : (row.guest_name || row.full_name || row.user_name || 'গেস্ট পরীক্ষার্থী');
+          const avatarUrl = !isGuest ? (prof?.avatar_url || row.avatar_url) : row.avatar_url;
+          const rollNumber = prof?.roll_number || prof?.student_id || row.roll_number || row.student_id;
           const score = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
-          const totalMarks = Number(row.total_marks ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
+          const totalMarks = Number(row.total_marks ?? row.total_questions ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
           const wrongAnswers = Number(row.wrong_answers ?? row.wrong_count ?? 0);
           const timeTaken = Number(row.time_taken ?? row.time_taken_seconds ?? 0);
-          const uId = String(row.user_id || '');
-          const isGuest = Boolean(
-            row.is_guest === true ||
-            Boolean(row.guest_name) ||
-            !uId ||
-            uId.startsWith('guest_') ||
-            uId.startsWith('anon_') ||
-            fullName.includes('গেস্ট') ||
-            fullName.includes('Guest')
-          );
 
           return {
             rank: idx + 1,
             user_id: uId,
             full_name: fullName,
-            guest_name: row.guest_name || (isGuest ? fullName : undefined),
+            guest_name: isGuest ? (row.guest_name || fullName) : undefined,
             avatar_url: avatarUrl,
+            roll_number: rollNumber,
+            student_id: rollNumber,
             score,
             total_marks: totalMarks,
             correct_answers: correctAnswers,
             wrong_answers: wrongAnswers,
             time_taken_seconds: timeTaken,
             is_guest: isGuest,
+            submitted_at: row.submitted_at || row.created_at,
           };
         });
       }
@@ -1899,60 +1897,38 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   let dbEntries: LeaderboardEntry[] = [];
 
-  // 2. Fetch directly from Supabase `global_leaderboard` view or `exam_results` table (Sort by score DESC)
+  // 2. Fetch directly from Supabase `exam_results` table (Sort by score DESC)
   if (supabaseInstance) {
     try {
       let data: any = null;
       let error: any = null;
 
-      // 2A. Try 'global_leaderboard' VIEW first
-      try {
-        let viewQuery = supabaseInstance
-          .from('global_leaderboard')
-          .select('*')
-          .order('score', { ascending: false })
-          .limit(1000);
+      let query = supabaseInstance
+        .from('exam_results')
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(1000);
 
-        if (examId && examId !== 'all') {
-          const cleanExamId = examId.trim();
-          viewQuery = viewQuery.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
-        }
-
-        const viewRes = await fetchWithTimeout(Promise.resolve(viewQuery), 4000, { data: null, error: null } as any);
-        if (!viewRes.error && Array.isArray(viewRes.data) && viewRes.data.length > 0) {
-          data = viewRes.data;
-        }
-      } catch {}
-
-      // 2B. If VIEW not present, query `exam_results` table
-      if (!data || data.length === 0) {
-        let query = supabaseInstance
-          .from('exam_results')
-          .select('*')
-          .order('score', { ascending: false })
-          .limit(1000);
-
-        if (examId && examId !== 'all') {
-          const cleanExamId = examId.trim();
-          query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
-        }
-
-        const queryPromise = Promise.resolve(query);
-        const timeoutFallback = { data: null, error: { message: 'Timeout' } };
-        const directRes = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
-        data = directRes.data;
-        error = directRes.error;
+      if (examId && examId !== 'all') {
+        const cleanExamId = examId.trim();
+        query = query.or(`exam_id.eq.${cleanExamId},exam_title.eq.${cleanExamId},exam_id.ilike.%${cleanExamId}%,exam_title.ilike.%${cleanExamId}%`);
       }
+
+      const queryPromise = Promise.resolve(query);
+      const timeoutFallback = { data: null, error: { message: 'Timeout' } };
+      const directRes = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
+      data = directRes.data;
+      error = directRes.error;
 
       if (data && !error && Array.isArray(data) && data.length > 0) {
         // Fetch profiles
         const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
-        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string }>();
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
         if (userIds.length > 0) {
           try {
             const { data: profs } = await supabaseInstance
               .from('profiles')
-              .select('id, full_name, avatar_url')
+              .select('id, full_name, avatar_url, roll_number, student_id')
               .in('id', userIds);
             if (profs && Array.isArray(profs)) {
               profs.forEach((p: any) => {
