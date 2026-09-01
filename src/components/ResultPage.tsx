@@ -178,55 +178,88 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
         const currentUserProfile = getUserProfile();
         const currentRoll = currentUserProfile?.roll_number || currentUserProfile?.student_id;
-        const currentName = currentUserProfile?.name?.trim()?.toLowerCase();
+        const currentName = (currentUserProfile?.name || currentUserName || '').trim().toLowerCase();
         const isRegisteredUser = isUserRegistered();
+
+        // Helper to check if an item belongs to the current user (registered or guest)
+        const checkIsUser = (item: any, rawName: string) => {
+          if (isRegisteredUser) {
+            if (currentUserId && item.user_id && item.user_id === currentUserId) return true;
+            if (currentRoll && (item.roll_number === currentRoll || item.student_id === currentRoll || item.guest_id === currentRoll)) return true;
+            if (currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.full_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
+            return false;
+          } else {
+            // For Guest users: match by name or guest_id or current unique ID
+            if (currentUserId && (item.guest_id === currentUserId || item.user_id === currentUserId)) return true;
+            if (currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.guest_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
+            return false;
+          }
+        };
 
         // Add from RPC
         for (const item of rpcEntries) {
           const rawName = (item.full_name || item.user_name || item.guest_name || '').trim();
           if (!rawName) continue;
 
-          const isUser = Boolean(
-            isRegisteredUser && (
-              (currentUserId && item.user_id && item.user_id === currentUserId) ||
-              (currentRoll && (item.roll_number === currentRoll || item.student_id === currentRoll || item.guest_id === currentRoll)) ||
-              (currentName && (rawName.toLowerCase() === currentName || (item.full_name || '').toLowerCase() === currentName))
-            )
-          );
+          const isUser = checkIsUser(item, rawName);
           const isGuest = item.is_guest !== undefined
             ? item.is_guest
-            : (!isUser && (!item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name)));
+            : (!isRegisteredUser || !item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name));
 
-          const key = (isUser && (item.user_id || currentRoll))
-            ? (item.user_id || currentRoll)
-            : (item.roll_number || item.student_id || item.guest_id || item.user_id || rawName || 'anon').toLowerCase();
+          // Compute a stable distinct key for deduplicating participants
+          let key: string;
+          if (isUser) {
+            key = '__CURRENT_USER__';
+          } else if (!isGuest && item.user_id) {
+            key = item.user_id.toLowerCase().trim();
+          } else {
+            // Guest participant key: use guest_id or name
+            key = (item.guest_id || rawName || item.roll_number || item.student_id || 'anon').toLowerCase().trim();
+          }
 
-          candidatesMap.set(key, {
-            name: rawName,
-            avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
-            isUser,
-            isGuest,
-            rollNumber: item.roll_number || item.student_id,
-            correct: Number(item.correct_answers ?? item.score ?? 0),
-            wrong: Number(item.wrong_answers ?? 0),
-            score: Number(item.score ?? 0),
-            timeTakenSeconds: Number(item.time_taken_seconds ?? 0),
-            submittedAt: item.submitted_at || new Date().toISOString(),
-            userId: item.user_id,
-          });
+          const existingCandidate = candidatesMap.get(key);
+          const itemScore = Number(item.score ?? (item as any).obtained_marks ?? item.correct_answers ?? 0);
+          const itemTime = Number(item.time_taken_seconds ?? (item as any).time_taken ?? 999999);
+
+          if (!existingCandidate) {
+            candidatesMap.set(key, {
+              name: rawName,
+              avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
+              isUser,
+              isGuest,
+              rollNumber: item.roll_number || item.student_id,
+              correct: Number(item.correct_answers ?? item.score ?? 0),
+              wrong: Number(item.wrong_answers ?? 0),
+              score: itemScore,
+              timeTakenSeconds: itemTime,
+              submittedAt: item.submitted_at || new Date().toISOString(),
+              userId: item.user_id,
+            });
+          } else {
+            // Keep the best score / lowest time entry
+            if (itemScore > existingCandidate.score || (itemScore === existingCandidate.score && itemTime < existingCandidate.timeTakenSeconds)) {
+              candidatesMap.set(key, {
+                ...existingCandidate,
+                name: rawName,
+                isUser: isUser || existingCandidate.isUser,
+                correct: Number(item.correct_answers ?? item.score ?? 0),
+                wrong: Number(item.wrong_answers ?? 0),
+                score: itemScore,
+                timeTakenSeconds: itemTime,
+                submittedAt: item.submitted_at || existingCandidate.submittedAt,
+              });
+            }
+          }
         }
 
         // Always ensure current user's latest submission is included
-        const isCurrentSubmissionGuest = !isUserRegistered();
+        const isCurrentSubmissionGuest = !isRegisteredUser;
         const effectiveCurrentUserName = currentUserName || (isCurrentSubmissionGuest ? 'গেস্ট পরীক্ষার্থী' : 'শিক্ষার্থী');
-        const userKey = !isCurrentSubmissionGuest && currentUserId
-          ? currentUserId
-          : effectiveCurrentUserName.toLowerCase();
-
+        const userKey = '__CURRENT_USER__';
         const timeTakenSeconds = result.timeTakenSeconds || 0;
         
         const existingUser = candidatesMap.get(userKey);
-        if (!existingUser || obtainedMarksVal > existingUser.score || (obtainedMarksVal === existingUser.score && timeTakenSeconds < existingUser.timeTakenSeconds)) {
+        if (!existingUser) {
           candidatesMap.set(userKey, {
             name: effectiveCurrentUserName,
             avatar: currentUserAvatar,
@@ -239,6 +272,20 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             submittedAt: new Date().toISOString(),
             userId: currentUserId,
           });
+        } else {
+          // If local score is higher or equal, update the user entry
+          if (obtainedMarksVal >= existingUser.score) {
+            candidatesMap.set(userKey, {
+              ...existingUser,
+              name: effectiveCurrentUserName || existingUser.name,
+              avatar: currentUserAvatar || existingUser.avatar,
+              isUser: true,
+              score: obtainedMarksVal,
+              correct: result.correctCount,
+              wrong: result.wrongCount,
+              timeTakenSeconds: timeTakenSeconds || existingUser.timeTakenSeconds,
+            });
+          }
         }
 
         const allCandidates = Array.from(candidatesMap.values());
