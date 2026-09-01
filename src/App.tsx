@@ -522,8 +522,8 @@ export default function App() {
       student_id: userRoll,
     } as any).then((res) => {
       if (!res.success) {
-        console.error("Exam submission failed:", res.error);
-        alert("পরীক্ষার রেজাল্ট সেভ করতে সমস্যা হয়েছে। দয়া করে ইন্টারনেট কানেকশন চেক করুন।");
+        console.error("Exam submission failed error from Supabase:", res.error);
+        alert(`পরীক্ষার ফলাফল সুপাবেজে জমা করতে সমস্যা হয়েছে!\n\nসুপাবেজ এরর:\n${res.error || 'অজানা ত্রুটি (Unknown Supabase Error)'}`);
         return;
       }
       // Mark specific active exam as completed and persist result

@@ -1228,89 +1228,59 @@ export async function submitExamResultToSupabase(params: {
       }
     }
 
-    // 3B. Insert into exam_results directly with user_id (UUID or null)
-    const guestId = !dbUserId
-      ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
-      : null;
+    // 3B. Insert into exam_results directly with strict payload
     const isGuest = !dbUserId;
-    const userType = isGuest ? 'guest' : 'registered';
-    const guestName = isGuest ? (params.guest_name || effectiveName || 'গেস্ট পরীক্ষার্থী') : null;
-    const userName = !isGuest ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
+    const userType: 'registered' | 'guest' = isGuest ? 'guest' : 'registered';
+    
+    // Ensure user_name is never empty or whitespace
+    const candidateName = isGuest
+      ? (params.guest_name || effectiveName || (userProfile?.name && userProfile.name !== 'শিক্ষার্থী' ? userProfile.name : '') || 'গেস্ট পরীক্ষার্থী')
+      : (registeredFullName || effectiveName || 'পরীক্ষার্থী');
+    const userName = (candidateName && String(candidateName).trim().length > 0)
+      ? String(candidateName).trim()
+      : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
 
-    // ONLY send columns that are strictly defined in our recommended SQL schema
-    // We add user_type, user_name, total_questions, time_taken for full schema match
-    const submissionData: any = {
+    // Strict payload matching Supabase exam_results table schema
+    const submissionData = {
       exam_id: String(params.exam_id),
-      user_id: dbUserId,
-      user_name: userName,
-      user_type: userType,
-      full_name: registeredFullName || userName,
-      guest_name: guestName || userName, 
-      guest_id: guestId || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : null),
-      roll_number: registeredRollNumber,
-      student_id: registeredRollNumber,
-      score: Number(params.score),
-      total_marks: Number(params.total_marks),
-      total_questions: Number(params.total_marks),
-      correct_answers: Number(params.correct_answers),
-      wrong_answers: Number(params.wrong_answers),
-      time_taken: Number(timeTaken),
-      time_taken_seconds: Number(timeTaken),
-      submitted_at: submittedAt,
+      user_id: dbUserId, // Valid Auth UUID string or null for guests
+      user_name: userName, // Non-empty string
+      user_type: userType, // 'registered' | 'guest'
+      score: Number(params.score ?? 0),
+      correct_answers: Number(params.correct_answers ?? 0),
+      wrong_answers: Number(params.wrong_answers ?? 0),
+      total_questions: Number(params.total_marks ?? 0),
+      time_taken: Number(timeTaken ?? 0),
     };
 
-    let { error } = await supabaseInstance
+    const { error } = await supabaseInstance
       .from('exam_results')
       .insert([submissionData]);
 
     if (error) {
-      console.warn("Supabase Exam Submit Full Error:", error);
+      console.log("Supabase insert response error:", error);
+      console.error("Supabase Exam Submit Full Error Details:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        payload: submissionData,
+      });
 
-      // If error is due to an unknown column (e.g. user_type, time_taken, total_questions not existing in old table),
-      // retry with schema-safe stripped object
-      const safeData: any = {
-        exam_id: String(params.exam_id),
-        user_id: dbUserId,
-        user_name: userName,
-        full_name: registeredFullName || userName,
-        guest_name: guestName || userName,
-        score: Number(params.score),
-        correct_answers: Number(params.correct_answers),
-        wrong_answers: Number(params.wrong_answers),
-        total_marks: Number(params.total_marks),
-        time_taken_seconds: Number(timeTaken),
-        submitted_at: submittedAt,
-      };
+      const detailedMsg = [
+        error.message,
+        error.details ? `Details: ${error.details}` : '',
+        error.hint ? `Hint: ${error.hint}` : '',
+        error.code ? `Code: ${error.code}` : '',
+      ].filter(Boolean).join(' | ');
 
-      const safeRes = await supabaseInstance
-        .from('exam_results')
-        .insert([safeData]);
-
-      if (safeRes.error) {
-        console.warn("Supabase Exam Submit Safe Insert Error:", safeRes.error);
-        
-        // FALLBACK: Try a minimal insert with only the absolute basic columns
-        const minimalData = {
-          exam_id: String(params.exam_id),
-          user_id: dbUserId,
-          score: Number(params.score),
-          submitted_at: submittedAt
-        };
-        
-        const { error: fallbackError } = await supabaseInstance
-          .from('exam_results')
-          .insert([minimalData]);
-          
-        if (fallbackError) {
-          console.error("Supabase Exam Submit Fallback Error:", fallbackError);
-          return { success: false, error: fallbackError.message };
-        }
-      }
+      return { success: false, error: detailedMsg || error.message || 'Supabase insert failed' };
     }
 
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.log("Supabase insert exception response error:", err);
     console.error("submitExamResultToSupabase Exception:", err);
     return { success: false, error: msg };
   }
