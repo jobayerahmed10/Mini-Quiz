@@ -5212,13 +5212,12 @@ export function getCachedBlogs(): BlogPost[] {
     const raw = localStorage.getItem(BLOGS_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         // Filter out old demo blogs if any exist
         const nonDemo = parsed.filter((b: BlogPost) => !b.id.startsWith('blog-'));
-        if (nonDemo.length !== parsed.length) {
-          localStorage.setItem(BLOGS_CACHE_KEY, JSON.stringify(nonDemo));
+        if (nonDemo.length > 0) {
+          return nonDemo;
         }
-        return nonDemo;
       }
     }
   } catch {}
@@ -5262,7 +5261,9 @@ export async function fetchBlogPosts(filterOptions?: { category?: string; sub_ca
         query = query.eq('subject', filterOptions.subject);
       }
 
-      const { data, error } = await query;
+      // 3.5s Timeout guard to prevent UI freeze on slow mobile data/connection
+      const timeoutFallback = { data: null, error: { message: 'Network Timeout', code: 'TIMEOUT' } };
+      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 3500, timeoutFallback as any);
 
       if (!error && Array.isArray(data) && data.length > 0) {
         const mapped: BlogPost[] = data.map((item: any) => ({

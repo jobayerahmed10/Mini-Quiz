@@ -19,6 +19,7 @@ import { BlogPost, BlogCategory } from '../types';
 import { BLOG_TAXONOMY, BlogTaxonomyCategory, BlogTaxonomySubCategory } from '../data/blogData';
 import { 
   fetchBlogPosts, 
+  getCachedBlogs,
   toggleBlogBookmark, 
   getLocalBookmarkedBlogIds 
 } from '../lib/supabase';
@@ -43,7 +44,7 @@ const CATEGORY_ITEMS: { id: SelectedFilter; label: string; icon: React.Component
 export const BlogPage: React.FC<BlogPageProps> = ({
   searchQuery = '',
 }) => {
-  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [blogs, setBlogs] = useState<BlogPost[]>(() => getCachedBlogs());
   const [selectedCategory, setSelectedCategory] = useState<SelectedFilter>('সবগুলো');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);

@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { Question, TabRoute, BlogPost } from '../types';
 import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
-import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, toggleBlogBookmark, getLocalBookmarkedBlogIds } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, getCachedBlogs, toggleBlogBookmark, getLocalBookmarkedBlogIds } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { BlogDetailView } from './BlogDetailView';
 
@@ -131,7 +131,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Load latest exams from Supabase or cache
   const [examineeCounts, setExamineeCounts] = useState<Record<string, number>>({});
   const [serverCompletedIds, setServerCompletedIds] = useState<string[]>([]);
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => getCachedBlogs().slice(0, 5));
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
 
   useEffect(() => {
