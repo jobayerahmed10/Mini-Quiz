@@ -183,15 +183,19 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
         // Helper to check if an item belongs to the current user (registered or guest)
         const checkIsUser = (item: any, rawName: string) => {
+          const itemIsGuest = Boolean(
+            item.is_guest !== undefined
+              ? item.is_guest
+              : (!item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name))
+          );
           if (isRegisteredUser) {
-            if (currentUserId && item.user_id && item.user_id === currentUserId) return true;
-            if (currentRoll && (item.roll_number === currentRoll || item.student_id === currentRoll || item.guest_id === currentRoll)) return true;
-            if (currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.full_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
+            // Strictly match registered user ID and ensure it is not a guest record
+            if (!itemIsGuest && currentUserId && item.user_id && item.user_id === currentUserId) return true;
             return false;
           } else {
-            // For Guest users: match by name or guest_id or current unique ID
-            if (currentUserId && (item.guest_id === currentUserId || item.user_id === currentUserId)) return true;
-            if (currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.guest_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
+            // For Guest users: match by guest_id or active guest session
+            if (itemIsGuest && currentUserId && (item.guest_id === currentUserId || item.user_id === currentUserId)) return true;
+            if (itemIsGuest && currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.guest_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
             return false;
           }
         };

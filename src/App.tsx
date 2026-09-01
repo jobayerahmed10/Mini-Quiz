@@ -46,6 +46,7 @@ import {
   isUserRegistered, 
   saveUserProfile, 
   clearUserProfile,
+  clearGuestExamSession,
   saveExamToHistory,
   saveWrongAnswersFromQuiz,
   resetExamAttemptCache,
@@ -249,6 +250,9 @@ export default function App() {
           event === 'TOKEN_REFRESHED' ||
           event === 'USER_UPDATED')
       ) {
+        if (event === 'SIGNED_IN') {
+          clearGuestExamSession();
+        }
         const synced = await syncUserProfileFromSupabase(session.user);
         if (synced && isMounted) {
           saveUserProfile(

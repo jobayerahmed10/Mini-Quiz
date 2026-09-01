@@ -481,8 +481,25 @@ export function saveUserProfile(
   return profile;
 }
 
+export function clearGuestExamSession(): void {
+  try {
+    localStorage.removeItem('tamreen_guest_device_id');
+    localStorage.removeItem('tamreen_completed_exams');
+    localStorage.removeItem('tamreen_saved_exam_results');
+    localStorage.removeItem('tamreen_exam_history_list');
+    localStorage.removeItem('tamreen_student_stats');
+    localStorage.removeItem('miniquiz_student_stats');
+    localStorage.removeItem('tamreen_wrong_answers_bank');
+    localStorage.removeItem('tamreen_exam_completion_times');
+    localStorage.removeItem('tamreen_total_exams_count');
+  } catch {
+    // ignore
+  }
+}
+
 export function clearUserProfile(): void {
   try {
+    clearGuestExamSession();
     localStorage.removeItem(PROFILE_STORAGE_KEY);
     localStorage.removeItem(USER_ROLL_KEY);
     localStorage.removeItem('tamreen_user_auth_status');
@@ -501,6 +518,7 @@ export function clearUserProfile(): void {
     localStorage.removeItem('tamreen_user_enrollments');
     localStorage.removeItem('tamreen_bookmarked_ids');
     localStorage.removeItem('tamreen_bookmarked_questions');
+    localStorage.removeItem('tamreen_user_liked_question_ids');
   } catch {
     // ignore
   }

@@ -193,19 +193,25 @@ export function computeLeaderboard(
 
     const itemsList: LeaderboardDisplayItem[] = Array.from(userBestMap.values()).map((e) => {
       const eUserId = (e.user_id || '').trim();
+      const isGuestEntry = Boolean(
+        e.is_guest !== undefined
+          ? e.is_guest
+          : (!eUserId || eUserId.startsWith('guest_') || eUserId.startsWith('anon_') || Boolean(e.guest_name))
+      );
+
+      // Strict user matching:
+      // - Registered user: ONLY matches genuine registered user_id (never guest records or name collisions)
+      // - Guest user: matches current guest session id
       const isCurr = Boolean(
         currentUserId && (
-          (eUserId && (eUserId === currentUserId || (userRoll && eUserId === userRoll))) ||
-          (isReg && userProf?.name && (e.user_name || e.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+          isReg
+            ? (!isGuestEntry && eUserId && eUserId === currentUserId)
+            : (isGuestEntry && (eUserId === currentUserId || (e as any).guest_id === currentUserId))
         )
       );
 
       const rollNumber = e.roll_number || e.student_id || (isCurr && userRoll ? userRoll : undefined);
-      const isGuest = Boolean(
-        e.is_guest !== undefined
-          ? e.is_guest
-          : (!isCurr && (!eUserId || eUserId.startsWith('guest_') || eUserId.startsWith('anon_')))
-      );
+      const isGuest = isGuestEntry;
 
       const rawClean = (e.full_name || e.user_name || e.guest_name || '').trim();
       const displayName = (isCurr && isReg && userProf?.name)
@@ -476,19 +482,23 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           const mapped: LeaderboardDisplayItem[] = examRows.map((row, idx) => {
             const rowUserId = (row.user_id || '').trim();
             const rowRoll = row.roll_number || row.student_id;
+            const isGuestEntry = Boolean(
+              row.is_guest !== undefined
+                ? row.is_guest
+                : (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_') || Boolean(row.guest_name))
+            );
+
+            // Strict user matching
             const isCurr = Boolean(
               currentUserId && (
-                (rowUserId && (rowUserId === currentUserId || (userRoll && rowUserId === userRoll))) ||
-                (isReg && userProf?.name && (row.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+                isReg
+                  ? (!isGuestEntry && rowUserId && rowUserId === currentUserId)
+                  : (isGuestEntry && (rowUserId === currentUserId || row.guest_id === currentUserId))
               )
             );
 
             const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
-            const isGuest = Boolean(
-              row.is_guest !== undefined
-                ? row.is_guest
-                : (!isCurr && (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_')))
-            );
+            const isGuest = isGuestEntry;
 
             const rawClean = (row.full_name || row.guest_name || '').trim();
             const cleanName = (isCurr && isReg && userProf?.name)
@@ -548,19 +558,23 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           const mapped: LeaderboardDisplayItem[] = filteredFree.map((row, idx) => {
             const rowUserId = (row.user_id || '').trim();
             const rowRoll = row.roll_number || row.student_id;
+            const isGuestEntry = Boolean(
+              row.is_guest !== undefined
+                ? row.is_guest
+                : (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_') || Boolean(row.guest_name))
+            );
+
+            // Strict user matching
             const isCurr = Boolean(
               currentUserId && (
-                (rowUserId && (rowUserId === currentUserId || (userRoll && rowUserId === userRoll))) ||
-                (isReg && userProf?.name && (row.full_name || '').trim().toLowerCase() === userProf.name.trim().toLowerCase())
+                isReg
+                  ? (!isGuestEntry && rowUserId && rowUserId === currentUserId)
+                  : (isGuestEntry && (rowUserId === currentUserId || (row as any).guest_id === currentUserId))
               )
             );
 
             const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
-            const isGuest = Boolean(
-              row.is_guest !== undefined
-                ? row.is_guest
-                : (!isCurr && (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_')))
-            );
+            const isGuest = isGuestEntry;
 
             const rawClean = (row.full_name || row.guest_name || '').trim();
             const cleanName = (isCurr && isReg && userProf?.name)

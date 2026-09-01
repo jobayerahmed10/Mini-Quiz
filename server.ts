@@ -910,32 +910,41 @@ app.get('/api/exam/completed', (req, res) => {
     const rawGuestId = String(req.query.guestId || '').trim();
 
     const completedExamIdsSet = new Set<string>();
+    const isRegistered = Boolean(rawUserId && !rawUserId.startsWith('guest_') && !rawUserId.startsWith('anon_'));
 
     serverExamResultsStore.forEach((r) => {
-      const uMatch = rawUserId && r.user_id && (r.user_id === rawUserId || r.user_id.toLowerCase() === rawUserId.toLowerCase());
-      const gMatch = rawGuestId && (r.user_id === rawGuestId || (r as any).guest_id === rawGuestId);
-      if (uMatch || gMatch) {
-        if (r.exam_id) completedExamIdsSet.add(String(r.exam_id).trim());
-        if (r.exam_title) completedExamIdsSet.add(String(r.exam_title).trim());
+      if (isRegistered) {
+        if (r.user_id && (r.user_id === rawUserId || r.user_id.toLowerCase() === rawUserId.toLowerCase()) && !r.is_guest) {
+          if (r.exam_id) completedExamIdsSet.add(String(r.exam_id).trim());
+          if (r.exam_title) completedExamIdsSet.add(String(r.exam_title).trim());
+        }
+      } else if (rawGuestId) {
+        if (r.is_guest && ((r as any).guest_id === rawGuestId || r.user_id === rawGuestId)) {
+          if (r.exam_id) completedExamIdsSet.add(String(r.exam_id).trim());
+          if (r.exam_title) completedExamIdsSet.add(String(r.exam_title).trim());
+        }
       }
     });
 
     serverLeaderboardStore.forEach((e) => {
-      const uMatch = rawUserId && e.user_id && (e.user_id === rawUserId || e.user_id.toLowerCase() === rawUserId.toLowerCase());
-      if (uMatch) {
-        if (e.exam_id) completedExamIdsSet.add(String(e.exam_id).trim());
-        if (e.exam_title) completedExamIdsSet.add(String(e.exam_title).trim());
+      if (isRegistered) {
+        if (e.user_id && (e.user_id === rawUserId || e.user_id.toLowerCase() === rawUserId.toLowerCase()) && !e.is_guest) {
+          if (e.exam_id) completedExamIdsSet.add(String(e.exam_id).trim());
+          if (e.exam_title) completedExamIdsSet.add(String(e.exam_title).trim());
+        }
       }
     });
 
-    serverUserProgressStore.forEach((p) => {
-      const uMatch = rawUserId && p.userId && (p.userId === rawUserId || p.userId.toLowerCase() === rawUserId.toLowerCase());
-      if (uMatch && Array.isArray(p.completedExams)) {
-        p.completedExams.forEach((id) => {
-          if (id) completedExamIdsSet.add(String(id).trim());
-        });
-      }
-    });
+    if (isRegistered) {
+      serverUserProgressStore.forEach((p) => {
+        const uMatch = p.userId && (p.userId === rawUserId || p.userId.toLowerCase() === rawUserId.toLowerCase());
+        if (uMatch && Array.isArray(p.completedExams)) {
+          p.completedExams.forEach((id) => {
+            if (id) completedExamIdsSet.add(String(id).trim());
+          });
+        }
+      });
+    }
 
     return res.json({
       success: true,

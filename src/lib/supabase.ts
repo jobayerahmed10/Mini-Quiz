@@ -1288,7 +1288,7 @@ export async function submitExamResultToSupabase(params: {
 
 /**
  * Fetch all exam IDs/titles that the current user (registered or guest) has completed from Supabase.
- * Automatically synchronizes with local storage.
+ * Automatically synchronizes with local storage without leaking guest exams to registered users.
  */
 export async function fetchUserCompletedExamsFromSupabase(userId?: string): Promise<string[]> {
   let authUserId: string | undefined;
@@ -1306,19 +1306,10 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
     localStoredUserId = localStorage.getItem('tamreen_user_id') || '';
   }
 
-  const currentUId = userId || authUserId || localStoredUserId || getUserUniqueId();
   const prof = getUserProfile();
-  const guestDevId = getGuestDeviceId();
-  const candidateIds = Array.from(new Set([
-    authUserId,
-    currentUId,
-    userId,
-    localStoredUserId,
-    prof?.student_id,
-    prof?.roll_number,
-    prof?.phone,
-    guestDevId,
-  ].filter(Boolean) as string[]));
+  const isReg = isUserRegistered() || Boolean(authUserId || (localStoredUserId && !localStoredUserId.startsWith('guest_') && !localStoredUserId.startsWith('anon_')));
+  const currentUId = authUserId || (isReg ? localStoredUserId : '') || (isReg ? userId : '');
+  const guestDevId = !isReg ? getGuestDeviceId() : '';
 
   const completedExamIds: string[] = [];
 
@@ -1326,33 +1317,14 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
     Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
   // 1. Try Supabase exam_results table with type-safe query
-  if (supabaseInstance && candidateIds.length > 0) {
+  if (supabaseInstance) {
     try {
-      const uuidCandidates = candidateIds.filter(isValidUuid);
-      const textCandidates = candidateIds.filter((id) => !isValidUuid(id));
-
-      const filterParts: string[] = [];
-      uuidCandidates.forEach((id) => {
-        filterParts.push(`user_id.eq.${id}`);
-      });
-      textCandidates.forEach((id) => {
-        filterParts.push(`guest_id.eq.${id}`);
-        filterParts.push(`roll_number.eq.${id}`);
-        filterParts.push(`student_id.eq.${id}`);
-      });
-      if (prof?.phone) {
-        filterParts.push(`phone.eq.${prof.phone}`);
-      }
-      if (prof?.name && prof.name !== 'শিক্ষার্থী' && prof.name !== 'গেস্ট পরীক্ষার্থী') {
-        filterParts.push(`user_name.eq."${prof.name.replace(/"/g, '')}"`);
-        filterParts.push(`guest_name.eq."${prof.name.replace(/"/g, '')}"`);
-      }
-
-      if (filterParts.length > 0) {
+      if (isReg && currentUId && isValidUuid(currentUId)) {
+        // Registered User: Query STRICTLY by user_id
         const query = supabaseInstance
           .from('exam_results')
           .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
-          .or(filterParts.join(','));
+          .eq('user_id', currentUId);
 
         const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
         if (!error && Array.isArray(data) && data.length > 0) {
@@ -1360,13 +1332,25 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
             if (r.exam_id) {
               const cleanId = String(r.exam_id).trim();
               completedExamIds.push(cleanId);
-              addCompletedExamId(cleanId);
             }
             if (r.exam_title) {
               const cleanTitle = String(r.exam_title).trim();
               completedExamIds.push(cleanTitle);
-              addCompletedExamId(cleanTitle);
             }
+          });
+        }
+      } else if (!isReg && guestDevId) {
+        // Guest User: Query strictly by guest device / guest id
+        const query = supabaseInstance
+          .from('exam_results')
+          .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
+          .eq('guest_id', guestDevId);
+
+        const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          data.forEach((r: any) => {
+            if (r.exam_id) completedExamIds.push(String(r.exam_id).trim());
+            if (r.exam_title) completedExamIds.push(String(r.exam_title).trim());
           });
         }
       }
@@ -1377,30 +1361,33 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
 
   // 2. Also check Server API completed exams
   try {
-    const srvRes = await fetch(`/api/exam/completed?userId=${encodeURIComponent(currentUId || '')}&guestId=${encodeURIComponent(guestDevId || '')}&phone=${encodeURIComponent(prof?.phone || '')}`);
+    const queryUrl = isReg
+      ? `/api/exam/completed?userId=${encodeURIComponent(currentUId || '')}`
+      : `/api/exam/completed?guestId=${encodeURIComponent(guestDevId || '')}`;
+    const srvRes = await fetch(queryUrl);
     if (srvRes.ok) {
       const srvJson = await srvRes.json();
       if (srvJson?.success && Array.isArray(srvJson.completedExamIds)) {
         srvJson.completedExamIds.forEach((id: string) => {
           const clean = String(id).trim();
-          if (clean) {
+          if (clean && !completedExamIds.includes(clean)) {
             completedExamIds.push(clean);
-            addCompletedExamId(clean);
           }
         });
       }
     }
   } catch {}
 
-  // 3. Also check local storage completed list
-  const localCompleted = getCompletedExamIds();
-  localCompleted.forEach((id) => {
-    if (!completedExamIds.includes(id)) {
-      completedExamIds.push(id);
-    }
-  });
+  const finalCompletedList = Array.from(new Set(completedExamIds));
 
-  return Array.from(new Set(completedExamIds));
+  // Sync to local storage strictly for the current identity
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('tamreen_completed_exams', JSON.stringify(finalCompletedList));
+    } catch {}
+  }
+
+  return finalCompletedList;
 }
 
 /**
@@ -3829,32 +3816,28 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
         }
 
         if (typeof window !== 'undefined') {
-          // Restore completed exams across browsers
-          if (Array.isArray(progressData.completedExams) && progressData.completedExams.length > 0) {
+          // Restore completed exams for registered account only (do not merge guest local exams)
+          if (Array.isArray(progressData.completedExams)) {
             try {
-              const currentExams = JSON.parse(localStorage.getItem('tamreen_completed_exams') || '[]');
-              const mergedExams = Array.from(new Set([...currentExams, ...progressData.completedExams]));
-              localStorage.setItem('tamreen_completed_exams', JSON.stringify(mergedExams));
+              localStorage.setItem('tamreen_completed_exams', JSON.stringify(progressData.completedExams));
+            } catch {}
+          } else {
+            try {
+              localStorage.setItem('tamreen_completed_exams', JSON.stringify([]));
             } catch {}
           }
 
           // Restore practice stats across browsers
           if (progressData.studentStats && typeof progressData.studentStats === 'object') {
             try {
-              const currentStatsRaw = localStorage.getItem('tamreen_student_stats');
-              const currentStats = currentStatsRaw ? JSON.parse(currentStatsRaw) : null;
-              if (!currentStats || (progressData.studentStats.totalQuestionsAnswered > (currentStats.totalQuestionsAnswered || 0))) {
-                localStorage.setItem('tamreen_student_stats', JSON.stringify(progressData.studentStats));
-              }
+              localStorage.setItem('tamreen_student_stats', JSON.stringify(progressData.studentStats));
             } catch {}
           }
 
           // Restore bookmarks & goal
-          if (Array.isArray(progressData.bookmarkedIds) && progressData.bookmarkedIds.length > 0) {
+          if (Array.isArray(progressData.bookmarkedIds)) {
             try {
-              const curBm = JSON.parse(localStorage.getItem('tamreen_bookmarked_ids') || '[]');
-              const mergedBm = Array.from(new Set([...curBm, ...progressData.bookmarkedIds]));
-              localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(mergedBm));
+              localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(progressData.bookmarkedIds));
             } catch {}
           }
           if (progressData.goal) {
