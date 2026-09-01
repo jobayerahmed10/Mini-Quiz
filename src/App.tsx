@@ -521,6 +521,11 @@ export default function App() {
       roll_number: userRoll,
       student_id: userRoll,
     } as any).then((res) => {
+      if (!res.success) {
+        console.error("Exam submission failed:", res.error);
+        alert("পরীক্ষার রেজাল্ট সেভ করতে সমস্যা হয়েছে। দয়া করে ইন্টারনেট কানেকশন চেক করুন।");
+        return;
+      }
       // Mark specific active exam as completed and persist result
       if (activeExamId) {
         addCompletedExamId(activeExamId);

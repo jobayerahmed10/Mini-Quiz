@@ -7,7 +7,18 @@ import {
   Check
 } from 'lucide-react';
 import { Question, UserAnswer } from '../types';
-import { toBengaliNumeral, OPTION_BENGLI_LABEL, normalizeCorrectOption, formatArabicText, isArabicText, isFullyArabic } from '../lib/utils';
+import { 
+  toBengaliNumeral, 
+  OPTION_BENGLI_LABEL, 
+  normalizeCorrectOption, 
+  formatArabicText, 
+  isArabicText, 
+  isFullyArabic,
+  isUserRegistered,
+  getUserProfile,
+  saveUserProfile
+} from '../lib/utils';
+import { User, Sparkles } from 'lucide-react';
 import { detectQuestionSubject } from '../lib/subjects';
 import { fetchQuestionsByExamId } from '../lib/supabase';
 
@@ -223,8 +234,34 @@ export const PracticePage: React.FC<PracticePageProps> = ({
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showGuestNameModal, setShowGuestNameModal] = useState(false);
+  const [guestInputName, setGuestInputName] = useState(() => {
+    try {
+      const p = localStorage.getItem('miniquiz_user_profile');
+      if (p) {
+        const parsed = JSON.parse(p);
+        return parsed.name || '';
+      }
+    } catch {}
+    return '';
+  });
 
   const handleOpenSubmitModal = () => {
+    const isReg = isUserRegistered();
+    const prof = getUserProfile();
+    // If guest and no name saved yet, ask for guest name in modal
+    if (!isReg && (!prof?.name || prof.name === 'শিক্ষার্থী' || prof.name === 'গেস্ট পরীক্ষার্থী')) {
+      setShowGuestNameModal(true);
+      return;
+    }
+    setShowSubmitModal(true);
+  };
+
+  const handleConfirmGuestNameAndProceed = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanName = guestInputName.trim() || 'গেস্ট পরীক্ষার্থী';
+    saveUserProfile(cleanName, '', '', false);
+    setShowGuestNameModal(false);
     setShowSubmitModal(true);
   };
 
@@ -516,6 +553,60 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         </div>
 
       </div>
+
+      {/* Guest Name Input Modal (For Non-Logged-in / Guest Users) */}
+      {showGuestNameModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-[32px] max-w-sm w-full p-6 text-center space-y-5 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-[#046A38] dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-200 dark:border-emerald-800">
+              <User className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-[#0B132B] dark:text-white">
+                আপনার নাম লিখুন
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                মেধা তালিকায় আপনার পরীক্ষার রেজাল্ট ও স্কোর দেখতে আপনার নাম প্রবেশ করুন।
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmGuestNameAndProceed} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  নাম (Guest Name)
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={guestInputName}
+                  onChange={(e) => setGuestInputName(e.target.value)}
+                  placeholder="যেমন: মুহাম্মদ আব্দুল্লাহ"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-800 dark:text-white focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowGuestNameModal(false)}
+                  className="py-3 px-4 rounded-2xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all active:scale-95 text-center"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  disabled={!guestInputName.trim()}
+                  className="py-3 px-4 rounded-2xl bg-[#046A38] hover:bg-[#03542c] disabled:opacity-50 text-white font-black text-xs cursor-pointer shadow-sm transition-all active:scale-95 text-center"
+                >
+                  পরবর্তী ধাপ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Submission Confirmation Modal (Matching Image 1) */}
       {showSubmitModal && (

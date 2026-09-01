@@ -1232,51 +1232,79 @@ export async function submitExamResultToSupabase(params: {
     const guestId = !dbUserId
       ? (params.guest_id || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)).trim()
       : null;
-    const guestName = !dbUserId ? (params.guest_name || effectiveName || 'গেস্ট পরীক্ষার্থী') : null;
-    const userName = dbUserId ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
+    const isGuest = !dbUserId;
+    const userType = isGuest ? 'guest' : 'registered';
+    const guestName = isGuest ? (params.guest_name || effectiveName || 'গেস্ট পরীক্ষার্থী') : null;
+    const userName = !isGuest ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
 
     // ONLY send columns that are strictly defined in our recommended SQL schema
+    // We add user_type, user_name, total_questions, time_taken for full schema match
     const submissionData: any = {
       exam_id: String(params.exam_id),
-      user_id: dbUserId, // Valid Auth UUID or null
+      user_id: dbUserId,
       user_name: userName,
-      full_name: registeredFullName,
-      guest_name: guestName,
-      guest_id: guestId,
+      user_type: userType,
+      full_name: registeredFullName || userName,
+      guest_name: guestName || userName, 
+      guest_id: guestId || (params.user_id && params.user_id.startsWith('guest_') ? params.user_id : null),
       roll_number: registeredRollNumber,
       student_id: registeredRollNumber,
       score: Number(params.score),
       total_marks: Number(params.total_marks),
+      total_questions: Number(params.total_marks),
       correct_answers: Number(params.correct_answers),
       wrong_answers: Number(params.wrong_answers),
+      time_taken: Number(timeTaken),
       time_taken_seconds: Number(timeTaken),
       submitted_at: submittedAt,
     };
 
-    const { error } = await supabaseInstance
+    let { error } = await supabaseInstance
       .from('exam_results')
       .insert([submissionData]);
 
     if (error) {
       console.warn("Supabase Exam Submit Full Error:", error);
-      
-      // FALLBACK: Try a minimal insert with only the absolute basic columns (exam_id, user_id, score)
-      // in case the user hasn't added the new columns yet.
-      const minimalData = {
+
+      // If error is due to an unknown column (e.g. user_type, time_taken, total_questions not existing in old table),
+      // retry with schema-safe stripped object
+      const safeData: any = {
         exam_id: String(params.exam_id),
         user_id: dbUserId,
+        user_name: userName,
+        full_name: registeredFullName || userName,
+        guest_name: guestName || userName,
         score: Number(params.score),
+        correct_answers: Number(params.correct_answers),
+        wrong_answers: Number(params.wrong_answers),
         total_marks: Number(params.total_marks),
-        submitted_at: submittedAt
+        time_taken_seconds: Number(timeTaken),
+        submitted_at: submittedAt,
       };
-      
-      const { error: fallbackError } = await supabaseInstance
+
+      const safeRes = await supabaseInstance
         .from('exam_results')
-        .insert([minimalData]);
+        .insert([safeData]);
+
+      if (safeRes.error) {
+        console.warn("Supabase Exam Submit Safe Insert Error:", safeRes.error);
         
-      if (fallbackError) {
-        console.error("Supabase Exam Submit Fallback Error:", fallbackError);
-        return { success: false, error: fallbackError.message };
+        // FALLBACK: Try a minimal insert with only the absolute basic columns
+        const minimalData = {
+          exam_id: String(params.exam_id),
+          user_id: dbUserId,
+          score: Number(params.score),
+          submitted_at: submittedAt
+        };
+        
+        const { error: fallbackError } = await supabaseInstance
+          .from('exam_results')
+          .insert([minimalData]);
+          
+        if (fallbackError) {
+          console.error("Supabase Exam Submit Fallback Error:", fallbackError);
+          return { success: false, error: fallbackError.message };
+        }
       }
     }
 

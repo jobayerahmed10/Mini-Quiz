@@ -32,6 +32,7 @@ export interface LeaderboardDisplayItem {
   correctCount: number;
   wrongCount: number;
   score: number;
+  timeTakenSeconds?: number;
   examTitle?: string;
   
   createdAt: string;
@@ -228,17 +229,26 @@ export function computeLeaderboard(
         correctCount: Number(e.correct_count || e.score || 0),
         wrongCount: Number(e.wrong_count || 0),
         score: Number(e.score || 0),
+        timeTakenSeconds: Number(e.time_taken_seconds || 0),
         examTitle: e.exam_title || 'মডেল টেস্ট',
         createdAt: e.created_at,
       };
     });
 
     // Ranking rules for 'this_exam':
-    // 1. Points / Score (desc)
-    // 2. Avg Accuracy (desc)
-    // 3. Submission time (asc)
+    // 1. Score / Points (desc)
+    // 2. Time Taken (asc)
+    // 3. Avg Accuracy (desc)
+    // 4. Submission time (asc)
     itemsList.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
+      const scoreA = Number(a.score ?? a.points ?? 0);
+      const scoreB = Number(b.score ?? b.points ?? 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      
+      const timeA = Number(a.timeTakenSeconds ?? 999999);
+      const timeB = Number(b.timeTakenSeconds ?? 999999);
+      if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+      
       if (b.avgAccuracy !== a.avgAccuracy) return b.avgAccuracy - a.avgAccuracy;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });

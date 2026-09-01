@@ -182,18 +182,22 @@ ON public.profiles FOR ALL USING (true);
 
 CREATE TABLE IF NOT EXISTS public.exam_results (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT,
-  user_name TEXT,
+  exam_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_name TEXT NOT NULL DEFAULT 'পরীক্ষার্থী',
+  user_type TEXT NOT NULL DEFAULT 'registered',
+  score NUMERIC NOT NULL DEFAULT 0,
+  correct_answers INT NOT NULL DEFAULT 0,
+  wrong_answers INT NOT NULL DEFAULT 0,
+  total_questions INT NOT NULL DEFAULT 0,
+  time_taken INT DEFAULT 0,
+  -- অতিরিক্ত সুবিধাজনক কলাম (Backward compatibility)
   full_name TEXT,
   roll_number TEXT,
   student_id TEXT,
   guest_name TEXT,
   guest_id TEXT,
-  exam_id TEXT NOT NULL,
-  score NUMERIC NOT NULL DEFAULT 0,
-  total_marks NUMERIC NOT NULL DEFAULT 0,
-  correct_answers INT NOT NULL DEFAULT 0,
-  wrong_answers INT NOT NULL DEFAULT 0,
+  total_marks NUMERIC DEFAULT 0,
   time_taken_seconds INT DEFAULT 0,
   submitted_at TIMESTAMPTZ DEFAULT now()
 );
