@@ -107,6 +107,21 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
     examId?: string;
     examType?: string;
   }) => {
+    const isDone = isExamCompleted(opts.examId, opts.examType) ||
+      serverCompletedIds.some(id => {
+        const cleanId = String(id).trim().toLowerCase();
+        const targetId = String(opts.examId || '').trim().toLowerCase();
+        const targetTitle = String(opts.examType || '').trim().toLowerCase();
+        return (targetId && cleanId === targetId) || (targetTitle && cleanId === targetTitle);
+      });
+
+    if (isDone) {
+      if (onReviewAnswers) {
+        onReviewAnswers(opts);
+      }
+      return;
+    }
+
     const profile = getUserProfile();
     if (profile && profile.name) {
       onStartExam(opts);
@@ -228,6 +243,8 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
     window.addEventListener('tamreen_exam_completed', handleExamCompleted);
     window.addEventListener('tamreen_profile_updated', handleExamCompleted);
+    window.addEventListener('tamreen_auth_status_changed', handleExamCompleted);
+    window.addEventListener('storage', handleExamCompleted);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
@@ -235,6 +252,8 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       unsubscribe();
       window.removeEventListener('tamreen_exam_completed', handleExamCompleted);
       window.removeEventListener('tamreen_profile_updated', handleExamCompleted);
+      window.removeEventListener('tamreen_auth_status_changed', handleExamCompleted);
+      window.removeEventListener('storage', handleExamCompleted);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
     };

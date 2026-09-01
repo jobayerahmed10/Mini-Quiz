@@ -578,13 +578,36 @@ export default function App() {
       setResultViewMode('explanation');
       navigateWithHistory('result');
     } else {
-      handleStartPractice({
-        subject: opts.subject || 'সকল বিষয়',
-        questionCount: opts.questionCount,
-        timeMinutes: opts.timeMinutes,
-        examId: opts.examId,
-        examType: opts.examType,
+      // Build a fallback result for review/explanation mode so the user NEVER retakes the exam
+      const targetSub = opts.subject || opts.examType || 'সকল বিষয়';
+      const matchingQuestions = questions.filter((q) => {
+        if (opts.examId && String(q.id) === String(opts.examId)) return true;
+        if (opts.examType && (q.examType === opts.examType || q.subject === opts.examType)) return true;
+        if (opts.subject && q.subject === opts.subject) return true;
+        return false;
       });
+      const qList = matchingQuestions.length > 0 ? matchingQuestions : questions.slice(0, opts.questionCount || 10);
+      const constructedUserAnswers: UserAnswer[] = qList.map((q) => ({
+        question: q,
+        selectedAnswer: '',
+        isCorrect: false,
+      }));
+      const fallbackResult: QuizResult = {
+        totalQuestions: qList.length,
+        correctCount: 0,
+        wrongCount: 0,
+        score: 0,
+        percentage: 0,
+        userAnswers: constructedUserAnswers,
+        completedAt: new Date().toISOString(),
+        selectedSubject: targetSub,
+        examId: opts.examId || null,
+        examTitle: opts.examType || opts.subject || null,
+      };
+
+      setQuizResult(fallbackResult);
+      setResultViewMode('explanation');
+      navigateWithHistory('result');
     }
   };
 

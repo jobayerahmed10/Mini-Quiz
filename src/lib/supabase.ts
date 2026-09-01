@@ -1327,6 +1327,7 @@ export async function submitExamResultToSupabase(params: {
     // Comprehensive payload matching Supabase exam_results table schema
     const fullSubmissionData: Record<string, any> = {
       exam_id: String(params.exam_id),
+      exam_title: params.exam_title ? String(params.exam_title) : null,
       user_id: dbUserId, // Valid Auth UUID string or null for guests / non-UUID IDs
       user_name: userName, // Non-empty student name
       user_type: userType, // 'registered' | 'guest'
@@ -1446,12 +1447,23 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
   // 1. Try Supabase exam_results table with type-safe query
   if (supabaseInstance) {
     try {
-      if (isReg && currentUId && isValidUuid(currentUId)) {
-        // Registered User: Query STRICTLY by user_id
-        const query = supabaseInstance
+      if (isReg) {
+        const rollNum = prof?.roll_number || prof?.student_id || (prof?.phone ? getUserRollNumber(prof.phone) : null);
+        let query = supabaseInstance
           .from('exam_results')
-          .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
-          .eq('user_id', currentUId);
+          .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free');
+
+        if (currentUId && isValidUuid(currentUId)) {
+          if (rollNum) {
+            query = query.or(`user_id.eq.${currentUId},roll_number.eq.${rollNum},student_id.eq.${rollNum}`);
+          } else {
+            query = query.eq('user_id', currentUId);
+          }
+        } else if (rollNum) {
+          query = query.or(`roll_number.eq.${rollNum},student_id.eq.${rollNum}`);
+        } else if (prof?.name && prof.name !== 'শিক্ষার্থী' && prof.name !== 'পরীক্ষার্থী') {
+          query = query.eq('user_name', prof.name.trim());
+        }
 
         const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
         if (!error && Array.isArray(data) && data.length > 0) {
@@ -1511,6 +1523,9 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('tamreen_completed_exams', JSON.stringify(finalCompletedList));
+      finalCompletedList.forEach((id) => {
+        if (id) addCompletedExamId(id);
+      });
     } catch {}
   }
 

@@ -65,23 +65,38 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
   // Sync completed exam status from Supabase and Server API
   useEffect(() => {
     let isMounted = true;
-    setHasCompleted(isExamCompleted(examId, title));
+    const checkCompletion = () => {
+      setHasCompleted(isExamCompleted(examId, title));
 
-    fetchUserCompletedExamsFromSupabase().then((completedList) => {
-      if (!isMounted) return;
-      const targetId = (examId || '').trim().toLowerCase();
-      const targetTitle = (title || '').trim().toLowerCase();
-      const isDone = completedList.some((id) => {
-        const cleanId = String(id || '').trim().toLowerCase();
-        return cleanId === targetId || cleanId === targetTitle || (targetId && cleanId.includes(targetId));
+      fetchUserCompletedExamsFromSupabase().then((completedList) => {
+        if (!isMounted) return;
+        const targetId = (examId || '').trim().toLowerCase();
+        const targetTitle = (title || '').trim().toLowerCase();
+        const isDone = completedList.some((id) => {
+          const cleanId = String(id || '').trim().toLowerCase();
+          return cleanId === targetId || cleanId === targetTitle || (targetId && cleanId.includes(targetId));
+        });
+        if (isDone) {
+          setHasCompleted(true);
+        }
       });
-      if (isDone) {
-        setHasCompleted(true);
-      }
-    });
+    };
+
+    checkCompletion();
+
+    window.addEventListener('tamreen_exam_completed', checkCompletion);
+    window.addEventListener('tamreen_profile_updated', checkCompletion);
+    window.addEventListener('tamreen_auth_status_changed', checkCompletion);
+    window.addEventListener('storage', checkCompletion);
+    window.addEventListener('focus', checkCompletion);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('tamreen_exam_completed', checkCompletion);
+      window.removeEventListener('tamreen_profile_updated', checkCompletion);
+      window.removeEventListener('tamreen_auth_status_changed', checkCompletion);
+      window.removeEventListener('storage', checkCompletion);
+      window.removeEventListener('focus', checkCompletion);
     };
   }, [examId, title]);
 
@@ -94,6 +109,12 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasCompleted) {
+      if (onReviewAnswers) {
+        onReviewAnswers();
+      }
+      return;
+    }
     const cleanName = studentName.trim();
     if (!cleanName) {
       setErrorMessage('পরীক্ষা শুরু করতে অনুগ্রহ করে আপনার নাম লিখুন।');

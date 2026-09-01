@@ -170,13 +170,19 @@ export const HomePage: React.FC<HomePageProps> = ({
 
     window.addEventListener('tamreen_data_changed', handleDataChanged);
     window.addEventListener('tamreen_exam_completed', handleDataChanged);
+    window.addEventListener('tamreen_profile_updated', handleDataChanged);
+    window.addEventListener('tamreen_auth_status_changed', handleDataChanged);
     window.addEventListener('tamreen_blog_changed', handleDataChanged);
     window.addEventListener('storage', handleDataChanged);
+    window.addEventListener('focus', handleDataChanged);
     return () => {
       window.removeEventListener('tamreen_data_changed', handleDataChanged);
       window.removeEventListener('tamreen_exam_completed', handleDataChanged);
+      window.removeEventListener('tamreen_profile_updated', handleDataChanged);
+      window.removeEventListener('tamreen_auth_status_changed', handleDataChanged);
       window.removeEventListener('tamreen_blog_changed', handleDataChanged);
       window.removeEventListener('storage', handleDataChanged);
+      window.removeEventListener('focus', handleDataChanged);
     };
   }, []);
 
@@ -194,6 +200,23 @@ export const HomePage: React.FC<HomePageProps> = ({
     timeMinutes: number;
     examType: string;
   }) => {
+    const isDone = isExamCompleted(opts.examId, opts.examType) ||
+      serverCompletedIds.some(id => {
+        const cleanId = String(id).trim().toLowerCase();
+        const targetId = String(opts.examId || '').trim().toLowerCase();
+        const targetTitle = String(opts.examType || '').trim().toLowerCase();
+        return (targetId && cleanId === targetId) || (targetTitle && cleanId === targetTitle);
+      });
+
+    if (isDone) {
+      if (onReviewAnswers) {
+        onReviewAnswers(opts);
+      } else if (onTabNavigate) {
+        onTabNavigate('exam');
+      }
+      return;
+    }
+
     const profile = getUserProfile();
     const hasProfile = Boolean(profile && profile.name && profile.name.trim() !== '' && profile.name.trim() !== 'পরীক্ষার্থী');
 

@@ -96,6 +96,27 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [pendingStartOpts, setPendingStartOpts] = useState<ExamStartOptions | null>(null);
 
   const handleAttemptStartExam = (opts: ExamStartOptions) => {
+    const isDone = isExamCompleted(opts.examId, opts.examType) ||
+      serverCompletedIds.some(id => {
+        const cleanId = String(id).trim().toLowerCase();
+        const targetId = String(opts.examId || '').trim().toLowerCase();
+        const targetTitle = String(opts.examType || '').trim().toLowerCase();
+        return (targetId && cleanId === targetId) || (targetTitle && cleanId === targetTitle);
+      });
+
+    if (isDone) {
+      if (onReviewAnswers) {
+        onReviewAnswers({
+          examId: opts.examId,
+          subject: opts.subject,
+          questionCount: opts.questionCount,
+          timeMinutes: opts.timeMinutes,
+          examType: opts.examType,
+        });
+      }
+      return;
+    }
+
     const profile = getUserProfile();
     if (profile && profile.name) {
       onStartExam(opts);
@@ -155,9 +176,15 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     };
     window.addEventListener('tamreen_exam_completed', handleExamCompleted);
     window.addEventListener('tamreen_profile_updated', handleExamCompleted);
+    window.addEventListener('tamreen_auth_status_changed', handleExamCompleted);
+    window.addEventListener('storage', handleExamCompleted);
+    window.addEventListener('focus', handleExamCompleted);
     return () => {
       window.removeEventListener('tamreen_exam_completed', handleExamCompleted);
       window.removeEventListener('tamreen_profile_updated', handleExamCompleted);
+      window.removeEventListener('tamreen_auth_status_changed', handleExamCompleted);
+      window.removeEventListener('storage', handleExamCompleted);
+      window.removeEventListener('focus', handleExamCompleted);
     };
   }, [loadExams]);
 
@@ -562,20 +589,17 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                 })()}
 
                 {/* Action Buttons: Before exam -> Only 'পরীক্ষা দিন' full width. After exam -> 'ব্যাখ্যা সহ উত্তর' + 'মেধাতালিকা' */}
-                {isExamCompleted(exam.id, exam.title) || serverCompletedIds.includes(String(exam.id)) || serverCompletedIds.includes(String(exam.title)) ? (
+                {isExamCompleted(exam.id, exam.title) || serverCompletedIds.some(id => {
+                  const cleanId = String(id).trim().toLowerCase();
+                  const targetId = String(exam.id || '').trim().toLowerCase();
+                  const targetTitle = String(exam.title || '').trim().toLowerCase();
+                  return (targetId && cleanId === targetId) || (targetTitle && cleanId === targetTitle);
+                }) ? (
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => {
                         if (onReviewAnswers) {
                           onReviewAnswers({
-                            examId: exam.id,
-                            subject: exam.subject,
-                            questionCount: displayQuestionCount,
-                            timeMinutes: displayTimeMinutes,
-                            examType: exam.title,
-                          });
-                        } else {
-                          handleAttemptStartExam({
                             examId: exam.id,
                             subject: exam.subject,
                             questionCount: displayQuestionCount,

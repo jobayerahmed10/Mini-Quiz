@@ -672,11 +672,25 @@ export function addCompletedExamId(examIdentifier: string): void {
   }
 }
 
-export function isExamCompleted(examId: string, examTitle?: string): boolean {
+export function isExamCompleted(examId?: string | number | null, examTitle?: string | null): boolean {
   const completedList = getCompletedExamIds();
-  if (examId && completedList.includes(examId)) return true;
-  if (examTitle && completedList.includes(examTitle)) return true;
-  return false;
+  if (!completedList || completedList.length === 0) return false;
+
+  const targetId = examId !== undefined && examId !== null ? String(examId).trim().toLowerCase() : '';
+  const targetTitle = examTitle ? String(examTitle).trim().toLowerCase() : '';
+
+  if (!targetId && !targetTitle) return false;
+
+  return completedList.some(item => {
+    if (item === undefined || item === null) return false;
+    const cleanItem = String(item).trim().toLowerCase();
+    if (!cleanItem) return false;
+    if (targetId && cleanItem === targetId) return true;
+    if (targetTitle && cleanItem === targetTitle) return true;
+    if (targetId && cleanItem.includes(targetId)) return true;
+    if (targetTitle && cleanItem.includes(targetTitle)) return true;
+    return false;
+  });
 }
 
 /**
