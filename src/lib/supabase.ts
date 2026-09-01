@@ -1336,6 +1336,7 @@ export async function submitExamResultToSupabase(params: {
       total_questions: Number(params.total_marks ?? 0),
       time_taken: Number(timeTaken ?? 0),
       // Metadata & compatibility fields for roll number & ranking
+      roll_no: registeredRollNumber || null,
       roll_number: registeredRollNumber || null,
       student_id: registeredRollNumber || null,
       full_name: userName,
@@ -1420,13 +1421,27 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
 
   const prof = getUserProfile();
   const isReg = isUserRegistered() || Boolean(authUserId || (localStoredUserId && !localStoredUserId.startsWith('guest_') && !localStoredUserId.startsWith('anon_')));
-  const currentUId = authUserId || (isReg ? localStoredUserId : '') || (isReg ? userId : '');
+  let currentUId = authUserId || (isReg ? localStoredUserId : '') || (isReg ? userId : '');
   const guestDevId = !isReg ? getGuestDeviceId() : '';
 
   const completedExamIds: string[] = [];
 
   const isValidUuid = (str?: string | null) =>
     Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+  // If registered but currentUId is not a UUID, check profiles by phone
+  if (isReg && (!currentUId || !isValidUuid(currentUId)) && supabaseInstance && prof?.phone) {
+    try {
+      const { data: profMatch } = await supabaseInstance
+        .from('profiles')
+        .select('id')
+        .eq('phone', prof.phone.trim())
+        .maybeSingle();
+      if (profMatch?.id && isValidUuid(profMatch.id)) {
+        currentUId = profMatch.id;
+      }
+    } catch {}
+  }
 
   // 1. Try Supabase exam_results table with type-safe query
   if (supabaseInstance) {

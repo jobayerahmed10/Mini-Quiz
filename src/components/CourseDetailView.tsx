@@ -94,6 +94,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   const [exams, setExams] = useState<CourseExam[]>([]);
   const [routines, setRoutines] = useState<CourseRoutineItem[]>([]);
   const [syllabusList, setSyllabusList] = useState<CourseSyllabusItem[]>([]);
+  const [serverCompletedIds, setServerCompletedIds] = useState<string[]>([]);
   const [isLoadingSheets, setIsLoadingSheets] = useState<boolean>(false);
   const [isLoadingExams, setIsLoadingExams] = useState<boolean>(false);
   const [isLoadingRoutines, setIsLoadingRoutines] = useState<boolean>(false);
@@ -157,10 +158,14 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
   };
 
   const getExamCompletionInfo = (exam: CourseExam) => {
-    const isCompleted = isExamCompleted(exam.id, exam.title);
+    const isLocalCompleted = isExamCompleted(exam.id, exam.title);
+    const isServerCompleted = 
+      serverCompletedIds.includes(String(exam.id)) || 
+      serverCompletedIds.includes(String(exam.title)) ||
+      (exam.topic ? serverCompletedIds.includes(String(exam.topic)) : false);
     const savedResult = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title);
     return {
-      isCompleted: isCompleted || Boolean(savedResult),
+      isCompleted: isLocalCompleted || isServerCompleted || Boolean(savedResult),
       result: savedResult || {
         score: 0,
         totalQuestions: exam.question_count || 10,
@@ -183,7 +188,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
     setIsLoadingRoutines(true);
     setIsLoadingSyllabus(true);
     try {
-      const [sheetRes, examRes, routineRes, syllabusRes] = await Promise.all([
+      const [sheetRes, examRes, routineRes, syllabusRes, completedList] = await Promise.all([
         fetchCourseSheetsFromSupabase(course.id, course.title),
         fetchCourseExamsFromSupabase(course.id, course.title),
         fetchCourseRoutinesFromSupabase(course.id, course.title),
@@ -194,6 +199,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       setExams(examRes.exams || []);
       setRoutines(routineRes.routines || []);
       setSyllabusList(syllabusRes.syllabusList || []);
+      setServerCompletedIds(Array.isArray(completedList) ? completedList.map(String) : []);
     } catch (e) {
       console.error('Error loading course assets:', e);
     } finally {
@@ -212,15 +218,23 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       loadData();
     });
 
+    const handleExamCompleted = () => {
+      loadData();
+    };
+
     const handleFocus = () => {
       loadData();
     };
 
+    window.addEventListener('tamreen_exam_completed', handleExamCompleted);
+    window.addEventListener('tamreen_profile_updated', handleExamCompleted);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
       unsubscribe();
+      window.removeEventListener('tamreen_exam_completed', handleExamCompleted);
+      window.removeEventListener('tamreen_profile_updated', handleExamCompleted);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
     };
