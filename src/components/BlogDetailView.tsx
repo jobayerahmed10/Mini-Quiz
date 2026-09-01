@@ -209,61 +209,18 @@ export const BlogDetailView: React.FC<BlogDetailViewProps> = ({
           )}
 
           {/* Article Full Content */}
-          <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed space-y-4 font-sans">
-            {post.content.split('\n\n').map((paragraph, idx) => {
-              const trimmed = paragraph.trim();
-              if (trimmed.startsWith('### ')) {
-                return (
-                  <h3 key={idx} className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-6 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1">
-                    {trimmed.replace('### ', '')}
-                  </h3>
-                );
-              }
-              if (trimmed.startsWith('## ')) {
-                return (
-                  <h2 key={idx} className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-6 mb-3 text-[#046A38] dark:text-emerald-400">
-                    {trimmed.replace('## ', '')}
-                  </h2>
-                );
-              }
-              if (trimmed.startsWith('#### ')) {
-                return (
-                  <h4 key={idx} className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 mt-4 mb-1">
-                    {trimmed.replace('#### ', '')}
-                  </h4>
-                );
-              }
-              if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                const items = trimmed.split('\n').filter(Boolean);
-                return (
-                  <ul key={idx} className="list-disc list-inside space-y-1.5 pl-2 my-3 text-slate-700 dark:text-slate-300">
-                    {items.map((item, i) => (
-                      <li key={i} className="leading-snug">
-                        {item.replace(/^[-*]\s+/, '')}
-                      </li>
-                    ))}
-                  </ul>
-                );
-              }
-              if (/^\d+\.\s/.test(trimmed)) {
-                const items = trimmed.split('\n').filter(Boolean);
-                return (
-                  <ol key={idx} className="list-decimal list-inside space-y-1.5 pl-2 my-3 text-slate-700 dark:text-slate-300">
-                    {items.map((item, i) => (
-                      <li key={i} className="leading-snug">
-                        {item.replace(/^\d+\.\s+/, '')}
-                      </li>
-                    ))}
-                  </ol>
-                );
-              }
-              return (
-                <p key={idx} className="text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {trimmed}
-                </p>
-              );
-            })}
-          </div>
+          <div 
+            className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed font-sans
+              prose-h2:text-[#046A38] dark:prose-h2:text-emerald-400 prose-h2:font-black prose-h2:text-lg sm:prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
+              prose-h3:text-slate-900 dark:prose-h3:text-white prose-h3:font-bold prose-h3:text-base sm:prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-2 prose-h3:border-b prose-h3:border-slate-100 dark:prose-h3:border-slate-800 prose-h3:pb-1
+              prose-p:mb-4 prose-ul:list-disc prose-ul:my-3 prose-ol:list-decimal prose-ol:my-3
+              prose-li:leading-relaxed"
+            dangerouslySetInnerHTML={{ 
+              __html: post.content.includes('<') && post.content.includes('>') 
+                ? post.content 
+                : post.content.split('\n\n').map(p => `<p>${p}</p>`).join('')
+            }}
+          />
 
           {/* Reaction & Action Footer */}
           <div className="mt-8 pt-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3">

@@ -25,6 +25,71 @@ import {
   fetchBlogPosts 
 } from '../lib/supabase';
 
+import { RichTextEditor } from './RichTextEditor';
+
+// HTML Sanitization for Blog Content
+const sanitizeBlogContent = (html: string): string => {
+  if (!html) return '';
+  if (typeof window === 'undefined') return html;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  const cleanNode = (node: Node): Node | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.cloneNode(true);
+    }
+    
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+      
+      // Allowed tags: Paragraphs, Headings, Lists, Formatting, Images
+      const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'span', 'div', 'img'];
+      
+      if (!allowedTags.includes(tag)) {
+        const fragment = document.createDocumentFragment();
+        el.childNodes.forEach(child => {
+          const cleanedChild = cleanNode(child);
+          if (cleanedChild) fragment.appendChild(cleanedChild);
+        });
+        return fragment;
+      }
+
+      const newEl = document.createElement(tag);
+      
+      // Preserve images but with clean attributes
+      if (tag === 'img') {
+        const src = el.getAttribute('src');
+        const alt = el.getAttribute('alt');
+        if (src) newEl.setAttribute('src', src);
+        if (alt) newEl.setAttribute('alt', alt);
+        newEl.className = 'rounded-2xl max-w-full h-auto my-4 border border-slate-100 dark:border-slate-800';
+      }
+
+      // REMOVE all other attributes (inline styles, MS Word junk, font-family, etc.)
+      // as requested: "হাবিজাবি Tag & Attributes ছাঁটাই (Sanitize) করে পরিষ্কার বিশুদ্ধ HTML ডাটা সেভ করো"
+      
+      el.childNodes.forEach(child => {
+        const cleanedChild = cleanNode(child);
+        if (cleanedChild) newEl.appendChild(cleanedChild);
+      });
+      
+      return newEl;
+    }
+    
+    return null;
+  };
+
+  const container = document.createElement('div');
+  doc.body.childNodes.forEach(node => {
+    const cleaned = cleanNode(node);
+    if (cleaned) container.appendChild(cleaned);
+  });
+  
+  return container.innerHTML.trim();
+};
+
 interface AdminBlogModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -179,6 +244,9 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
 
     setIsSaving(true);
     try {
+      // Sanitize and Clean Content before saving to ensure pure HTML as requested
+      const cleanedContent = sanitizeBlogContent(content);
+
       const payload: Partial<BlogPost> & { title: string; content: string; category: BlogCategory; sub_category?: string; subject?: string } = {
         ...(editingId ? { id: editingId } : {}),
         title: title.trim(),
@@ -186,8 +254,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
         sub_category: subCategory.trim() || undefined,
         subject: subject.trim() || undefined,
         thumbnail: thumbnail.trim() || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
-        excerpt: excerpt.trim() || content.substring(0, 140) + '...',
-        content: content.trim(),
+        excerpt: excerpt.trim() || cleanedContent.replace(/<[^>]*>/g, '').substring(0, 140) + '...',
+        content: cleanedContent,
         author: author.trim() || 'আত-তামরীন একাডেমি',
         published_date: publishedDate.trim() || '৩১ আগস্ট ২০২৬',
         reading_time_minutes: Number(readingTime) || 5,
@@ -471,18 +539,15 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                   />
                 </div>
 
-                {/* Full Article Content */}
+                {/* Full Article Content - Now Using Rich Text Editor */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    সম্পূর্ণ আর্টিকেলের কন্টেন্ট (Full Article Content) *
+                    সম্পূর্ণ আর্টিকেলের কন্টেন্ট (Rich Text Editor) *
                   </label>
-                  <textarea
-                    rows={8}
-                    required
+                  <RichTextEditor
                     value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="ব্লগের বিস্তারিত লেখা, পয়েন্ট, প্রস্তুতি কৌশল এবং তথ্য এখানে লিখুন (Markdown সাপোর্টেড)..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-sans focus:outline-none focus:border-[#046A38]"
+                    onChange={(val) => setContent(val)}
+                    placeholder="ব্লগের বিস্তারিত লেখা, পয়েন্ট, প্রস্তুতি কৌশল এবং তথ্য এখানে লিখুন (Word/Web থেকে কপি-পেস্ট সাপোর্ট করে)..."
                   />
                 </div>
               </div>
