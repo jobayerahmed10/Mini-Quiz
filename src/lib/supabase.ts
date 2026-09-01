@@ -1111,7 +1111,7 @@ export async function submitExamResultToSupabase(params: {
   wrong_answers: number;
   time_taken_seconds?: number;
   submitted_at?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; alreadySubmitted?: boolean }> {
   const submittedAt = params.submitted_at || new Date().toISOString();
   const timeTaken = Number(params.time_taken_seconds || 0);
   const isGuest = Boolean(
@@ -1323,6 +1323,42 @@ export async function submitExamResultToSupabase(params: {
     const userName = (candidateName && String(candidateName).trim().length > 0)
       ? String(candidateName).trim()
       : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
+
+    // Strict safety check: Prevent duplicate submissions for the same exam_id & user/guest
+    if (supabaseInstance && params.exam_id) {
+      try {
+        let existingCheck = supabaseInstance
+          .from('exam_results')
+          .select('id')
+          .eq('exam_id', String(params.exam_id));
+
+        if (isRegistered) {
+          if (dbUserId && isValidUuid(dbUserId)) {
+            existingCheck = existingCheck.eq('user_id', dbUserId);
+          } else if (registeredRollNumber) {
+            existingCheck = existingCheck.or(`roll_number.eq.${registeredRollNumber},student_id.eq.${registeredRollNumber}`);
+          } else {
+            existingCheck = existingCheck.eq('user_name', userName);
+          }
+        } else {
+          const gId = params.guest_id || getGuestDeviceId();
+          if (gId) {
+            existingCheck = existingCheck.eq('guest_id', gId);
+          }
+        }
+
+        const { data: existingRecords } = await fetchWithTimeout(Promise.resolve(existingCheck.limit(1)), 3000, { data: null, error: null } as any);
+        if (Array.isArray(existingRecords) && existingRecords.length > 0) {
+          if (typeof window !== 'undefined') {
+            addCompletedExamId(String(params.exam_id));
+            if (params.exam_title) addCompletedExamId(String(params.exam_title));
+          }
+          return { success: true, alreadySubmitted: true };
+        }
+      } catch (checkErr) {
+        console.warn('Duplicate exam check warning:', checkErr);
+      }
+    }
 
     // Comprehensive payload matching Supabase exam_results table schema
     const fullSubmissionData: Record<string, any> = {
