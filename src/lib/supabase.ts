@@ -1235,9 +1235,9 @@ export async function submitExamResultToSupabase(params: {
     const guestName = !dbUserId ? (params.guest_name || effectiveName || 'গেস্ট পরীক্ষার্থী') : null;
     const userName = dbUserId ? registeredFullName : (guestName || 'গেস্ট পরীক্ষার্থী');
 
-    const submissionData = {
+    // ONLY send columns that are strictly defined in our recommended SQL schema
+    const submissionData: any = {
       exam_id: String(params.exam_id),
-      exam_title: params.exam_title || 'মডেল টেস্ট',
       user_id: dbUserId, // Valid Auth UUID or null
       user_name: userName,
       full_name: registeredFullName,
@@ -1245,19 +1245,12 @@ export async function submitExamResultToSupabase(params: {
       guest_id: guestId,
       roll_number: registeredRollNumber,
       student_id: registeredRollNumber,
-      total_marks: Number(params.total_marks),
-      total_questions: Number(params.total_marks),
       score: Number(params.score),
-      obtained_marks: Number(params.score),
-      correct_count: Number(params.correct_answers),
+      total_marks: Number(params.total_marks),
       correct_answers: Number(params.correct_answers),
-      wrong_count: Number(params.wrong_answers),
       wrong_answers: Number(params.wrong_answers),
-      time_taken: Number(timeTaken),
       time_taken_seconds: Number(timeTaken),
       submitted_at: submittedAt,
-      is_free: params.is_free ?? true,
-      is_guest: !dbUserId,
     };
 
     const { error } = await supabaseInstance
@@ -1265,14 +1258,33 @@ export async function submitExamResultToSupabase(params: {
       .insert([submissionData]);
 
     if (error) {
-      console.warn("Supabase Exam Submit Notice:", error.message);
-      return { success: true, error: error.message };
+      console.warn("Supabase Exam Submit Full Error:", error);
+      
+      // FALLBACK: Try a minimal insert with only the absolute basic columns (exam_id, user_id, score)
+      // in case the user hasn't added the new columns yet.
+      const minimalData = {
+        exam_id: String(params.exam_id),
+        user_id: dbUserId,
+        score: Number(params.score),
+        total_marks: Number(params.total_marks),
+        submitted_at: submittedAt
+      };
+      
+      const { error: fallbackError } = await supabaseInstance
+        .from('exam_results')
+        .insert([minimalData]);
+        
+      if (fallbackError) {
+        console.error("Supabase Exam Submit Fallback Error:", fallbackError);
+        return { success: false, error: fallbackError.message };
+      }
     }
 
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    return { success: true, error: msg };
+    console.error("submitExamResultToSupabase Exception:", err);
+    return { success: false, error: msg };
   }
 }
 
