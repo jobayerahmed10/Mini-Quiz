@@ -1177,21 +1177,86 @@ export async function submitExamResultToSupabase(params: {
       }
     } catch {}
 
+    if (!authUser) {
+      try {
+        const { data: sessionData } = await supabaseInstance.auth.getSession();
+        if (sessionData?.session?.user?.id) {
+          authUser = sessionData.session.user;
+        }
+      } catch {}
+    }
+
     const userProfile = getUserProfile();
+    const storedAuthId = typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : null;
+    const isAuthRegistered = typeof window !== 'undefined' && localStorage.getItem('tamreen_user_auth_status') === 'registered';
+    
+    // Determine registration status reliably
+    const isExplicitGuest = params.is_guest === true;
+    const isRegistered = !isExplicitGuest && Boolean(
+      authUser?.id || 
+      isUserRegistered() || 
+      userProfile?.isRegistered || 
+      isAuthRegistered ||
+      (userProfile?.phone && userProfile.phone.trim().length >= 6)
+    );
+    const isGuest = !isRegistered;
+    const userType: 'registered' | 'guest' = isRegistered ? 'registered' : 'guest';
+
+    // Resolve valid UUID for PostgreSQL foreign key
     const authUserId = authUser?.id || null;
     const authFullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name;
 
-    const rawCandidateId = authUserId || (userProfile as any)?.id || params.user_id;
-    // Only pass user_id to Supabase if it is a valid Auth UUID to prevent PostgreSQL type errors
-    const isRegistered = Boolean((authUserId || isUserRegistered()) && isValidUuid(rawCandidateId));
-    const dbUserId = (isRegistered && isValidUuid(rawCandidateId))
-      ? String(rawCandidateId).trim()
-      : null;
+    const rawCandidates = [
+      authUserId,
+      userProfile?.id,
+      storedAuthId,
+      params.user_id,
+    ].filter(Boolean);
 
-    let registeredRollNumber: string | null = params.roll_number || params.student_id || userProfile?.roll_number || userProfile?.student_id || null;
-    let registeredFullName: string = authFullName || userProfile?.name || effectiveName || 'শিক্ষার্থী';
+    let dbUserId: string | null = null;
+    for (const cand of rawCandidates) {
+      if (isValidUuid(cand)) {
+        dbUserId = String(cand).trim();
+        break;
+      }
+    }
 
-    // 3A. Fetch and Upsert Profile ONLY for registered users with a valid UUID
+    let registeredRollNumber: string | null = 
+      params.roll_number || 
+      params.student_id || 
+      userProfile?.roll_number || 
+      userProfile?.student_id || 
+      (typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_roll_number') : null) || 
+      (userProfile?.phone ? getUserRollNumber(userProfile.phone) : null) || 
+      null;
+
+    let registeredFullName: string = authFullName || userProfile?.name || effectiveName || (isRegistered ? 'শিক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
+
+    // If registered user UUID not found yet, attempt phone/email lookup in profiles
+    if (!dbUserId && isRegistered && userProfile?.phone) {
+      try {
+        const cleanPhone = userProfile.phone.trim();
+        const { data: profMatch } = await supabaseInstance
+          .from('profiles')
+          .select('id, full_name, roll_number, student_id')
+          .eq('phone', cleanPhone)
+          .maybeSingle();
+
+        if (profMatch) {
+          if (profMatch.id && isValidUuid(profMatch.id)) {
+            dbUserId = profMatch.id;
+          }
+          if (profMatch.roll_number || profMatch.student_id) {
+            registeredRollNumber = String(profMatch.roll_number || profMatch.student_id);
+          }
+          if (profMatch.full_name && profMatch.full_name !== 'শিক্ষার্থী') {
+            registeredFullName = profMatch.full_name;
+          }
+        }
+      } catch {}
+    }
+
+    // 3A. Fetch and Upsert Profile for registered users
     if (dbUserId) {
       try {
         const { data: prof } = await supabaseInstance
@@ -1219,6 +1284,9 @@ export async function submitExamResultToSupabase(params: {
           profileData.roll_number = registeredRollNumber;
           profileData.student_id = registeredRollNumber;
         }
+        if (userProfile?.phone) {
+          profileData.phone = userProfile.phone.trim();
+        }
 
         await supabaseInstance
           .from('profiles')
@@ -1226,13 +1294,29 @@ export async function submitExamResultToSupabase(params: {
       } catch (profErr) {
         console.warn('Profiles upsert warning:', profErr);
       }
+    } else if (isRegistered && userProfile?.phone) {
+      // If dbUserId is not a UUID, update profile row by phone
+      try {
+        const cleanPhone = userProfile.phone.trim();
+        const updatePayload: any = {
+          full_name: registeredFullName,
+          updated_at: submittedAt,
+        };
+        if (registeredRollNumber) {
+          updatePayload.roll_number = registeredRollNumber;
+          updatePayload.student_id = registeredRollNumber;
+        }
+        if (params.avatar_url || userProfile?.avatar) {
+          updatePayload.avatar_url = params.avatar_url || userProfile?.avatar;
+        }
+        await supabaseInstance
+          .from('profiles')
+          .update(updatePayload)
+          .eq('phone', cleanPhone);
+      } catch {}
     }
 
-    // 3B. Insert into exam_results directly with strict payload
-    const isGuest = !dbUserId;
-    const userType: 'registered' | 'guest' = isGuest ? 'guest' : 'registered';
-    
-    // Ensure user_name is never empty or whitespace
+    // 3B. Insert into exam_results directly
     const candidateName = isGuest
       ? (params.guest_name || effectiveName || (userProfile?.name && userProfile.name !== 'শিক্ষার্থী' ? userProfile.name : '') || 'গেস্ট পরীক্ষার্থী')
       : (registeredFullName || effectiveName || 'পরীক্ষার্থী');
@@ -1240,22 +1324,50 @@ export async function submitExamResultToSupabase(params: {
       ? String(candidateName).trim()
       : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
 
-    // Strict payload matching Supabase exam_results table schema
-    const submissionData = {
+    // Comprehensive payload matching Supabase exam_results table schema
+    const fullSubmissionData: Record<string, any> = {
       exam_id: String(params.exam_id),
-      user_id: dbUserId, // Valid Auth UUID string or null for guests
-      user_name: userName, // Non-empty string
+      user_id: dbUserId, // Valid Auth UUID string or null for guests / non-UUID IDs
+      user_name: userName, // Non-empty student name
       user_type: userType, // 'registered' | 'guest'
       score: Number(params.score ?? 0),
       correct_answers: Number(params.correct_answers ?? 0),
       wrong_answers: Number(params.wrong_answers ?? 0),
       total_questions: Number(params.total_marks ?? 0),
       time_taken: Number(timeTaken ?? 0),
+      // Metadata & compatibility fields for roll number & ranking
+      roll_number: registeredRollNumber || null,
+      student_id: registeredRollNumber || null,
+      full_name: userName,
+      guest_name: isGuest ? userName : null,
+      guest_id: isGuest ? (params.guest_id || `guest_${Date.now()}`) : null,
+      total_marks: Number(params.total_marks ?? 0),
+      time_taken_seconds: Number(timeTaken ?? 0),
+      submitted_at: submittedAt,
     };
 
-    const { error } = await supabaseInstance
+    let { error } = await supabaseInstance
       .from('exam_results')
-      .insert([submissionData]);
+      .insert([fullSubmissionData]);
+
+    // If optional columns are missing in older schema (code 42703 undefined_column), retry with core fields
+    if (error && (error.code === '42703' || error.message?.includes('column'))) {
+      const baseSubmissionData = {
+        exam_id: String(params.exam_id),
+        user_id: dbUserId,
+        user_name: userName,
+        user_type: userType,
+        score: Number(params.score ?? 0),
+        correct_answers: Number(params.correct_answers ?? 0),
+        wrong_answers: Number(params.wrong_answers ?? 0),
+        total_questions: Number(params.total_marks ?? 0),
+        time_taken: Number(timeTaken ?? 0),
+      };
+      const retryRes = await supabaseInstance
+        .from('exam_results')
+        .insert([baseSubmissionData]);
+      error = retryRes.error;
+    }
 
     if (error) {
       console.log("Supabase insert response error:", error);
@@ -1264,7 +1376,7 @@ export async function submitExamResultToSupabase(params: {
         details: error.details,
         hint: error.hint,
         code: error.code,
-        payload: submissionData,
+        payload: fullSubmissionData,
       });
 
       const detailedMsg = [
@@ -1630,7 +1742,13 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
       bestMap.set(key, e);
     }
   }
-  const sorted = Array.from(bestMap.values()).sort((a, b) => b.score - a.score);
+  const sorted = Array.from(bestMap.values()).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const timeA = a.time_taken_seconds !== undefined && a.time_taken_seconds !== null ? Number(a.time_taken_seconds) : 999999;
+    const timeB = b.time_taken_seconds !== undefined && b.time_taken_seconds !== null ? Number(b.time_taken_seconds) : 999999;
+    if (timeA !== timeB) return timeA - timeB;
+    return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+  });
   return sorted.map((e, idx) => ({
     rank: idx + 1,
     user_id: e.user_id || '',
@@ -2133,9 +2251,12 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
   const mergedList = Array.from(bestPerExamAndUser.values());
 
-  // Sort by score descending (Sort by score DESC)
+  // Sort by score descending with tie-break on time_taken ASC
   mergedList.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    const timeA = a.time_taken_seconds !== undefined && a.time_taken_seconds !== null ? Number(a.time_taken_seconds) : 999999;
+    const timeB = b.time_taken_seconds !== undefined && b.time_taken_seconds !== null ? Number(b.time_taken_seconds) : 999999;
+    if (timeA !== timeB) return timeA - timeB;
     if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });

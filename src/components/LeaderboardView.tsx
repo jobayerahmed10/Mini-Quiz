@@ -243,7 +243,7 @@ export function computeLeaderboard(
 
     // Ranking rules for 'this_exam':
     // 1. Score / Points (desc)
-    // 2. Time Taken (asc)
+    // 2. Time Taken (asc) - lowest time taken comes first
     // 3. Avg Accuracy (desc)
     // 4. Submission time (asc)
     itemsList.sort((a, b) => {
@@ -251,9 +251,9 @@ export function computeLeaderboard(
       const scoreB = Number(b.score ?? b.points ?? 0);
       if (scoreB !== scoreA) return scoreB - scoreA;
       
-      const timeA = Number(a.timeTakenSeconds ?? 999999);
-      const timeB = Number(b.timeTakenSeconds ?? 999999);
-      if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+      const timeA = a.timeTakenSeconds !== undefined && a.timeTakenSeconds !== null ? Number(a.timeTakenSeconds) : 999999;
+      const timeB = b.timeTakenSeconds !== undefined && b.timeTakenSeconds !== null ? Number(b.timeTakenSeconds) : 999999;
+      if (timeA !== timeB) return timeA - timeB;
       
       if (b.avgAccuracy !== a.avgAccuracy) return b.avgAccuracy - a.avgAccuracy;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();

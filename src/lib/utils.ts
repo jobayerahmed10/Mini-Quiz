@@ -226,6 +226,7 @@ const PROFILE_STORAGE_KEY = 'tamreen_user_profile';
 const USER_ROLL_KEY = 'tamreen_user_roll_number';
 
 export interface UserProfile {
+  id?: string;
   name: string;
   phone: string;
   avatar?: string;
@@ -384,12 +385,15 @@ export function getUserProfile(): UserProfile | null {
     const parsed = JSON.parse(data);
     if (parsed && typeof parsed.name === 'string' && parsed.name.trim().length > 0) {
       const roll = parsed.roll_number || parsed.student_id || getUserRollNumber(parsed.phone);
+      const storedId = parsed.id || (typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : undefined) || undefined;
+      const isAuthRegistered = typeof window !== 'undefined' && localStorage.getItem('tamreen_user_auth_status') === 'registered';
       return {
+        id: storedId,
         name: parsed.name.trim(),
         phone: parsed.phone ? parsed.phone.trim() : '',
         avatar: parsed.avatar || '',
         email: parsed.email || '',
-        isRegistered: Boolean(parsed.isRegistered || (parsed.phone && parsed.phone.length >= 6)),
+        isRegistered: Boolean(parsed.isRegistered || (parsed.phone && parsed.phone.length >= 6) || isAuthRegistered),
         student_id: roll,
         roll_number: roll,
       };
@@ -406,16 +410,18 @@ export function saveUserProfile(
   avatar?: string, 
   isRegistered: boolean = true, 
   email?: string,
-  rollNumber?: string
+  rollNumber?: string,
+  userId?: string
 ): UserProfile {
   const previousProfile = getUserProfile();
-  const oldName = previousProfile?.name?.trim()?.toLowerCase();
 
   // If avatar is provided as a non-empty string, use it; otherwise preserve existing avatar
   const finalAvatar = (avatar && avatar.trim().length > 0) ? avatar.trim() : (previousProfile?.avatar || '');
   const finalRoll = rollNumber || previousProfile?.roll_number || previousProfile?.student_id || getUserRollNumber(phone);
+  const finalId = userId || previousProfile?.id || (typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : undefined) || undefined;
 
   const profile: UserProfile = {
+    id: finalId,
     name: name.trim(),
     phone: phone ? phone.trim() : (previousProfile?.phone || ''),
     avatar: finalAvatar,
@@ -426,7 +432,12 @@ export function saveUserProfile(
   };
   try {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-    localStorage.setItem(USER_ROLL_KEY, finalRoll);
+    if (finalRoll) {
+      localStorage.setItem(USER_ROLL_KEY, finalRoll);
+    }
+    if (finalId) {
+      localStorage.setItem('tamreen_user_id', finalId);
+    }
     if (isRegistered) {
       localStorage.setItem('tamreen_user_auth_status', 'registered');
     }

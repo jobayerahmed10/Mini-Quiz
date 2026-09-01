@@ -231,7 +231,9 @@ export default function App() {
             synced.phone,
             synced.avatar_url,
             true,
-            synced.email
+            synced.email,
+            synced.roll_number || synced.student_id,
+            synced.id || session.user.id
           );
           window.dispatchEvent(new Event('tamreen_profile_updated'));
           window.dispatchEvent(new Event('tamreen_auth_status_changed'));
@@ -260,7 +262,9 @@ export default function App() {
             synced.phone,
             synced.avatar_url,
             true,
-            synced.email
+            synced.email,
+            synced.roll_number || synced.student_id,
+            synced.id || session.user.id
           );
           window.dispatchEvent(new Event('tamreen_profile_updated'));
           window.dispatchEvent(new Event('tamreen_auth_status_changed'));
@@ -478,7 +482,8 @@ export default function App() {
     const guestName = isGuest ? effectiveName : undefined;
     const userAvatar = userProfile?.avatar;
     const userRoll = userProfile?.roll_number || userProfile?.student_id || (isRegistered ? getUserRollNumber(userProfile?.phone) : undefined);
-    const authUuid = (userProfile as any)?.id;
+    const storedAuthId = typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : undefined;
+    const authUuid = userProfile?.id || storedAuthId;
     const userId = isRegistered 
       ? (authUuid || userRoll || getUserUniqueId()) 
       : `guest_${(rawName || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
@@ -773,6 +778,8 @@ export default function App() {
                 onRefreshQuestions={loadQuestions}
                 onOpenSupabaseModal={() => {}}
                 onTabNavigate={handleTabChange}
+                onOpenLeaderboard={handleOpenLeaderboard}
+                onReviewAnswers={(opts) => handleReviewAnswers(opts)}
                 searchQuery={searchQuery}
               />
             )}
