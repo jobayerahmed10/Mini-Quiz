@@ -142,7 +142,34 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         return explicitMatches;
       }
 
-      // If this is a specific exam and no questions matched, return empty array (NO auto range / arbitrary fallbacks)
+      // Fallback matching by subject/topic/title in rawPool if direct exam_id / question codes didn't match
+      if (subj && subj !== 'all' && subj !== 'সকল বিষয়') {
+        const subjectMatches = rawPool.filter(q => {
+          if (!q) return false;
+          if (q.subject && (q.subject.toLowerCase().includes(subj.toLowerCase()) || subj.toLowerCase().includes(q.subject.toLowerCase()))) {
+            return true;
+          }
+          const detected = detectQuestionSubject(q);
+          return detected === subj || subj.includes(detected) || detected.includes(subj);
+        });
+        if (subjectMatches.length > 0) {
+          return count && count > 0 && subjectMatches.length > count ? subjectMatches.slice(0, count) : subjectMatches;
+        }
+      }
+
+      if (examTitle && examTitle.trim()) {
+        const cleanTitle = examTitle.toLowerCase().trim();
+        const titleMatches = rawPool.filter(q => {
+          if (!q) return false;
+          const text = `${q.subject || ''} ${q.topic || ''} ${q.question || ''}`.toLowerCase();
+          return text.includes(cleanTitle);
+        });
+        if (titleMatches.length > 0) {
+          return count && count > 0 && titleMatches.length > count ? titleMatches.slice(0, count) : titleMatches;
+        }
+      }
+
+      // If this is a specific exam and no questions matched, return empty array
       return [];
     }
 

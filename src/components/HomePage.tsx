@@ -568,7 +568,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             {displayLiveExams.map((exam, idx) => {
               const questionCount = exam.question_count || (exam.total_marks ? Number(exam.total_marks) : 10);
               const timeMinutes = exam.time_minutes || 5;
-              const countNum = examineeCounts[exam.id] ?? examineeCounts[exam.title] ?? 0;
+              const cleanId = String(exam.id || '').trim().toLowerCase();
+              const countNum = examineeCounts[cleanId] ?? (examineeCounts[String(exam.id || '')] ?? 0);
               const examineeCount = `${toBengaliNumeral(countNum)} জন`;
               const subject = exam.subject || 'সাধারণ ও মাদ্রাসা কারিকুলাম';
 

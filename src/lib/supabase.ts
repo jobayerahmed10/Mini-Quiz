@@ -534,38 +534,61 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
     let rawQuestions: any[] = [];
     let selectedCodesList: string[] = [];
 
-    // Helper to parse question codes/ids from various formats (array, JSON string, comma-separated)
+    // Helper to parse question codes/ids from various formats (array, JSON string, comma-separated, object arrays)
     const extractCodes = (val: any): string[] => {
       if (!val) return [];
+      let list: any[] = [];
       if (Array.isArray(val)) {
-        return val.map((v: any) => String(v).trim()).filter(Boolean);
-      }
-      if (typeof val === 'string') {
+        list = val;
+      } else if (typeof val === 'string') {
         const trimmed = val.trim();
-        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
           try {
             const parsed = JSON.parse(trimmed);
-            if (Array.isArray(parsed)) {
-              return parsed.map((v: any) => String(v).trim()).filter(Boolean);
-            }
-          } catch {}
+            list = Array.isArray(parsed) ? parsed : [parsed];
+          } catch {
+            list = trimmed.split(',').map(s => s.trim());
+          }
+        } else {
+          list = trimmed.split(',').map(s => s.trim());
         }
-        return trimmed.split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else if (typeof val === 'object' && val !== null) {
+        list = [val];
+      } else {
+        list = [val];
       }
-      return [String(val).trim()].filter(Boolean);
+
+      const codes: string[] = [];
+      for (const item of list) {
+        if (!item) continue;
+        if (typeof item === 'object') {
+          const extracted = String(item.id || item.question_code || item.code || item.slug || '').trim();
+          if (extracted) codes.push(extracted);
+        } else {
+          const str = String(item).trim();
+          if (str && str !== '[object Object]') codes.push(str);
+        }
+      }
+      return codes;
     };
 
-    // 1. First, lookup the exam record directly in Supabase 'exams' table to ensure fresh data
+    // 1. First, lookup the exam record directly in Supabase 'exams' table safely
     let examRecord: any = null;
 
-    let examQuery = supabaseInstance.from('exams').select('*');
-    const { data: dbExams } = await examQuery.or(`id.eq.${cleanExamId},title.eq.${cleanExamId}`);
-    if (dbExams && dbExams.length > 0) {
-      examRecord = dbExams[0];
-    } else if (examTitle && examTitle.trim()) {
-      const { data: titleExams } = await supabaseInstance.from('exams').select('*').eq('title', examTitle.trim());
+    // Try finding by id
+    const { data: idExams } = await supabaseInstance.from('exams').select('*').eq('id', cleanExamId);
+    if (idExams && idExams.length > 0) {
+      examRecord = idExams[0];
+    } else {
+      // Try finding by title
+      const { data: titleExams } = await supabaseInstance.from('exams').select('*').eq('title', cleanExamId);
       if (titleExams && titleExams.length > 0) {
         examRecord = titleExams[0];
+      } else if (examTitle && examTitle.trim()) {
+        const { data: titleExams2 } = await supabaseInstance.from('exams').select('*').eq('title', examTitle.trim());
+        if (titleExams2 && titleExams2.length > 0) {
+          examRecord = titleExams2[0];
+        }
       }
     }
 
@@ -592,6 +615,7 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         ...extractCodes(examRecord.question_ids),
         ...extractCodes(examRecord.question_codes),
         ...extractCodes(examRecord.selected_questions),
+        ...extractCodes(examRecord.questions),
       ];
       selectedCodesList = Array.from(new Set(codes));
     }
@@ -632,7 +656,6 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       }
 
       if (matchedQuestions.length > 0) {
-        // Maintain the exact ordering of selected_question_codes specified by the admin
         const idMap = new Map<string, any>();
         matchedQuestions.forEach((q: any) => {
           idMap.set(String(q.id).trim(), q);
@@ -673,10 +696,35 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
 
       if (!directErr && directData && directData.length > 0) {
         rawQuestions = directData;
+      } else {
+        // Try ilike for partial exam_id match
+        const { data: ilikeData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .ilike('exam_id', `%${cleanExamId}%`)
+          .order('created_at', { ascending: true });
+        if (ilikeData && ilikeData.length > 0) {
+          rawQuestions = ilikeData;
+        }
       }
     }
 
-    // 4. Return strictly empty array if no questions are assigned to this exam (NO random pagination/ranges)
+    // 4. Fallback: If still 0, query by exam subject or topic if available
+    if (rawQuestions.length === 0) {
+      const targetSubj = examSubject || examRecord?.subject || examRecord?.title || examTitle;
+      if (targetSubj && targetSubj !== 'all' && targetSubj !== 'সকল বিষয়') {
+        const cleanSubj = String(targetSubj).trim();
+        const { data: subjData } = await supabaseInstance
+          .from('questions')
+          .select('*')
+          .ilike('subject', `%${cleanSubj}%`)
+          .order('created_at', { ascending: true });
+        if (subjData && subjData.length > 0) {
+          rawQuestions = subjData;
+        }
+      }
+    }
+
     if (rawQuestions.length === 0) {
       return [];
     }
@@ -1606,8 +1654,11 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
           const pKey = isReg
             ? String(row.user_id)
             : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '');
-          if (row.exam_id) addParticipant(row.exam_id, pKey);
-          if (row.exam_title) addParticipant(row.exam_title, pKey);
+          if (row.exam_id) {
+            addParticipant(row.exam_id, pKey);
+          } else if (row.exam_title) {
+            addParticipant(row.exam_title, pKey);
+          }
         }
       }
     } catch (e) {
@@ -1622,8 +1673,11 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
     const pKey = isReg
       ? String(entry.user_id)
       : String(entry.guest_name || entry.user_name || entry.full_name || entry.id || '');
-    if (entry.exam_id) addParticipant(entry.exam_id, pKey);
-    if (entry.exam_title) addParticipant(entry.exam_title, pKey);
+    if (entry.exam_id) {
+      addParticipant(entry.exam_id, pKey);
+    } else if (entry.exam_title) {
+      addParticipant(entry.exam_title, pKey);
+    }
   }
 
   // Calculate distinct counts

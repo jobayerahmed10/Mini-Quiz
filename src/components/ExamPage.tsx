@@ -573,7 +573,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
                 {/* Bottom Examinee Count & Publication Date/Day */}
                 {(() => {
-                  const actualCount = examineeCounts[exam.id] || examineeCounts[exam.title] || 0;
+                  const cleanId = String(exam.id || '').trim().toLowerCase();
+                  const actualCount = examineeCounts[cleanId] ?? (examineeCounts[String(exam.id || '')] ?? 0);
                   return (
                     <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-1">
                       <div className="flex items-center gap-1.5">

@@ -679,7 +679,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>ব্লগ</span>
           </button>
 
-          {/* 6. বিষয়ভিত্তিক */}
+          {/* 6. প্র্যাক্টিস */}
           <button
             onClick={() => handleSubTabClick('subjects')}
             className={`px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -689,7 +689,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Layers className={`w-3.5 h-3.5 ${activeTab === 'subjects' && currentPage === 'home' ? 'text-[#EAB308]' : ''}`} />
-            <span>বিষয়ভিত্তিক</span>
+            <span>প্র্যাক্টিস</span>
           </button>
         </div>
       </div>
