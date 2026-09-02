@@ -218,12 +218,47 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     return [];
   };
 
+  // Compute effective limit from targetQuestionCount or cached exam specs
+  const effectiveLimit = useMemo(() => {
+    if (targetQuestionCount && targetQuestionCount > 0) {
+      return targetQuestionCount;
+    }
+    if (examId && examId !== 'general') {
+      try {
+        const raw = localStorage.getItem('miniquiz_exams_cache');
+        if (raw) {
+          const cachedExams = JSON.parse(raw);
+          const eId = String(examId).trim().toLowerCase();
+          const titleId = examTitle ? String(examTitle).trim().toLowerCase() : '';
+          const found = cachedExams.find((e: any) => 
+            String(e.id).trim().toLowerCase() === eId ||
+            (e.title && String(e.title).trim().toLowerCase() === eId) ||
+            (titleId && e.title && String(e.title).trim().toLowerCase() === titleId)
+          );
+          if (found) {
+            const explicitCodes = found.selected_question_codes || found.question_ids;
+            if (Array.isArray(explicitCodes) && explicitCodes.length > 0) {
+              return explicitCodes.length;
+            }
+            if (found.question_count && Number(found.question_count) > 0) {
+              return Number(found.question_count);
+            }
+            if (found.total_marks && Number(found.total_marks) > 0) {
+              return Number(found.total_marks);
+            }
+          }
+        }
+      } catch {}
+    }
+    return 0;
+  }, [targetQuestionCount, examId, examTitle]);
+
   // Lock exam questions on session mount
   const [examQuestions, setExamQuestions] = useState<Question[]>(() => {
     if (examId && examId !== 'general') {
       return []; // Start with empty array to prevent mock/different questions from showing
     }
-    return getResolvedQuestions(questions, initialSubject, initialTopic, targetQuestionCount, examId);
+    return getResolvedQuestions(questions, initialSubject, initialTopic, effectiveLimit, examId);
   });
 
   // Re-sync exam questions directly from Supabase by examId if provided, or from questions pool
@@ -231,31 +266,31 @@ export const PracticePage: React.FC<PracticePageProps> = ({
     let isMounted = true;
     if (examId && examId !== 'general') {
       setIsLoading(true);
-      fetchQuestionsByExamId(examId, activeSubject, examTitle).then((fetchedFromDb) => {
+      fetchQuestionsByExamId(examId, activeSubject, examTitle, effectiveLimit).then((fetchedFromDb) => {
         if (!isMounted) return;
         setIsLoading(false);
         if (fetchedFromDb && fetchedFromDb.length > 0) {
-          const limit = targetQuestionCount && targetQuestionCount > 0 ? targetQuestionCount : 0;
+          const limit = effectiveLimit > 0 ? effectiveLimit : (targetQuestionCount || 0);
           const finalQuestions = limit > 0 && fetchedFromDb.length > limit ? fetchedFromDb.slice(0, limit) : fetchedFromDb;
           setExamQuestions(finalQuestions);
         } else {
           // Fall back to robust matching from the locally synchronized/cached questions pool (including admin-generated/added offline items)
-          const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+          const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, effectiveLimit, examId);
           setExamQuestions(fallbackResolved && fallbackResolved.length > 0 ? fallbackResolved : []);
         }
       }).catch(() => {
         if (!isMounted) return;
         setIsLoading(false);
-        const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+        const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, effectiveLimit, examId);
         setExamQuestions(fallbackResolved && fallbackResolved.length > 0 ? fallbackResolved : []);
       });
     } else {
       setIsLoading(false);
-      const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
+      const resolved = getResolvedQuestions(questions, activeSubject, activeTopic, effectiveLimit, examId);
       setExamQuestions(resolved);
     }
     return () => { isMounted = false; };
-  }, [questions, activeSubject, activeTopic, targetQuestionCount, examId, examTitle]);
+  }, [questions, activeSubject, activeTopic, targetQuestionCount, effectiveLimit, examId, examTitle]);
 
   const filteredQuestions = examQuestions;
   const totalQuestions = filteredQuestions.length;

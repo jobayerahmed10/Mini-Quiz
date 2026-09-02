@@ -356,26 +356,34 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
 
     const fetchedExams: ExamItem[] = data
       .filter((item: any) => item && item.status !== 'inactive' && item.status !== 'draft')
-      .map((item: any) => ({
-      id: String(item.id),
-      title: String(item.title || 'পরীক্ষা'),
-      badge: String(item.badge || 'ফ্রি পরীক্ষা'),
-      badge_type: (item.badge_type || 'free') as 'free' | 'daily' | 'weekly' | 'live',
-      subject: String(item.subject || 'সকল বিষয়'),
-      question_count: Number(item.question_count || 25),
-      time_minutes: Number(item.time_minutes || 20),
-      negative_marks: Number(item.negative_marks || 0.5),
-      total_marks: Number(item.total_marks || item.question_count || 25),
-      description: item.description ? String(item.description) : undefined,
-      examinee_count: item.examinee_count ? String(item.examinee_count) : '০',
-      examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
-      is_premium: Boolean(item.is_premium),
-      status: item.status || 'active',
-      question_ids: parseIds(item.question_ids || item.selected_question_codes || item.question_codes),
-      selected_question_codes: parseIds(item.selected_question_codes || item.question_codes || item.question_ids),
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-    }));
+      .map((item: any) => {
+        const parsedCodes = parseIds(item.selected_question_codes || item.question_codes || item.question_ids);
+        const explicitCount = parsedCodes && parsedCodes.length > 0 ? parsedCodes.length : 0;
+        const qCount = item.question_count 
+          ? Number(item.question_count) 
+          : (explicitCount > 0 ? explicitCount : (item.total_marks ? Number(item.total_marks) : 25));
+
+        return {
+          id: String(item.id),
+          title: String(item.title || 'পরীক্ষা'),
+          badge: String(item.badge || 'ফ্রি পরীক্ষা'),
+          badge_type: (item.badge_type || 'free') as 'free' | 'daily' | 'weekly' | 'live',
+          subject: String(item.subject || 'সকল বিষয়'),
+          question_count: qCount,
+          time_minutes: Number(item.time_minutes || 20),
+          negative_marks: Number(item.negative_marks || 0.5),
+          total_marks: Number(item.total_marks || qCount),
+          description: item.description ? String(item.description) : undefined,
+          examinee_count: item.examinee_count ? String(item.examinee_count) : '০',
+          examinee_tag: item.examinee_tag ? String(item.examinee_tag) : 'আজকের টেস্ট',
+          is_premium: Boolean(item.is_premium),
+          status: item.status || 'active',
+          question_ids: parsedCodes,
+          selected_question_codes: parsedCodes,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        };
+      });
 
     try {
       localStorage.setItem('miniquiz_exams_cache', JSON.stringify(fetchedExams));
@@ -524,7 +532,7 @@ function isUuidString(str: string): boolean {
  *    then queries questions table using .in() to retrieve only those specific questions in exact order.
  * 2. Disabled Auto Range/Pagination: No range/offset queries, renders only specifically selected questions.
  */
-export async function fetchQuestionsByExamId(examId: string, examSubject?: string, examTitle?: string): Promise<Question[]> {
+export async function fetchQuestionsByExamId(examId: string, examSubject?: string, examTitle?: string, targetQuestionCount?: number): Promise<Question[]> {
   if (!supabaseInstance || !examId) return [];
 
   const cleanExamId = String(examId).trim();
@@ -749,11 +757,14 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         created_at: item.created_at || new Date().toISOString(),
       }));
 
+    const explicitCodesCount = selectedCodesList.length;
     const targetLimit = Number(
+      targetQuestionCount ||
+      (explicitCodesCount > 0 ? explicitCodesCount : 0) ||
       examRecord?.question_count || 
       examRecord?.total_questions || 
       examRecord?.total_marks || 
-      (selectedCodesList.length > 0 ? selectedCodesList.length : 0)
+      0
     );
 
     if (targetLimit > 0 && formattedQuestions.length > targetLimit) {

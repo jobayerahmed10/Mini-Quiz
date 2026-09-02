@@ -636,7 +636,33 @@ export default function App() {
     } else {
       setSelectedSubject(subjectOrOpts.subject);
       setSelectedTopic(subjectOrOpts.topic);
-      setExamQuestionCount(subjectOrOpts.questionCount);
+
+      let qCount = subjectOrOpts.questionCount;
+      if (!qCount && (subjectOrOpts.examId || subjectOrOpts.examType)) {
+        try {
+          const raw = localStorage.getItem('miniquiz_exams_cache');
+          if (raw) {
+            const cachedExams = JSON.parse(raw);
+            const searchId = String(subjectOrOpts.examId || subjectOrOpts.examType).trim().toLowerCase();
+            const found = cachedExams.find((e: any) => 
+              String(e.id).trim().toLowerCase() === searchId || 
+              (e.title && String(e.title).trim().toLowerCase() === searchId)
+            );
+            if (found) {
+              const explicitCodes = found.selected_question_codes || found.question_ids;
+              if (Array.isArray(explicitCodes) && explicitCodes.length > 0) {
+                qCount = explicitCodes.length;
+              } else if (found.question_count && Number(found.question_count) > 0) {
+                qCount = Number(found.question_count);
+              } else if (found.total_marks && Number(found.total_marks) > 0) {
+                qCount = Number(found.total_marks);
+              }
+            }
+          }
+        } catch {}
+      }
+
+      setExamQuestionCount(qCount);
       setExamTimeMinutes(subjectOrOpts.timeMinutes || 30);
       const eId = subjectOrOpts.examId;
       const eType = subjectOrOpts.examType;
