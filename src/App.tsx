@@ -511,7 +511,30 @@ export default function App() {
 
     saveLeaderboardEntryToSupabase(entry);
 
-    // Also persist structured exam result to Supabase exam_results & profiles
+    // 1. Mark exam as completed IMMEDIATELY locally (unconditional on network success)
+    const identifiersToMark = [
+      examId,
+      examTitle,
+      activeExamId,
+      activeExamTitle,
+      selectedSubject,
+    ];
+
+    identifiersToMark.forEach((id) => {
+      if (id) {
+        addCompletedExamId(String(id));
+        saveExamResult(String(id), result);
+      }
+    });
+
+    saveExamResult('latest_exam_result', result);
+    saveExamToHistory(result);
+    saveWrongAnswersFromQuiz(result);
+
+    const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
+    setStudentStats(updatedStats);
+
+    // 2. Also persist structured exam result to Supabase exam_results & profiles
     submitExamResultToSupabase({
       exam_id: examId,
       exam_title: examTitle,
@@ -531,32 +554,9 @@ export default function App() {
       student_id: userRoll,
     } as any).then((res) => {
       if (!res.success) {
-        console.error("Exam submission failed error from Supabase:", res.error);
-        alert(`পরীক্ষার ফলাফল সুপাবেজে জমা করতে সমস্যা হয়েছে!\n\nসুপাবেজ এরর:\n${res.error || 'অজানা ত্রুটি (Unknown Supabase Error)'}`);
-        return;
+        console.warn("Exam submission notice from Supabase:", res.error);
       }
-      // Mark specific active exam as completed and persist result
-      if (activeExamId) {
-        addCompletedExamId(activeExamId);
-        saveExamResult(activeExamId, result);
-      }
-      if (activeExamTitle) {
-        addCompletedExamId(activeExamTitle);
-        saveExamResult(activeExamTitle, result);
-      }
-      if (selectedSubject) {
-        saveExamResult(selectedSubject, result);
-      }
-      saveExamResult('latest_exam_result', result);
-
-      // Save to real full exam history and wrong answers bank
-      saveExamToHistory(result);
-      saveWrongAnswersFromQuiz(result);
-
-      const updatedStats = saveQuizResultToStats(correctCount, totalQuestions);
-      setStudentStats(updatedStats);
-
-      // Redirect to Leaderboard Page upon successful insert
+      // Redirect to Leaderboard Page upon completion
       handleOpenLeaderboard(examId);
     });
   };

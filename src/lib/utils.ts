@@ -625,8 +625,23 @@ export function incrementTotalExamsCount(): number {
 export function getCompletedExamIds(): string[] {
   try {
     const data = localStorage.getItem(COMPLETED_EXAMS_KEY);
-    if (!data) return [];
-    return JSON.parse(data) || [];
+    const list: string[] = data ? (JSON.parse(data) || []) : [];
+    
+    // Merge keys from SAVED_EXAM_RESULTS_KEY map for 100% local coverage
+    const savedRaw = localStorage.getItem(SAVED_EXAM_RESULTS_KEY);
+    if (savedRaw) {
+      try {
+        const map = JSON.parse(savedRaw);
+        if (map && typeof map === 'object') {
+          Object.keys(map).forEach((k) => {
+            if (k && k !== 'latest_exam_result' && !list.includes(k)) {
+              list.push(k);
+            }
+          });
+        }
+      } catch {}
+    }
+    return list;
   } catch {
     return [];
   }
@@ -665,10 +680,10 @@ export function addCompletedExamId(examIdentifier: string): void {
         }),
       }).catch(() => {});
     } catch {}
+  }
 
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('tamreen_exam_completed', { detail: { examIdentifier } }));
-    }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tamreen_exam_completed', { detail: { examIdentifier } }));
   }
 }
 
@@ -687,7 +702,7 @@ export function isExamCompleted(examId?: string | number | null, examTitle?: str
     if (!cleanItem) return false;
     if (targetId && cleanItem === targetId) return true;
     if (targetTitle && cleanItem === targetTitle) return true;
-    if (targetId && cleanItem.includes(targetId)) return true;
+    if (targetId && (cleanItem.endsWith(`_${targetId}`) || cleanItem.endsWith(`-${targetId}`) || cleanItem.startsWith(`${targetId}_`) || cleanItem.startsWith(`${targetId}-`))) return true;
     if (targetTitle && cleanItem.includes(targetTitle)) return true;
     return false;
   });

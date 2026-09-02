@@ -612,7 +612,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                   </div>
 
                   {/* Bottom Action Buttons: Participated -> 'ব্যাখ্যা সহ উত্তর' + 'মেধাতালিকা'. Not Participated -> 'পরীক্ষায় অংশ নিন' */}
-                  {isExamCompleted(exam.id, exam.title) || serverCompletedIds.includes(String(exam.id)) || serverCompletedIds.includes(String(exam.title)) ? (
+                  {isExamCompleted(exam.id, exam.title) || serverCompletedIds.some(id => {
+                    const cleanId = String(id || '').trim().toLowerCase();
+                    const targetId = String(exam.id || '').trim().toLowerCase();
+                    const targetTitle = String(exam.title || '').trim().toLowerCase();
+                    return (targetId && cleanId === targetId) || (targetTitle && cleanId === targetTitle);
+                  }) ? (
                     <div className="grid grid-cols-2 gap-2.5">
                       <button
                         onClick={() => {

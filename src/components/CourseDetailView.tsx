@@ -174,10 +174,17 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
   const getExamCompletionInfo = (exam: CourseExam) => {
     const isLocalCompleted = isExamCompleted(exam.id, exam.title);
-    const isServerCompleted = 
-      serverCompletedIds.includes(String(exam.id)) || 
-      serverCompletedIds.includes(String(exam.title)) ||
-      (exam.topic ? serverCompletedIds.includes(String(exam.topic)) : false);
+    const isServerCompleted = serverCompletedIds.some((id) => {
+      const cleanId = String(id || '').trim().toLowerCase();
+      const targetId = String(exam.id || '').trim().toLowerCase();
+      const targetTitle = String(exam.title || '').trim().toLowerCase();
+      const targetTopic = String(exam.topic || '').trim().toLowerCase();
+      return (
+        (targetId && cleanId === targetId) ||
+        (targetTitle && cleanId === targetTitle) ||
+        (targetTopic && cleanId === targetTopic)
+      );
+    });
     const savedResult = getExamResult(exam.id) || getExamResult(exam.topic) || getExamResult(exam.title);
     return {
       isCompleted: isLocalCompleted || isServerCompleted || Boolean(savedResult),

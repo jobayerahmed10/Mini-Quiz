@@ -1378,7 +1378,7 @@ export async function submitExamResultToSupabase(params: {
       student_id: registeredRollNumber || null,
       full_name: userName,
       guest_name: isGuest ? userName : null,
-      guest_id: isGuest ? (params.guest_id || `guest_${Date.now()}`) : null,
+      guest_id: isGuest ? (params.guest_id || getGuestDeviceId() || `guest_${Date.now()}`) : null,
       total_marks: Number(params.total_marks ?? 0),
       time_taken_seconds: Number(timeTaken ?? 0),
       submitted_at: submittedAt,
@@ -1427,6 +1427,11 @@ export async function submitExamResultToSupabase(params: {
       return { success: false, error: detailedMsg || error.message || 'Supabase insert failed' };
     }
 
+    if (typeof window !== 'undefined') {
+      addCompletedExamId(String(params.exam_id));
+      if (params.exam_title) addCompletedExamId(String(params.exam_title));
+    }
+
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -1459,7 +1464,7 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
   const prof = getUserProfile();
   const isReg = isUserRegistered() || Boolean(authUserId || (localStoredUserId && !localStoredUserId.startsWith('guest_') && !localStoredUserId.startsWith('anon_')));
   let currentUId = authUserId || (isReg ? localStoredUserId : '') || (isReg ? userId : '');
-  const guestDevId = !isReg ? getGuestDeviceId() : '';
+  const persistentGuestId = getGuestDeviceId();
 
   const completedExamIds: string[] = [];
 
@@ -1514,12 +1519,14 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
             }
           });
         }
-      } else if (!isReg && guestDevId) {
-        // Guest User: Query strictly by guest device / guest id
+      }
+      
+      // Also query by guest device ID if available to ensure offline/guest attempts are merged
+      if (persistentGuestId) {
         const query = supabaseInstance
           .from('exam_results')
           .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
-          .eq('guest_id', guestDevId);
+          .eq('guest_id', persistentGuestId);
 
         const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
         if (!error && Array.isArray(data) && data.length > 0) {
@@ -1538,7 +1545,7 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
   try {
     const queryUrl = isReg
       ? `/api/exam/completed?userId=${encodeURIComponent(currentUId || '')}`
-      : `/api/exam/completed?guestId=${encodeURIComponent(guestDevId || '')}`;
+      : `/api/exam/completed?guestId=${encodeURIComponent(persistentGuestId || '')}`;
     const srvRes = await fetch(queryUrl);
     if (srvRes.ok) {
       const srvJson = await srvRes.json();
