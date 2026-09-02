@@ -749,6 +749,17 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         created_at: item.created_at || new Date().toISOString(),
       }));
 
+    const targetLimit = Number(
+      examRecord?.question_count || 
+      examRecord?.total_questions || 
+      examRecord?.total_marks || 
+      (selectedCodesList.length > 0 ? selectedCodesList.length : 0)
+    );
+
+    if (targetLimit > 0 && formattedQuestions.length > targetLimit) {
+      return formattedQuestions.slice(0, targetLimit);
+    }
+
     return formattedQuestions;
   } catch (err) {
     console.error('Error in fetchQuestionsByExamId:', cleanExamId, err);

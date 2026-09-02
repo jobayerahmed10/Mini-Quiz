@@ -66,6 +66,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number, activeExamId?: string): Question[] => {
     const rawPool = pool || [];
     const targetExamId = activeExamId || examId;
+    const effectiveCount = count || targetQuestionCount || 0;
     
     // Strict Mode for specific Exams: Only load specifically assigned question codes or exam_id
     if (targetExamId && targetExamId !== 'general') {
@@ -118,7 +119,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                   }
                 });
                 if (exactMatches.length > 0) {
-                  return exactMatches;
+                  return effectiveCount > 0 && exactMatches.length > effectiveCount ? exactMatches.slice(0, effectiveCount) : exactMatches;
                 }
               }
             }
@@ -139,7 +140,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
       });
 
       if (explicitMatches.length > 0) {
-        return explicitMatches;
+        return effectiveCount > 0 && explicitMatches.length > effectiveCount ? explicitMatches.slice(0, effectiveCount) : explicitMatches;
       }
 
       // Fallback matching by subject/topic/title in rawPool if direct exam_id / question codes didn't match
@@ -153,7 +154,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           return detected === subj || subj.includes(detected) || detected.includes(subj);
         });
         if (subjectMatches.length > 0) {
-          return count && count > 0 && subjectMatches.length > count ? subjectMatches.slice(0, count) : subjectMatches;
+          return effectiveCount > 0 && subjectMatches.length > effectiveCount ? subjectMatches.slice(0, effectiveCount) : subjectMatches;
         }
       }
 
@@ -165,7 +166,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
           return text.includes(cleanTitle);
         });
         if (titleMatches.length > 0) {
-          return count && count > 0 && titleMatches.length > count ? titleMatches.slice(0, count) : titleMatches;
+          return effectiveCount > 0 && titleMatches.length > effectiveCount ? titleMatches.slice(0, effectiveCount) : titleMatches;
         }
       }
 
@@ -234,7 +235,9 @@ export const PracticePage: React.FC<PracticePageProps> = ({
         if (!isMounted) return;
         setIsLoading(false);
         if (fetchedFromDb && fetchedFromDb.length > 0) {
-          setExamQuestions(fetchedFromDb);
+          const limit = targetQuestionCount && targetQuestionCount > 0 ? targetQuestionCount : 0;
+          const finalQuestions = limit > 0 && fetchedFromDb.length > limit ? fetchedFromDb.slice(0, limit) : fetchedFromDb;
+          setExamQuestions(finalQuestions);
         } else {
           // Fall back to robust matching from the locally synchronized/cached questions pool (including admin-generated/added offline items)
           const fallbackResolved = getResolvedQuestions(questions, activeSubject, activeTopic, targetQuestionCount, examId);
