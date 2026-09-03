@@ -685,7 +685,8 @@ export default function App() {
   };
 
   const handleTabChange = (tab: TabRoute) => {
-    navigateWithHistory('home', tab);
+    const normalizedTab = (tab as string) === 'circular' ? 'circulars' : tab;
+    navigateWithHistory('home', normalizedTab as TabRoute);
   };
 
   const getFontFamilyClass = () => {
@@ -858,8 +859,14 @@ export default function App() {
               <UstadAiPage />
             )}
 
-            {(activeTab === 'blogs' || (activeTab as any) === 'circulars') && (
+            {activeTab === 'blogs' && (
               <BlogPage searchQuery={searchQuery} />
+            )}
+
+            {activeTab === 'circulars' && (
+              <JobCircularsPage 
+                onStartModelTestForCategory={(cat) => handleStartPractice(cat)}
+              />
             )}
 
             {activeTab === 'subjects' && (
