@@ -1,51 +1,242 @@
 import React, { useState } from 'react';
 import { 
-  Briefcase, 
   Search, 
-  Filter, 
-  Calendar, 
-  MapPin, 
-  ExternalLink, 
+  X, 
+  Pencil, 
+  Check, 
   Building2, 
-  CheckCircle2, 
+  Sparkles, 
   Clock, 
-  Sparkles,
+  MapPin, 
+  Briefcase, 
+  ExternalLink, 
+  Bookmark, 
+  ArrowLeft,
+  CheckCircle2,
   ChevronRight,
-  X,
-  Share2,
-  Bookmark,
-  ArrowLeft
+  BookOpen,
+  FileText,
+  Award,
+  Layers,
+  Zap,
+  Filter
 } from 'lucide-react';
 import { JobCircular } from '../types';
 import { JOB_CIRCULARS_DATA } from '../data/jobCircularsData';
+import { toBengaliNumeral } from '../lib/utils';
 
 interface JobCircularsPageProps {
   onStartModelTestForCategory?: (categoryName: string) => void;
 }
 
+interface ArchiveCardData {
+  id: string;
+  title: string;
+  count: number;
+  bgGradient: string;
+  logoType?: 'gov' | 'bank' | 'iba' | 'yinyang' | 'check' | 'railway' | 'electricity';
+  hasCheckBadge?: boolean;
+}
+
+interface ArchiveCategoryGroup {
+  id: string;
+  name: string;
+  bgColorLight: string;
+  bgColorDark: string;
+  cards: ArchiveCardData[];
+}
+
 export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
   onStartModelTestForCategory
 }) => {
+  const [activeTabMode, setActiveTabMode] = useState<'archive' | 'circulars'>('archive');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeJobModal, setActiveJobModal] = useState<JobCircular | null>(null);
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
+  const [selectedCategoryCard, setSelectedCategoryCard] = useState<ArchiveCardData | null>(null);
 
-  const categories = [
-    { id: 'all', label: 'সকল সার্কুলার' },
-    { id: 'NTRCA', label: 'NTRCA শিক্ষক নিবন্ধন' },
-    { id: 'মাদ্রাসা ও কারিগরি', label: 'মাদ্রাসা ও কারিগরি' },
-    { id: 'প্রাথমিক বিদ্যালয়', label: 'প্রাথমিক বিদ্যালয়' },
-    { id: 'সরকারি হাইস্কুল', label: 'সরকারি হাইস্কুল' },
+  // Category filter tabs data
+  const categoryFilters = [
+    { id: 'all', label: 'সকল ক্যাটাগরি' },
+    { id: 'bcs', label: 'বিসিএস' },
+    { id: 'teacher', label: 'টিচার রিক্রুটমেন্ট' },
+    { id: 'bank', label: 'ব্যাংক জব' },
+    { id: 'iba', label: 'আইবিএ' },
+    { id: 'grade_9_20', label: '৯-২০ গ্রেড' },
+    { id: 'others', label: 'অন্যান্য' },
   ];
 
+  // Full Archive Categories structure as shown in the app screenshot
+  const archiveGroups: ArchiveCategoryGroup[] = [
+    {
+      id: 'bcs',
+      name: 'বিসিএস',
+      bgColorLight: 'bg-[#EFF6E0]/90 border-emerald-100',
+      bgColorDark: 'dark:bg-emerald-950/20 dark:border-emerald-900/40',
+      cards: [
+        {
+          id: 'bcs-preli',
+          title: 'বিসিএস প্রিলি',
+          count: 41,
+          bgGradient: 'from-[#4F86F7] via-[#3B71E8] to-[#255BD8]',
+          hasCheckBadge: true,
+          logoType: 'check'
+        },
+        {
+          id: 'bcs-written',
+          title: 'বিসিএস রিটেন',
+          count: 6,
+          bgGradient: 'from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9]',
+          logoType: 'gov'
+        }
+      ]
+    },
+    {
+      id: 'teacher',
+      name: 'টিচার রিক্রুটমেন্ট',
+      bgColorLight: 'bg-[#E3F2FD]/90 border-sky-100',
+      bgColorDark: 'dark:bg-sky-950/20 dark:border-sky-900/40',
+      cards: [
+        {
+          id: 'primary-assistant',
+          title: 'প্রা. সহকারী শিক্ষক নিয়োগ',
+          count: 83,
+          bgGradient: 'from-[#7C3AED] via-[#6D28D9] to-[#5B21B6]',
+          logoType: 'gov'
+        },
+        {
+          id: 'ntrca-preli',
+          title: 'শিক্ষক নিবন্ধন প্রিলিমিনারি',
+          count: 5,
+          bgGradient: 'from-[#10B981] via-[#059669] to-[#047857]',
+          logoType: 'gov'
+        }
+      ]
+    },
+    {
+      id: 'bank',
+      name: 'ব্যাংক জব',
+      bgColorLight: 'bg-[#F1F8E9]/90 border-lime-100',
+      bgColorDark: 'dark:bg-lime-950/20 dark:border-lime-900/40',
+      cards: [
+        {
+          id: 'bjs',
+          title: 'বিজেএস',
+          count: 16,
+          bgGradient: 'from-[#334155] via-[#1E293B] to-[#0F172A]',
+          logoType: 'gov'
+        },
+        {
+          id: 'bank-job',
+          title: 'ব্যাংক নিয়োগ',
+          count: 43,
+          bgGradient: 'from-[#10B981] via-[#047857] to-[#065F46]',
+          logoType: 'bank'
+        }
+      ]
+    },
+    {
+      id: 'iba',
+      name: 'আইবিএ',
+      bgColorLight: 'bg-[#E0F2F1]/90 border-teal-100',
+      bgColorDark: 'dark:bg-teal-950/20 dark:border-teal-900/40',
+      cards: [
+        {
+          id: 'iba-solution',
+          title: 'আইবিএ জব সলিউশন',
+          count: 8,
+          bgGradient: 'from-[#0D9488] via-[#0F766E] to-[#115E59]',
+          logoType: 'iba'
+        },
+        {
+          id: 'petrobangla',
+          title: 'পেট্রোবাংলা',
+          count: 4,
+          bgGradient: 'from-[#38BDF8] via-[#0284C7] to-[#0369A1]',
+          logoType: 'yinyang'
+        }
+      ]
+    },
+    {
+      id: 'grade_9_20',
+      name: '৯-২০ গ্রেড',
+      bgColorLight: 'bg-[#F3E5F5]/90 border-purple-100',
+      bgColorDark: 'dark:bg-purple-950/20 dark:border-purple-900/40',
+      cards: [
+        {
+          id: 'psc-9-13',
+          title: 'PSC ৯ - ১৩ তম গ্রেড',
+          count: 68,
+          bgGradient: 'from-[#8B5CF6] via-[#7E22CE] to-[#6B21A8]',
+          logoType: 'gov'
+        },
+        {
+          id: 'grade-14-20',
+          title: '১৪ - ২০ তম গ্রেড',
+          count: 84,
+          bgGradient: 'from-[#059669] via-[#047857] to-[#064E3B]',
+          logoType: 'gov'
+        }
+      ]
+    },
+    {
+      id: 'others',
+      name: 'অন্যান্য',
+      bgColorLight: 'bg-[#E8EAF6]/90 border-indigo-100',
+      bgColorDark: 'dark:bg-indigo-950/20 dark:border-indigo-900/40',
+      cards: [
+        {
+          id: 'electricity',
+          title: 'বিদ্যুৎ বিভাগ',
+          count: 11,
+          bgGradient: 'from-[#7C3AED] via-[#6B21A8] to-[#581C87]',
+          logoType: 'electricity'
+        },
+        {
+          id: 'yearly-solution',
+          title: 'সালভিত্তিক জব সলিউশন',
+          count: 11,
+          bgGradient: 'from-[#64748B] via-[#475569] to-[#334155]',
+          logoType: 'gov'
+        },
+        {
+          id: 'railway',
+          title: 'বাংলাদেশ রেলওয়ে',
+          count: 15,
+          bgGradient: 'from-[#EF4444] via-[#DC2626] to-[#991B1B]',
+          logoType: 'railway'
+        },
+        {
+          id: 'social-welfare',
+          title: 'সমাজসেবা অধিদপ্তর',
+          count: 20,
+          bgGradient: 'from-[#8B5CF6] via-[#6D28D9] to-[#4C1D95]',
+          logoType: 'gov'
+        }
+      ]
+    }
+  ];
+
+  // Filter archive groups based on selected Category and Search query
+  const filteredArchiveGroups = archiveGroups
+    .filter(group => selectedCategory === 'all' || group.id === selectedCategory)
+    .map(group => {
+      if (!searchQuery.trim()) return group;
+      const matchingCards = group.cards.filter(c =>
+        c.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      return { ...group, cards: matchingCards };
+    })
+    .filter(group => group.cards.length > 0);
+
+  // Job Circulars Filter
   const filteredJobs = JOB_CIRCULARS_DATA.filter((job) => {
-    const matchesCategory = selectedCategory === 'all' || job.category === selectedCategory;
     const matchesSearch = 
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.organization.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.designation.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesSearch;
   });
 
   const toggleSaveJob = (id: string, e: React.MouseEvent) => {
@@ -57,161 +248,258 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
     }
   };
 
+  const handleCardClick = (card: ArchiveCardData) => {
+    setSelectedCategoryCard(card);
+    if (onStartModelTestForCategory) {
+      onStartModelTestForCategory(card.title);
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 pb-24 space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-4 font-hind pb-28 animate-fade-in">
       
-      {/* Top Banner Header */}
-      <div className="bg-[#0B132B] rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="relative z-10 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold text-amber-300">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>শিক্ষক নিয়োগ ও সরকারি চাকরি আপডেট ২০২৬</span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            শিক্ষক নিয়োগ জব পোর্টাল ও সার্কুলার
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            বেসরকারি শিক্ষক নিবন্ধন (NTRCA), মাদ্রাসা শিক্ষা অধিদপ্তর, প্রাথমিক সহকারী শিক্ষক ও সরকারি হাইস্কুল নিয়োগের সঠিক তথ্য ও আপডেট।
-          </p>
-
-          {/* Quick Stats */}
-          <div className="pt-2 grid grid-cols-3 gap-2 sm:gap-4 max-w-lg">
-            <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <p className="text-lg font-black text-amber-300">৩৫,০০০+</p>
-              <p className="text-[10px] text-slate-300 font-semibold">NTRCA পদসংখ্যা</p>
-            </div>
-            <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <p className="text-lg font-black text-emerald-300">৪,৫২০+</p>
-              <p className="text-[10px] text-slate-300 font-semibold">মাদ্রাসা শিক্ষক</p>
-            </div>
-            <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <p className="text-lg font-black text-sky-300">১৩,৭৭০+</p>
-              <p className="text-[10px] text-slate-300 font-semibold">প্রাথমিক শিক্ষক</p>
-            </div>
-          </div>
-        </div>
+      {/* Search Input Bar (Matches App Screenshot 1 & 2) */}
+      <div className="relative shadow-xs rounded-full">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="প্রশ্নব্যাংক খুঁজুন"
+          className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-slate-200/60 dark:bg-slate-800/80 border border-slate-300/70 dark:border-slate-700/80 rounded-full text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#046A38] transition-all"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Search Bar & Filter Tabs */}
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="পদ, প্রতিষ্ঠান বা সার্কুলার নাম লিখে খুঁজুন..."
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-900 font-semibold focus:outline-none focus:border-[#0B132B] shadow-xs"
-          />
-        </div>
-
-        {/* Categories Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer border ${
-                selectedCategory === cat.id
-                  ? 'bg-[#0B132B] border-[#0B132B] text-white shadow-xs'
-                  : 'bg-white text-slate-700 border-slate-300 hover:border-[#0B132B] hover:bg-slate-50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+      {/* Mode Switch Tab: "প্রশ্নব্যাংক ও আর্কাইভ" vs "নিয়োগ সার্কুলার" */}
+      <div className="flex items-center gap-2 p-1 bg-slate-200/70 dark:bg-slate-800/70 rounded-2xl border border-slate-300/50 dark:border-slate-700/50">
+        <button
+          onClick={() => setActiveTabMode('archive')}
+          className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeTabMode === 'archive'
+              ? 'bg-[#046A38] text-white shadow-xs'
+              : 'text-slate-700 dark:text-slate-300 hover:text-slate-900'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>প্রশ্নব্যাংক আর্কাইভ</span>
+        </button>
+        <button
+          onClick={() => setActiveTabMode('circulars')}
+          className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeTabMode === 'circulars'
+              ? 'bg-[#046A38] text-white shadow-xs'
+              : 'text-slate-700 dark:text-slate-300 hover:text-slate-900'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          <span>নিয়োগ সার্কুলার ({filteredJobs.length})</span>
+        </button>
       </div>
 
-      {/* Circulars List */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between text-xs font-bold text-[#0B132B]">
-          <span>সর্বশেষ শিক্ষক নিয়োগ সার্কুলারসমূহ ({filteredJobs.length}টি)</span>
-          <span className="text-emerald-700">নিয়মিত হালনাগাদকৃত</span>
+      {/* TOP TOPIC BUTTONS BAR (As requested: "নিচে যে টপিক অনুযায়ী বাটন দিছে এটা উপরে দিবে") */}
+      {activeTabMode === 'archive' && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+          {categoryFilters.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer border ${
+                  isActive
+                    ? 'bg-[#046A38] text-white border-[#046A38] shadow-sm scale-102'
+                    : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300/80 dark:border-slate-700 hover:border-[#046A38]'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
         </div>
+      )}
 
-        <div className="grid grid-cols-1 gap-4">
-          {filteredJobs.map((job) => (
-            <div
-              key={job.id}
-              onClick={() => setActiveJobModal(job)}
-              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-[#0B132B] hover:shadow-md transition-all cursor-pointer space-y-3 group relative overflow-hidden"
-            >
-              {job.isHot && (
-                <div className="absolute top-0 right-0 bg-[#0B132B] text-amber-300 text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-xs">
-                  হট সার্কুলার 🔥
-                </div>
-              )}
-
-              <div className="space-y-1 pr-12">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 bg-slate-100 text-[#0B132B] rounded-full border border-slate-300">
-                    {job.category}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
-                    {job.organization}
-                  </span>
-                </div>
-
-                <h2 className="text-base sm:text-lg font-black text-[#0B132B] group-hover:text-amber-800 transition-colors">
-                  {job.title}
+      {/* MAIN CONTENT AREA */}
+      {activeTabMode === 'archive' ? (
+        /* ARCHIVE QUESTION BANK CATEGORIES VIEW */
+        <div className="space-y-4">
+          {filteredArchiveGroups.length > 0 ? (
+            filteredArchiveGroups.map((group) => (
+              <div
+                key={group.id}
+                className={`rounded-3xl p-4 sm:p-5 border ${group.bgColorLight} ${group.bgColorDark} space-y-3 transition-all`}
+              >
+                {/* Group Title Header */}
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 font-hind">
+                  {group.name}
                 </h2>
-              </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-600 font-medium">
-                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                  <Briefcase className="w-3.5 h-3.5 text-[#0B132B] shrink-0" />
-                  <span className="truncate">পদসংখ্যা: <strong className="text-slate-900">{job.vacancyCount}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                  <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                  <span className="truncate">শেষ সময়: <strong className="text-rose-700">{job.deadline}</strong></span>
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                  <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                  <span className="truncate">{job.location}</span>
-                </div>
-              </div>
+                {/* Grid 2-Columns for Archive Cards (App Exact Match) */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  {group.cards.map((card) => (
+                    <div
+                      key={card.id}
+                      onClick={() => handleCardClick(card)}
+                      className={`relative min-h-[120px] sm:min-h-[140px] rounded-2xl bg-gradient-to-br ${card.bgGradient} p-3.5 sm:p-4 text-white shadow-md hover:shadow-lg transition-all transform active:scale-97 cursor-pointer flex flex-col justify-between overflow-hidden group`}
+                    >
+                      {/* Top Check Badge if applicable */}
+                      {card.hasCheckBadge && (
+                        <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/40">
+                          <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
+                        </div>
+                      )}
 
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">প্রকাশিত: {job.publishedDate}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => toggleSaveJob(job.id, e)}
-                    className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    <Bookmark className={`w-4 h-4 ${savedJobs.includes(job.id) ? 'fill-amber-500 text-amber-500' : ''}`} />
-                  </button>
-                  <span className="font-extrabold text-[#0B132B] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                    বিস্তারিত দেখুন <ChevronRight className="w-4 h-4 text-[#0B132B]" />
-                  </span>
+                      {/* Card Emblem / Logo Watermark */}
+                      <div className="absolute -bottom-2 -right-2 opacity-20 group-hover:scale-110 transition-transform pointer-events-none">
+                        {card.logoType === 'bank' && (
+                          <div className="w-16 h-16 rounded-full border-4 border-white/40 flex items-center justify-center font-black text-xs">
+                            BB
+                          </div>
+                        )}
+                        {card.logoType === 'iba' && (
+                          <div className="w-16 h-16 rounded-full border-4 border-white/40 flex items-center justify-center font-black text-xs">
+                            IBA
+                          </div>
+                        )}
+                        {card.logoType === 'yinyang' && (
+                          <div className="w-16 h-16 rounded-full border-4 border-white/40 flex items-center justify-center font-black text-xs">
+                            ☯
+                          </div>
+                        )}
+                        {card.logoType === 'railway' && (
+                          <div className="w-16 h-16 rounded-full border-4 border-white/40 flex items-center justify-center font-black text-xs">
+                            BR
+                          </div>
+                        )}
+                        {(!card.logoType || card.logoType === 'gov' || card.logoType === 'check' || card.logoType === 'electricity') && (
+                          <div className="w-20 h-20 rounded-full border-8 border-white/20 flex items-center justify-center font-black text-lg">
+                            🇧🇩
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Main Title */}
+                      <div className="space-y-1 relative z-10 pt-1">
+                        <h3 className="text-base sm:text-lg font-black tracking-tight font-hind leading-snug drop-shadow-xs">
+                          {card.title}
+                        </h3>
+                      </div>
+
+                      {/* Bottom Pencil Count Badge */}
+                      <div className="relative z-10 pt-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 text-slate-900 font-black text-xs sm:text-sm shadow-xs border border-white/50">
+                          <Pencil className="w-3.5 h-3.5 text-slate-800 shrink-0" />
+                          <span>{toBengaliNumeral(card.count)}</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-2">
+              <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                কোনো আর্কাইভ প্রশ্নব্যাংক খুঁজে পাওয়া যায়নি
+              </p>
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      ) : (
+        /* JOB CIRCULARS LIST VIEW */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-xs font-bold text-[#046A38]">
+            <span>সর্বশেষ শিক্ষক নিয়োগ ও সরকারি নিয়োগ সার্কুলারসমূহ ({filteredJobs.length}টি)</span>
+            <span className="text-emerald-700">নিয়মিত আপডেট</span>
+          </div>
 
-      {/* Detailed Modal */}
+          <div className="grid grid-cols-1 gap-4">
+            {filteredJobs.map((job) => (
+              <div
+                key={job.id}
+                onClick={() => setActiveJobModal(job)}
+                className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-2xs hover:border-[#046A38] hover:shadow-md transition-all cursor-pointer space-y-3 group relative overflow-hidden"
+              >
+                {job.isHot && (
+                  <div className="absolute top-0 right-0 bg-[#046A38] text-amber-300 text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-xs">
+                    হট সার্কুলার 🔥
+                  </div>
+                )}
+
+                <div className="space-y-1 pr-12">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-[#046A38] dark:text-emerald-400 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      {job.category}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {job.organization}
+                    </span>
+                  </div>
+
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white group-hover:text-[#046A38] transition-colors">
+                    {job.title}
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-xl border border-slate-100 dark:border-slate-600">
+                    <Briefcase className="w-3.5 h-3.5 text-[#046A38] shrink-0" />
+                    <span className="truncate">পদসংখ্যা: <strong className="text-slate-900 dark:text-white">{job.vacancyCount}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-xl border border-slate-100 dark:border-slate-600">
+                    <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="truncate">শেষ সময়: <strong className="text-rose-600 dark:text-rose-400">{job.deadline}</strong></span>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-xl border border-slate-100 dark:border-slate-600">
+                    <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    <span className="truncate">{job.location}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-medium">প্রকাশিত: {job.publishedDate}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => toggleSaveJob(job.id, e)}
+                      className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                    >
+                      <Bookmark className={`w-4 h-4 ${savedJobs.includes(job.id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                    </button>
+                    <span className="font-extrabold text-[#046A38] dark:text-emerald-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                      বিস্তারিত দেখুন <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Circular Detail Modal */}
       {activeJobModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 space-y-6 shadow-2xl relative">
-            
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <button
                 onClick={() => setActiveJobModal(null)}
-                className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5 transition-all"
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-amber-500" />
                 <span>পিছনে</span>
               </button>
               <button
                 onClick={() => setActiveJobModal(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -221,60 +509,60 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
               <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-200">
                 {activeJobModal.category}
               </span>
-              <h2 className="text-xl sm:text-2xl font-black text-[#1B4332]">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                 {activeJobModal.title}
               </h2>
-              <p className="text-xs text-slate-500 font-bold flex items-center gap-1">
-                <Building2 className="w-4 h-4 text-emerald-600" />
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
+                <Building2 className="w-4 h-4 text-[#046A38]" />
                 {activeJobModal.organization}
               </p>
             </div>
 
-            <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl grid grid-cols-2 gap-3 text-xs text-[#1B4332]">
+            <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl grid grid-cols-2 gap-3 text-xs text-slate-800 dark:text-slate-200">
               <div>
-                <p className="text-slate-500 font-medium">পদবী</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">পদবী</p>
                 <p className="font-bold">{activeJobModal.designation}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">মোট খালি পদ</p>
-                <p className="font-bold text-emerald-800">{activeJobModal.vacancyCount}</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">মোট খালি পদ</p>
+                <p className="font-bold text-emerald-800 dark:text-emerald-300">{activeJobModal.vacancyCount}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">আবেদনের শেষ তারিখ</p>
-                <p className="font-bold text-rose-700">{activeJobModal.deadline}</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">আবেদনের শেষ তারিখ</p>
+                <p className="font-bold text-rose-700 dark:text-rose-400">{activeJobModal.deadline}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-medium">বেতন স্কেল</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">বেতন স্কেল</p>
                 <p className="font-bold">{activeJobModal.salaryRange}</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-black text-[#1B4332]">বিবরণ ও বিবরণী:</h3>
-              <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">বিবরণ ও বিবরণী:</h3>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
                 {activeJobModal.description}
               </p>
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-black text-[#1B4332]">আবশ্যকীয় যোগ্যতা ও শর্তাবলি:</h3>
-              <ul className="space-y-2 text-xs text-slate-700">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">আবশ্যকীয় যোগ্যতা ও শর্তাবলি:</h3>
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
                 {activeJobModal.requirements.map((req, idx) => (
                   <li key={idx} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-[#046A38] shrink-0 mt-0.5" />
                     <span>{req}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-3 justify-between">
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-3 justify-between">
               {activeJobModal.applyUrl && (
                 <a
                   href={activeJobModal.applyUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#1B4332] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#046A38] hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span>অফিশিয়াল লিংকে আবেদন করুন</span>
