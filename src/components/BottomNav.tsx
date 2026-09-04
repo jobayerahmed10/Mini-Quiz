@@ -31,13 +31,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       icon: FileCheck2,
     },
     {
-      id: 'courses' as TabRoute,
-      label: 'কোর্স',
-      icon: BookOpen,
-      badge: 'নতুন',
-      badgeColor: 'bg-[#EF4444] text-white',
-    },
-    {
       id: 'blogs' as TabRoute,
       label: 'ব্লগ',
       icon: Newspaper,

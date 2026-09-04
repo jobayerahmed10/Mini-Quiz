@@ -843,15 +843,19 @@ export default function App() {
                 }}
                 onOpenLeaderboard={handleOpenLeaderboard}
                 onReviewAnswers={(opts) => handleReviewAnswers(opts)}
+                initialTabMode="free"
               />
             )}
 
             {activeTab === 'courses' && (
-              <CoursesPage
+              <ExamPage
                 questions={questions}
-                onStartExam={(opts) => handleStartPractice(opts)}
-                onReviewAnswers={(opts) => handleReviewAnswers(opts)}
+                onStartExam={(opts) => {
+                  handleStartPractice(opts);
+                }}
                 onOpenLeaderboard={handleOpenLeaderboard}
+                onReviewAnswers={(opts) => handleReviewAnswers(opts)}
+                initialTabMode="paid"
               />
             )}
 

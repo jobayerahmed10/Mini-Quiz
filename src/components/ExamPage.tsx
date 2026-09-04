@@ -39,6 +39,7 @@ import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
 import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { SharedExamEntranceCard } from './SharedExamEntranceCard';
+import { CoursesPage } from './CoursesPage';
 
 interface ExamStartOptions {
   examId?: string;
@@ -53,6 +54,7 @@ interface ExamPageProps {
   onStartExam: (options: ExamStartOptions) => void;
   onOpenLeaderboard?: (examId?: string) => void;
   onReviewAnswers?: (options: ExamStartOptions) => void;
+  initialTabMode?: 'free' | 'paid';
 }
 
 export const ExamPage: React.FC<ExamPageProps> = ({
@@ -60,7 +62,9 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   onStartExam,
   onOpenLeaderboard,
   onReviewAnswers,
+  initialTabMode = 'free',
 }) => {
+  const [examTabMode, setExamTabMode] = useState<'free' | 'paid'>(initialTabMode);
   const [exams, setExams] = useState<ExamItem[]>(() => {
     try {
       const raw = localStorage.getItem('miniquiz_exams_cache');
@@ -280,6 +284,42 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 mb-24 space-y-5">
       
+      {/* 0. Top Mode Toggle: ফ্রি পরীক্ষা vs পেইড পরীক্ষা */}
+      <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-200/90 dark:bg-slate-800/90 rounded-2xl border border-slate-300/80 dark:border-slate-700/80 shadow-xs">
+        <button
+          onClick={() => setExamTabMode('free')}
+          className={`py-3 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            examTabMode === 'free'
+              ? 'bg-[#046A38] text-white shadow-md border border-emerald-500/40'
+              : 'bg-transparent text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>ফ্রি পরীক্ষা</span>
+        </button>
+
+        <button
+          onClick={() => setExamTabMode('paid')}
+          className={`py-3 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            examTabMode === 'paid'
+              ? 'bg-[#046A38] text-white shadow-md border border-emerald-500/40'
+              : 'bg-transparent text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Crown className="w-4 h-4 text-amber-400" />
+          <span>পেইড পরীক্ষা (কোর্স)</span>
+        </button>
+      </div>
+
+      {examTabMode === 'paid' ? (
+        <CoursesPage
+          questions={questions}
+          onStartExam={onStartExam}
+          onReviewAnswers={onReviewAnswers}
+          onOpenLeaderboard={onOpenLeaderboard}
+        />
+      ) : (
+        <>
       {/* 1. Top Navy Blue Header Banner Card */}
       <div className="bg-[#0B132B] dark:bg-[#070D1E] text-white p-6 sm:p-8 rounded-[28px] shadow-xl relative overflow-hidden border border-slate-800">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -814,6 +854,8 @@ export const ExamPage: React.FC<ExamPageProps> = ({
             )}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
