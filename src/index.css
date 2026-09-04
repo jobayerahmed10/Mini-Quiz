@@ -3,19 +3,19 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-bengali: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, sans-serif;
+  --font-bengali: 'Noto Serif Bengali', 'Hind Siliguri', system-ui, serif;
   --color-navy-dark: #0B132B;
   --color-navy-card: #121E36;
   --color-navy-border: #233558;
 }
 
 :root {
-  --app-font-family: 'Hind Siliguri', 'Noto Serif Bengali', system-ui, sans-serif;
+  --app-font-family: 'Noto Serif Bengali', 'Hind Siliguri', system-ui, serif;
   --app-arabic-font: 'Amiri', 'Scheherazade New', 'Cairo', serif;
 }
 
 body {
-  font-family: var(--app-font-family), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--app-font-family), 'Noto Serif Bengali', serif;
   background-color: #EEF2F6;
   color: #0F172A;
   -webkit-tap-highlight-color: transparent;
@@ -33,7 +33,7 @@ textarea,
 h1, h2, h3, h4, h5, h6,
 p, span, a, label, li,
 div {
-  font-family: var(--app-font-family), 'Hind Siliguri', system-ui, sans-serif;
+  font-family: var(--app-font-family), 'Noto Serif Bengali', serif;
 }
 
 /* Specific Arabic Text elements */

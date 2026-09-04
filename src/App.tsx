@@ -125,7 +125,7 @@ export default function App() {
   });
 
   const [fontFamily, setFontFamily] = useState<FontFamilyType>(() => {
-    return (localStorage.getItem('miniquiz_fontfamily') as FontFamilyType) || 'hind';
+    return (localStorage.getItem('miniquiz_fontfamily') as FontFamilyType) || 'noto';
   });
 
   const [showHarakat, setShowHarakat] = useState<boolean>(() => {
