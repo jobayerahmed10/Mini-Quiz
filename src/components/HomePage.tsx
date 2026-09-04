@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { Question, TabRoute, BlogPost } from '../types';
 import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
-import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, getCachedBlogs, toggleBlogBookmark, getLocalBookmarkedBlogIds } from '../lib/supabase';
+import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, getCachedBlogs, toggleBlogBookmark, getLocalBookmarkedBlogIds, getTamreenLeaderboard, TamreenLeaderboardUser } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { BlogDetailView } from './BlogDetailView';
 
@@ -258,35 +258,48 @@ export const HomePage: React.FC<HomePageProps> = ({
     { name: 'সমাজসেবা অধিদপ্তর...', percent: 6 },
   ];
 
-  // Mock Leaderboard Data per League
-  const leaderboardData = {
-    iron: [
-      { rank: 1, name: 'Rakib', points: '5K পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Rakib' },
-      { rank: 2, name: 'Md Romjan', points: '400 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Romjan' },
-      { rank: 3, name: 'Marufa Ruhi', points: '336 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marufa' },
-      { rank: 4, name: 'FAHAD ALAM FARDIN', points: '315 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Fahad' },
-      { rank: 5, name: 'Sheikh Mohammad Saif', points: '305 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Saif' },
-    ],
-    bronze: [
-      { rank: 1, name: 'Tushar', points: '330.5 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Tushar' },
-      { rank: 2, name: 'Shephali Begum', points: '283.5 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Shephali' },
-      { rank: 3, name: 'S M Raja Hossen', points: '273 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Raja' },
-      { rank: 4, name: 'Amena Islam', points: '272.5 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amena' },
-      { rank: 5, name: 'NAYEEM', points: '255 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Nayeem' },
-    ],
-    silver: [
-      { rank: 1, name: 'Tanvir Ahmed', points: '620 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tanvir' },
-      { rank: 2, name: 'Habibur Rahman', points: '580 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Habib' },
-      { rank: 3, name: 'Nusrat Jahan', points: '540 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Nusrat' },
-    ],
-    gold: [
-      { rank: 1, name: 'Sabbir Hossain', points: '1200 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Sabbir' },
-      { rank: 2, name: 'Mahmudul Hasan', points: '1050 পয়েন্ট', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mahmud' },
-    ]
-  };
+  // Dynamic Leaderboard Data per League
+  const [liveLeaderboard, setLiveLeaderboard] = useState<TamreenLeaderboardUser[]>([]);
+  const [liveCurrentUserRank, setLiveCurrentUserRank] = useState<TamreenLeaderboardUser | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLeaderboard() {
+      try {
+        const profile = getUserProfile();
+        const res = await getTamreenLeaderboard({
+          periodType: 'this_week',
+          pageNumber: 1,
+          pageSize: 50,
+          currentUserId: profile?.id || undefined,
+        });
+        if (isMounted && res) {
+          setLiveLeaderboard(res.items || []);
+          setLiveCurrentUserRank(res.currentUser || null);
+        }
+      } catch {
+        if (isMounted) setLiveLeaderboard([]);
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const currentUserProfile = getUserProfile();
-  const currentUserName = currentUserProfile?.name || 'Jobayer Ahmed';
+  const currentUserName = currentUserProfile?.name && currentUserProfile.name !== 'Jobayer Ahmed' ? currentUserProfile.name : 'পরীক্ষার্থী';
+  const currentUserPoints = liveCurrentUserRank?.total_points || 0;
+
+  // Filter leaderboard based on active league
+  const activeLeagueUsers = liveLeaderboard.filter((item) => {
+    const pts = Number(item.total_points || 0);
+    if (selectedLeague === 'iron') return pts <= 50;
+    if (selectedLeague === 'bronze') return pts > 50 && pts <= 200;
+    if (selectedLeague === 'silver') return pts > 200 && pts <= 500;
+    if (selectedLeague === 'gold') return pts > 500;
+    return true;
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-5 sm:space-y-6 animate-fade-in mb-24 font-hind">
@@ -670,45 +683,65 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
               <div className="flex justify-between text-[11px] font-bold text-slate-500">
                 <span>০</span>
-                <span className="text-amber-500 flex items-center gap-0.5">⭐ ১০</span>
+                <span className="text-amber-500 flex items-center gap-0.5">⭐ {toBengaliNumeral(currentUserPoints)}</span>
                 <span>১০০</span>
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div className="bg-amber-400 h-full rounded-full" style={{ width: '10%' }} />
+                <div 
+                  className="bg-amber-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.max(0, (currentUserPoints / 100) * 100))}%` }} 
+                />
               </div>
             </div>
 
             {/* Leaderboard List */}
-            <div className="space-y-2 bg-white dark:bg-slate-900/90 rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 dark:border-slate-800">
-              {leaderboardData[selectedLeague].map((item) => (
-                <div
-                  key={item.rank}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={item.avatar}
-                      alt={item.name}
-                      className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 shrink-0"
-                    />
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-hind">
-                        {item.name}
-                      </h4>
+            {activeLeagueUsers.length > 0 ? (
+              <div className="space-y-2 bg-white dark:bg-slate-900/90 rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 dark:border-slate-800">
+                {activeLeagueUsers.slice(0, 5).map((item) => (
+                  <div
+                    key={`${item.user_id}_${item.rank}`}
+                    className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {item.avatar_url ? (
+                        <img
+                          src={item.avatar_url}
+                          alt={item.user_name}
+                          className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 shrink-0 object-cover"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
+                          {item.user_name ? item.user_name.charAt(0) : 'প'}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-hind">
+                          {item.user_name}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="text-right space-y-0.5">
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                        {toBengaliNumeral(item.rank)}
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-500">
+                        {toBengaliNumeral(item.total_points)} পয়েন্ট
+                      </p>
                     </div>
                   </div>
-
-                  <div className="text-right space-y-0.5">
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                      {toBengaliNumeral(item.rank)}
-                    </span>
-                    <p className="text-[10px] font-bold text-slate-500">
-                      {item.points}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-7 px-4 text-center space-y-1 bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <p className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 font-hind">
+                  এখনো কোনো মেধা তালিকা রেকর্ড নেই
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  পরীক্ষায় অংশগ্রহণ করে প্রথম স্থান অধিকার করুন!
+                </p>
+              </div>
+            )}
 
             {/* Pinned Current User Rank Bar */}
             <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
@@ -718,17 +751,17 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white font-hind">
-                    {currentUserName}
+                    {currentUserName} (আপনি)
                   </h4>
                 </div>
               </div>
 
               <div className="text-right">
                 <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">
-                  351 th
+                  {liveCurrentUserRank ? `${toBengaliNumeral(liveCurrentUserRank.rank)} তম` : '-'}
                 </span>
                 <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                  ১০ পয়েন্ট
+                  {toBengaliNumeral(currentUserPoints)} পয়েন্ট
                 </p>
               </div>
             </div>

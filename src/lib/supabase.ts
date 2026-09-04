@@ -1094,7 +1094,7 @@ export interface FreeOverallLeaderboardItem {
 
 const LOCAL_LEADERBOARD_KEY = 'tamreen_leaderboard_entries';
 const LOCAL_EXAM_RESULTS_KEY = 'tamreen_exam_results';
-const LEADERBOARD_CLEARED_FLAG = 'tamreen_lb_cleared_v3';
+const LEADERBOARD_CLEARED_FLAG = 'tamreen_lb_cleared_v5';
 
 // One-time client purge of past/legacy leaderboard entries so the leaderboard starts completely fresh
 try {
@@ -1102,6 +1102,9 @@ try {
     localStorage.removeItem(LOCAL_LEADERBOARD_KEY);
     localStorage.removeItem(LOCAL_EXAM_RESULTS_KEY);
     localStorage.removeItem('miniquiz_leaderboard_cache');
+    localStorage.removeItem('tamreen_local_leaderboard');
+    localStorage.removeItem('exam_leaderboard_cache');
+    localStorage.removeItem('user_exam_attempts');
     localStorage.setItem(LEADERBOARD_CLEARED_FLAG, 'true');
     // Notify server to clear in-memory stores as well
     fetch('/api/leaderboard/clear', { method: 'POST' }).catch(() => {});
