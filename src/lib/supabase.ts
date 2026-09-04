@@ -1051,6 +1051,7 @@ export interface LeaderboardEntry {
   correct_count: number;
   wrong_count: number;
   accuracy: number;
+  points?: number;
   time_taken_seconds?: number;
   is_guest?: boolean;
   created_at: string;
@@ -1070,6 +1071,7 @@ export interface ExamLeaderboardItem {
   total_marks: number;
   correct_answers: number;
   wrong_answers: number;
+  points?: number;
   time_taken_seconds: number;
   is_guest?: boolean;
   submitted_at?: string;
@@ -1179,11 +1181,13 @@ export async function submitExamResultToSupabase(params: {
   total_marks: number;
   correct_answers: number;
   wrong_answers: number;
+  points?: number;
   time_taken_seconds?: number;
   submitted_at?: string;
 }): Promise<{ success: boolean; error?: string; alreadySubmitted?: boolean }> {
   const submittedAt = params.submitted_at || new Date().toISOString();
   const timeTaken = Number(params.time_taken_seconds || 0);
+  const points = Number(params.points !== undefined && params.points !== null ? params.points : (params.correct_answers ?? 0));
   const isGuest = Boolean(
     params.is_guest !== undefined
       ? params.is_guest
@@ -1198,6 +1202,7 @@ export async function submitExamResultToSupabase(params: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...params,
+        points: points,
         full_name: effectiveName,
         guest_name: isGuest ? effectiveName : params.guest_name,
         is_guest: isGuest,
@@ -1224,6 +1229,7 @@ export async function submitExamResultToSupabase(params: {
     total_questions: params.total_marks,
     correct_count: params.correct_answers,
     wrong_count: params.wrong_answers,
+    points: points,
     accuracy: params.total_marks > 0 ? Math.round((params.score / params.total_marks) * 100) : 100,
     time_taken_seconds: timeTaken,
     created_at: submittedAt,
@@ -1442,6 +1448,7 @@ export async function submitExamResultToSupabase(params: {
       wrong_answers: Number(params.wrong_answers ?? 0),
       total_questions: Number(params.total_marks ?? 0),
       time_taken: Number(timeTaken ?? 0),
+      points: points, // প্রত্যেক সঠিক উত্তরের জন্য পয়েন্ট
       // Metadata & compatibility fields for roll number & ranking
       roll_no: registeredRollNumber || null,
       roll_number: registeredRollNumber || null,
@@ -1847,6 +1854,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             total_marks: totalMarks,
             correct_answers: correctAnswers,
             wrong_answers: wrongAnswers,
+            points: Number(row.points ?? correctAnswers),
             time_taken_seconds: timeTaken,
             is_guest: isGuest,
             submitted_at: row.submitted_at || row.created_at,
@@ -1907,6 +1915,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     total_marks: e.total_questions,
     correct_answers: e.correct_count,
     wrong_answers: e.wrong_count,
+    points: Number(e.points !== undefined ? e.points : e.correct_count),
     time_taken_seconds: e.time_taken_seconds || 0,
   }));
 }

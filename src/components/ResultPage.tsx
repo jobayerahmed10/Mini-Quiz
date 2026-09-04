@@ -267,6 +267,14 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             </span>
           </div>
 
+          {/* Row 6: অর্জিত পয়েন্ট */}
+          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold bg-indigo-50/40 dark:bg-indigo-950/20">
+            <span className="text-indigo-700 dark:text-indigo-400 font-extrabold">পয়েন্ট</span>
+            <span className="text-indigo-700 dark:text-indigo-400 font-black text-sm sm:text-base">
+              {toBengaliNumeral(result.correctCount)} পয়েন্ট
+            </span>
+          </div>
+
           {/* Row 8: রেজাল্ট */}
           <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
             <span className="text-slate-800 dark:text-slate-200">রেজাল্ট</span>

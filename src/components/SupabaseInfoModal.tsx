@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS public.exam_results (
   wrong_answers INT NOT NULL DEFAULT 0,
   total_questions INT NOT NULL DEFAULT 0,
   time_taken INT DEFAULT 0,
+  points INT NOT NULL DEFAULT 0, -- প্রত্যেক সঠিক উত্তরের জন্য পয়েন্ট
   -- অতিরিক্ত সুবিধাজনক কলাম (Backward compatibility)
   full_name TEXT,
   roll_number TEXT,
@@ -201,6 +202,9 @@ CREATE TABLE IF NOT EXISTS public.exam_results (
   time_taken_seconds INT DEFAULT 0,
   submitted_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- বিদ্যমান টেবিলে পয়েন্ট কলাম যুক্ত করার নির্দেশ
+ALTER TABLE public.exam_results ADD COLUMN IF NOT EXISTS points INT NOT NULL DEFAULT 0;
 
 -- RLS: Students can only SELECT and INSERT their own exam results
 ALTER TABLE public.exam_results ENABLE ROW LEVEL SECURITY;
@@ -224,6 +228,7 @@ RETURNS TABLE (
   total_marks numeric,
   correct_answers int,
   wrong_answers int,
+  points int,
   time_taken_seconds int
 )
 LANGUAGE plpgsql
@@ -241,6 +246,7 @@ BEGIN
       COALESCE(er.total_marks, e.total_marks, (er.correct_answers + er.wrong_answers)::numeric, 0)::numeric AS total_marks,
       COALESCE(er.correct_answers, er.score::int, 0)::int AS correct_answers,
       COALESCE(er.wrong_answers, 0)::int AS wrong_answers,
+      COALESCE(er.points, er.correct_answers, er.score::int, 0)::int AS points,
       COALESCE(er.time_taken_seconds, 0)::int AS time_taken_seconds,
       ROW_NUMBER() OVER (
         ORDER BY
@@ -262,6 +268,7 @@ BEGIN
     r.total_marks,
     r.correct_answers,
     r.wrong_answers,
+    r.points,
     r.time_taken_seconds
   FROM ranked_results r
   ORDER BY r.rank ASC

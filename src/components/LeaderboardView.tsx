@@ -230,7 +230,7 @@ export function computeLeaderboard(
         rollNumber,
         testCount: 1,
         avgAccuracy: Math.round(e.accuracy || 0),
-        points: Number(e.score || e.correct_count || 0),
+        points: Number(e.points !== undefined && e.points !== null ? e.points : (e.correct_count ?? e.score ?? 0)),
         totalQuestions: totalQ,
         correctCount: Number(e.correct_count || e.score || 0),
         wrongCount: Number(e.wrong_count || 0),
@@ -518,7 +518,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               rollNumber,
               testCount: 1,
               avgAccuracy: totalQ > 0 ? Math.round((Number(row.correct_answers ?? row.score) / totalQ) * 100) : 100,
-              points: Number(row.score ?? row.correct_answers ?? 0),
+              points: Number(row.points !== undefined && row.points !== null ? row.points : (row.correct_answers ?? row.score ?? 0)),
               totalQuestions: totalQ,
               correctCount: Number(row.correct_answers ?? row.score ?? 0),
               wrongCount: Number(row.wrong_answers ?? 0),
@@ -870,6 +870,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         <span className="text-[10px] font-bold text-slate-500 block">নাম্বার</span>
                         <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400">
                           {markText}
+                        </span>
+                      </div>
+
+                      {/* Points */}
+                      <div className="text-center pl-1 border-l border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-500 block">পয়েন্ট</span>
+                        <span className="text-xs sm:text-sm font-black text-indigo-600 dark:text-indigo-400">
+                          {toBengaliNumeral(item.points !== undefined && item.points !== null ? item.points : item.correctCount)}
                         </span>
                       </div>
                     </div>

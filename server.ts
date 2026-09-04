@@ -111,6 +111,7 @@ interface ServerLeaderboardEntry {
   correct_count: number;
   wrong_count: number;
   accuracy: number;
+  points?: number;
   created_at: string;
 }
 
@@ -132,6 +133,7 @@ interface ServerExamResult {
   total_marks: number;
   correct_answers: number;
   wrong_answers: number;
+  points?: number;
   time_taken_seconds: number;
   submitted_at: string;
 }
@@ -843,6 +845,7 @@ app.post('/api/exam_results', (req, res) => {
       total_marks: Number(item.total_marks ?? item.total_questions ?? item.totalQuestions ?? 0),
       correct_answers: Number(item.correct_answers ?? item.correct_count ?? item.correctCount ?? 0),
       wrong_answers: Number(item.wrong_answers ?? item.wrong_count ?? item.wrongCount ?? 0),
+      points: Number(item.points ?? item.correct_answers ?? item.correct_count ?? item.correctCount ?? 0),
       time_taken_seconds: Number(item.time_taken_seconds ?? item.timeTakenSeconds ?? 0),
       submitted_at: String(item.submitted_at || item.created_at || new Date().toISOString()),
     };
@@ -885,6 +888,7 @@ app.post('/api/exam_results', (req, res) => {
       total_questions: newRecord.total_marks,
       correct_count: newRecord.correct_answers,
       wrong_count: newRecord.wrong_answers,
+      points: newRecord.points ?? newRecord.correct_answers,
       accuracy: newRecord.total_marks > 0 ? Math.round((newRecord.score / newRecord.total_marks) * 100) : 0,
       created_at: newRecord.submitted_at,
     };
@@ -1026,6 +1030,7 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
         total_marks: r.total_marks,
         correct_answers: r.correct_answers,
         wrong_answers: r.wrong_answers,
+        points: r.points !== undefined && r.points !== null ? r.points : (r.correct_answers ?? r.score),
         time_taken_seconds: r.time_taken_seconds,
       };
     });
