@@ -1245,10 +1245,9 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
       {/* Course Enrollment Modal */}
       {showEnrollModal && (
         <CourseEnrollmentModal
-          isOpen={showEnrollModal}
           onClose={() => setShowEnrollModal(false)}
           course={course}
-          onEnrollSuccess={() => {
+          onSuccess={() => {
             setShowEnrollModal(false);
             showToast('ভর্তি আবেদন জমা হয়েছে! অ্যাডমিন অ্যাপ্রুভ করার পর সকল পরীক্ষা আনলক হবে।');
           }}

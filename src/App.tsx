@@ -285,7 +285,7 @@ export default function App() {
         setQuizResult(null);
         setShowProfileModal(false);
         setCurrentPage((prev) => (prev === 'profile' ? 'home' : prev));
-        setActiveTab((prev) => (prev === 'profile' ? 'home' : prev));
+        setActiveTab((prev) => (prev === 'home' ? 'home' : 'home'));
       }
     };
     window.addEventListener('tamreen_auth_status_changed', handleAuthChange);
@@ -583,15 +583,25 @@ export default function App() {
       const targetSub = opts.subject || opts.examType || 'সকল বিষয়';
       const matchingQuestions = questions.filter((q) => {
         if (opts.examId && String(q.id) === String(opts.examId)) return true;
-        if (opts.examType && (q.examType === opts.examType || q.subject === opts.examType)) return true;
+        if (opts.examType && ((q as any).examType === opts.examType || q.subject === opts.examType)) return true;
         if (opts.subject && q.subject === opts.subject) return true;
         return false;
       });
       const qList = matchingQuestions.length > 0 ? matchingQuestions : questions.slice(0, opts.questionCount || 10);
       const constructedUserAnswers: UserAnswer[] = qList.map((q) => ({
-        question: q,
-        selectedAnswer: '',
+        questionId: q.id,
+        questionText: q.question,
+        subject: q.subject,
+        options: {
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+        },
+        selectedOption: null,
+        correctOption: (q.correct_answer || 'option_a') as any,
         isCorrect: false,
+        explanation: q.explanation,
       }));
       const fallbackResult: QuizResult = {
         totalQuestions: qList.length,
@@ -861,7 +871,7 @@ export default function App() {
             )}
 
             {activeTab === 'ustad_ai' && (
-              <UstadAiPage />
+              <UstadAiPage onBack={() => setActiveTab('home')} />
             )}
 
             {activeTab === 'blogs' && (

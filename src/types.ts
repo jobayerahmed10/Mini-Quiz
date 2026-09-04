@@ -147,13 +147,23 @@ export interface CourseModule {
   pdfAvailable?: boolean;
 }
 
+export interface ThinkingStep {
+  id: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'loading' | 'completed';
+}
+
 export interface UstadAiMessage {
   id: string;
   sender: 'user' | 'ustad';
   text: string;
   timestamp: string;
+  image?: string;
   category?: string;
   references?: string[];
+  thinkingSteps?: ThinkingStep[];
+  isThinkingOpen?: boolean;
 }
 
 export interface JobCircular {

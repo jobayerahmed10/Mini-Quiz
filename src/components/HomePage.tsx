@@ -38,6 +38,7 @@ import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getComp
 import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, getCachedBlogs, toggleBlogBookmark, getLocalBookmarkedBlogIds, getTamreenLeaderboard, TamreenLeaderboardUser } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { BlogDetailView } from './BlogDetailView';
+import { LeaderboardView } from './LeaderboardView';
 
 interface HomePageProps {
   questions?: Question[];
@@ -77,7 +78,6 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const [completedRevision, setCompletedRevision] = useState(0);
   const [showRegModal, setShowRegModal] = useState(false);
-  const [selectedLeague, setSelectedLeague] = useState<'iron' | 'bronze' | 'silver' | 'gold'>('iron');
   const [pendingExamOpts, setPendingExamOpts] = useState<{
     examId?: string;
     subject: string;
@@ -258,49 +258,6 @@ export const HomePage: React.FC<HomePageProps> = ({
     { name: 'সমাজসেবা অধিদপ্তর...', percent: 6 },
   ];
 
-  // Dynamic Leaderboard Data per League
-  const [liveLeaderboard, setLiveLeaderboard] = useState<TamreenLeaderboardUser[]>([]);
-  const [liveCurrentUserRank, setLiveCurrentUserRank] = useState<TamreenLeaderboardUser | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadLeaderboard() {
-      try {
-        const profile = getUserProfile();
-        const res = await getTamreenLeaderboard({
-          periodType: 'this_week',
-          pageNumber: 1,
-          pageSize: 50,
-          currentUserId: profile?.id || undefined,
-        });
-        if (isMounted && res) {
-          setLiveLeaderboard(res.items || []);
-          setLiveCurrentUserRank(res.currentUser || null);
-        }
-      } catch {
-        if (isMounted) setLiveLeaderboard([]);
-      }
-    }
-    loadLeaderboard();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const currentUserProfile = getUserProfile();
-  const currentUserName = currentUserProfile?.name && currentUserProfile.name !== 'Jobayer Ahmed' ? currentUserProfile.name : 'পরীক্ষার্থী';
-  const currentUserPoints = liveCurrentUserRank?.total_points || 0;
-
-  // Filter leaderboard based on active league
-  const activeLeagueUsers = liveLeaderboard.filter((item) => {
-    const pts = Number(item.total_points || 0);
-    if (selectedLeague === 'iron') return pts <= 50;
-    if (selectedLeague === 'bronze') return pts > 50 && pts <= 200;
-    if (selectedLeague === 'silver') return pts > 200 && pts <= 500;
-    if (selectedLeague === 'gold') return pts > 500;
-    return true;
-  });
-
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-5 sm:space-y-6 animate-fade-in mb-24 font-hind">
       {selectedBlogPost ? (
@@ -410,16 +367,16 @@ export const HomePage: React.FC<HomePageProps> = ({
               </span>
             </button>
 
-            {/* 4. চর্চা AI */}
+            {/* 4. তামরীন AI */}
             <button
               onClick={() => onTabNavigate && onTabNavigate('ustad_ai')}
-              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
+              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-100/70 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 font-hind">
-                চর্চা AI
+                তামরীন AI
               </span>
             </button>
 
@@ -596,175 +553,14 @@ export const HomePage: React.FC<HomePageProps> = ({
           </section>
 
           {/* ========================================================================= */}
-          {/* 5. LEADERBOARD / LEAGUE SECTION (Exact Match to Screenshots 2, 3, 4) */}
+          {/* 5. APP'S REAL LEADERBOARD SECTION */}
           {/* ========================================================================= */}
-          <section className="bg-slate-100/80 dark:bg-slate-800/80 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-700/80 space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div 
-                onClick={() => onOpenLeaderboard && onOpenLeaderboard()}
-                className="flex items-center gap-2 cursor-pointer group"
-              >
-                <Trophy className="w-5 h-5 text-amber-500 fill-amber-400 group-hover:scale-110 transition-transform" />
-                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind group-hover:text-emerald-600 transition-colors">
-                  লিডারবোর্ড | {selectedLeague === 'iron' ? 'আয়রন লীগ' : selectedLeague === 'bronze' ? 'ব্রোঞ্জ লীগ' : selectedLeague === 'silver' ? 'সিলভার লীগ' : 'গোল্ড লীগ'}
-                </h2>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {onOpenLeaderboard && (
-                  <button
-                    onClick={() => onOpenLeaderboard()}
-                    className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <span>সম্পূর্ণ দেখুন</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <div className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-2xs">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <span>১০</span>
-                </div>
-              </div>
-            </div>
-
-            {/* League Tabs Selector (Iron, Bronze, Silver, Gold) */}
-            <div className="flex items-center justify-around gap-1 pt-1 pb-2">
-              <button
-                onClick={() => setSelectedLeague('iron')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all cursor-pointer ${
-                  selectedLeague === 'iron' ? 'bg-slate-200 dark:bg-slate-700 scale-105' : 'opacity-60 hover:opacity-100'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-400 text-slate-900 flex items-center justify-center shadow-2xs font-black text-xs">
-                  🛡️
-                </div>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">আয়রন</span>
-              </button>
-
-              <button
-                onClick={() => setSelectedLeague('bronze')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all cursor-pointer ${
-                  selectedLeague === 'bronze' ? 'bg-amber-100 dark:bg-amber-950/60 scale-105' : 'opacity-60 hover:opacity-100'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-2xs font-black text-xs">
-                  🛡️
-                </div>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">ব্রোঞ্জ</span>
-              </button>
-
-              <button
-                onClick={() => setSelectedLeague('silver')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all cursor-pointer ${
-                  selectedLeague === 'silver' ? 'bg-slate-200 dark:bg-slate-700 scale-105' : 'opacity-60 hover:opacity-100'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-300 text-slate-900 flex items-center justify-center shadow-2xs font-black text-xs">
-                  🛡️
-                </div>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">সিলভার</span>
-              </button>
-
-              <button
-                onClick={() => setSelectedLeague('gold')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all cursor-pointer ${
-                  selectedLeague === 'gold' ? 'bg-yellow-100 dark:bg-yellow-950/60 scale-105' : 'opacity-60 hover:opacity-100'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-2xs font-black text-xs">
-                  👑
-                </div>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">গোল্ড</span>
-              </button>
-            </div>
-
-            {/* League Progress Bar */}
-            <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
-              <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                <span>০</span>
-                <span className="text-amber-500 flex items-center gap-0.5">⭐ {toBengaliNumeral(currentUserPoints)}</span>
-                <span>১০০</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-amber-400 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, Math.max(0, (currentUserPoints / 100) * 100))}%` }} 
-                />
-              </div>
-            </div>
-
-            {/* Leaderboard List */}
-            {activeLeagueUsers.length > 0 ? (
-              <div className="space-y-2 bg-white dark:bg-slate-900/90 rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 dark:border-slate-800">
-                {activeLeagueUsers.slice(0, 5).map((item) => (
-                  <div
-                    key={`${item.user_id}_${item.rank}`}
-                    className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {item.avatar_url ? (
-                        <img
-                          src={item.avatar_url}
-                          alt={item.user_name}
-                          className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 shrink-0 object-cover"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
-                          {item.user_name ? item.user_name.charAt(0) : 'প'}
-                        </div>
-                      )}
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-hind">
-                          {item.user_name}
-                        </h4>
-                      </div>
-                    </div>
-
-                    <div className="text-right space-y-0.5">
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                        {toBengaliNumeral(item.rank)}
-                      </span>
-                      <p className="text-[10px] font-bold text-slate-500">
-                        {toBengaliNumeral(item.total_points)} পয়েন্ট
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-7 px-4 text-center space-y-1 bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <p className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 font-hind">
-                  এখনো কোনো মেধা তালিকা রেকর্ড নেই
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  পরীক্ষায় অংশগ্রহণ করে প্রথম স্থান অধিকার করুন!
-                </p>
-              </div>
-            )}
-
-            {/* Pinned Current User Rank Bar */}
-            <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
-                  {currentUserName.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white font-hind">
-                    {currentUserName} (আপনি)
-                  </h4>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">
-                  {liveCurrentUserRank ? `${toBengaliNumeral(liveCurrentUserRank.rank)} তম` : '-'}
-                </span>
-                <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                  {toBengaliNumeral(currentUserPoints)} পয়েন্ট
-                </p>
-              </div>
-            </div>
+          <section className="pt-2">
+            <LeaderboardView
+              initialExamId="all"
+              isModal={false}
+              onReviewAnswers={onReviewAnswers}
+            />
           </section>
 
           {/* User Registration Modal */}

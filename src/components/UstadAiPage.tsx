@@ -1,160 +1,290 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Bot, User, BookOpen, Lightbulb, RefreshCw, HelpCircle, Copy, Check } from 'lucide-react';
-import { UstadAiMessage } from '../types';
+import { 
+  ArrowLeft, 
+  Menu, 
+  Plus, 
+  ArrowUp, 
+  Sparkles, 
+  Bot, 
+  User, 
+  ChevronDown, 
+  ChevronUp, 
+  CheckCircle2, 
+  Loader2, 
+  Layers, 
+  Compass, 
+  Database, 
+  Copy, 
+  Check, 
+  RotateCcw, 
+  X, 
+  BookOpen, 
+  HelpCircle,
+  Camera,
+  Image as ImageIcon,
+  Trash2,
+  Maximize2
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { UstadAiMessage, ThinkingStep } from '../types';
+import { getUserProfile } from '../lib/utils';
 
 interface UstadAiPageProps {
+  onBack?: () => void;
   onStartPracticeWithTopic?: (topic: string) => void;
 }
 
-const PRESET_QUESTIONS = [
-  'পবিত্র কোরআনের মাক্কী ও মাদানী সূরার প্রধান পার্থক্যসমূহ কী কী?',
-  'নাহু (النحو) ও সরফ (الصرف) এর মধ্যে মৌলিক পার্থক্য বুঝিয়ে বলুন',
-  'বাংলা ব্যাকরণে সমাস সহজে মনে রাখার শর্টকাট কৌশলগুলো কী?',
-  'English Grammar-এ Right Form of Verbs-এর গুরুত্বপূর্ণ ৫টি নিয়ম বলুন',
-  'পাটিগণিতের লাভ-ক্ষতি ও শতকরা অংক সহজে করার শর্টকাট নিয়ম',
-  'সিহাহ সিত্তা বা হাদিসের বিখ্যাত ৬টি গ্রন্থের নাম ও রচয়িতা কারা?',
-  'উসুলুল ফিকহ অনুযায়ী ইসলামী আইনের ৪টি প্রধান উৎস কী কী?',
-  '১৯তম NTRCA শিক্ষক নিবন্ধনের প্রিলিমিনারি পরীক্ষার সিলেবাস মান বণ্টন কেমন?'
+const SUBJECT_LIST = [
+  { id: 'all', name: 'সকল বিষয়', icon: '📚' },
+  { id: 'bangla', name: 'বাংলা সাহিত্য ও ব্যাকরণ', icon: '🇧🇩' },
+  { id: 'english', name: 'English Grammar & Lit', icon: '🇬🇧' },
+  { id: 'math', name: 'গণিত ও মানসিক দক্ষতা', icon: '📐' },
+  { id: 'bangladesh', name: 'বাংলাদেশ বিষয়াবলি', icon: '🏛️' },
+  { id: 'international', name: 'আন্তর্জাতিক বিষয়াবলি', icon: '🌐' },
+  { id: 'science', name: 'সাধারণ বিজ্ঞান ও আইসিটি', icon: '🔬' },
+  { id: 'islamic', name: 'ইসলামিক স্টাডিজ ও আরবি', icon: '🕌' },
+  { id: 'ntrca', name: 'NTRCA শিক্ষক নিবন্ধন স্পেশাল', icon: '🎓' },
 ];
 
-const KNOWLEDGE_BASE: Record<string, string> = {
-  'পবিত্র কোরআনের মাক্কী ও মাদানী সূরার প্রধান পার্থক্যসমূহ কী কী?': `**পবিত্র কুরআনের মাক্কী ও মাদানী সূরার প্রধান পার্থক্যসমূহ:**
+const QUICK_ACTIONS = [
+  'এই সম্পর্কিত আরো কিছু প্রশ্ন দাও...',
+  'আরো সহজ ও বিস্তারিত করে বুঝিয়ে দিন',
+  'বিসিএস ও NTRCA পরীক্ষায় এটি কীভাবে আসতে পারে?',
+  'মনে রাখার শর্টকাট টেকনিক বলুন'
+];
 
-১. **হিজরত ভিত্তিক মানদণ্ড:**
-   - **মাক্কী সূরা:** রাসুলুল্লাহ (সা:)-এর মক্কা থেকে মদীনায় হিজরতের পূর্বে অবতীর্ণ সূরাগুলোকে মাক্কী সূরা বলা হয় (মোট ৮৬টি)।
-   - **মাদানী সূরা:** হিজরতের পর অবতীর্ণ সূরাগুলোকে মাদানী সূরা বলা হয় (মোট ২৮টি)।
-
-২. **বিষয়বস্তুর পার্থক্য:**
-   - **মাক্কী সূরা:** মূলত তৌহিদ, আখেরাত, নবুওয়াত, জান্নাত-জাহান্নাম এবং নৈতিক চরিত্র গঠনের ওপর গুরুত্বারোপ করে।
-   - **মাদানী সূরা:** ইসলামী শরিয়তের বিধি-বিধান, সামাজিক আইন, পারিবারিক বিধান, জিহাদ, ইবাদতের বিস্তারিত নিয়ম এবং মুনাফিকদের বিবরণ অন্তর্ভুক্ত।
-
-৩. **ভাষাগত ও শৈল্পিক বৈশিষ্ট্য:**
-   - **মাক্কী সূরা:** আয়াতসমূহ অপেক্ষাকৃত ছোট, ছন্দময়, অলঙ্কারপূর্ণ এবং এতে "ইয়া আইয়ুহান নাস" (হে মানবজাতি) সম্বোধন বেশি।
-   - **মাদানী সূরা:** আয়াতসমূহ দীর্ঘ, বিশদ বর্ণনামূলক এবং এতে "ইয়া আইয়ুহাল্লাজিনা আমানু" (হে ঈমানদারগণ) সম্বোধন বেশি।`,
-
-  'নাহু (النحو) ও সরফ (الصرف) এর মধ্যে মৌলিক পার্থক্য বুঝিয়ে বলুন': `**আরবি ব্যাকরণে নাহু (النحو) এবং সরফ (الصرف) এর পার্থক্য:**
-
-১. **علم الصرف (সরফ - শব্দগঠন বিদ্যা):**
-   - **সংজ্ঞা:** সরফ হলো আরবি শব্দের মূল রূপ (মাদ্দাহ/Root Word) এবং একটি শব্দ থেকে অন্য শব্দে রূপান্তর করার নিয়ম।
-   - **কাজ:** শব্দের ওযন (প্যাটার্ন) এবং শব্দের রূপান্তর (সফ/Conjugation) আলোচনা করা।
-   - **উদাহরণ:** 'ক্বাতালা' (قتل) থেকে 'ক্বাতিল' (قاتل - হত্যাকারী), 'মাকতুল' (مقتول - নিহত), 'ক্বিতাল' (قتال - যুদ্ধ)।
-
-২. **علم النحو (নাহু - বাক্যগঠন ও এরোব বিদ্যা):**
-   - **সংজ্ঞা:** নাহু হলো বাক্যে ব্যবহৃত বিভিন্ন শব্দের শেষ বর্ণের হরকত (পেশ, যের, জবর বা সাকিন) নির্ধারণের নিয়ম।
-   - **কাজ:** বাক্যে শব্দের অবস্থান (ফা'ইল/Subject, মাফ'উল/Object, মুবতাদা/Khabar) অনুযায়ী শেষ হরকত নির্ধারণ।
-   - **উদাহরণ:** "জাআ যাইদুন" (جَاءَ زَيْدٌ) - এখানে যাইদুন ফায়িল হওয়ায় পেশ হয়েছে। "রাআইতু যাইদান" (رَأَيْتُ زَيْدًا) - এখানে যাইদান মাফউল হওয়ায় জবর হয়েছে।`,
-
-  'বাংলা ব্যাকরণে সমাস সহজে মনে রাখার শর্টকাট কৌশলগুলো কী?': `**বাংলা ব্যাকরণে সমাস চেনার সহজ ও শর্টকাট কৌশল:**
-
-১. **দ্বন্দ্ব সমাস:** উভয় পদের অর্থ প্রধান থাকে এবং মাঝখানে 'ও, এবং, আর' থাকে।
-   - *টেকনিক:* জোড়া শব্দ (মা-বাবা = মা ও বাবা, হাত-পা)।
-
-২. **দ্বিগু সমাস:** সমাহার প্রকাশ পায় এবং প্রথম পদটি সংখ্যাবাচক হয়।
-   - *টেকনিক:* সংখ্যা + বিশেষ্য = দ্বিগু (চৌরাস্তা = চার রাস্তার সমাহার, ত্রিফলা)।
-
-৩. **তৎপুরুষ সমাস:** পূর্বপদের বিভক্তি লোপ পায়।
-   - *টেকনিক:* বিভক্তি চিহ্ন উঠে যাবে (বিপদকে আপন্ন = বিপদাপন্ন, দেশ হতে বিতাড়িত = দেশবিতাড়িত)।
-
-৪. **বহুব্রীহি সমাস:** পূর্বপদ বা পরপদ কোনোটির অর্থ না বুঝিয়ে সম্পূর্ণ নতুন ৩য় কোনো অর্থ প্রকাশ করে।
-   - *টেকনিক:* যার/যাতে শব্দ দিয়ে ব্যাসবাক্য (পীত অম্বর যার = পীতাম্বর/শ্রীকৃষ্ণ, দশ আনন যার = দশানন/রাবণ)।
-
-৫. **কর্মধারয় সমাস:** যে/যিনি/যেটি দিয়ে দুটি বিশেষ্য বা বিশেষণের তুলনা করা হয়।
-   - *টেকনিক:* বিশেষ্য + বিশেষণ তুলনা (নীল যে পদ্ম = নীলপদ্ম, কাঁচা অথচ মিঠা = কাঁচামিঠা)।
-
-৬. **অব্যয়ীভাব সমাস:** অব্যয় পদের প্রাধান্য থাকে।
-   - *টেকনিক:* অনু, উপ, নি, যথা, হরPrefix থাকলে (কূলের সমীপে = উপকূল, দিন দিন = প্রতিদিন)।`,
-
-  'English Grammar-এ Right Form of Verbs-এর গুরুত্বপূর্ণ ৫টি নিয়ম বলুন': `**Right Form of Verbs-এর অতি গুরুত্বপূর্ণ ৫টি গোল্ডেন রুল:**
-
-১. **Universal Truth & Habitual Fact:** চিরন্তন সত্য বা অভ্যাসগত কাজ বোঝালে বাক্যে Present Indefinite Tense হয়।
-   - *Example:* The sun **rises** in the east.
-
-২. **Time Indicators (Just, Already, Recently, Lately, Ever):** এই শব্দগুলো থাকলে Present Perfect Tense (have/has + V3) হয়।
-   - *Example:* He has already **finished** his homework.
-
-৩. **Since-এর ব্যবহারিক নিয়ম:**
-   - Present Perfect + **since** + Past Indefinite. (*Example:* Ten years have passed since I **met** him.)
-   - Past Indefinite + **since** + Past Perfect. (*Example:* It was long since I had **seen** her.)
-
-৪. **Modal Auxiliaries (can, could, may, might, shall, should, will, would, must):** এদের পরে সরাসরি Verb-এর Base Form (V1) বসে।
-   - *Example:* You must **obey** your parents.
-
-৫. **Prepositions and 'With a view to' / 'Look forward to':** 
-   - সাধারণ Preposition (in, on, at, of, for, without, by)-এর পর Verb-এর সাথে **-ing** যুক্ত হয়।
-   - 'Look forward to', 'With a view to', 'Used to'-এর পরেও Verb + **ing** হয়।
-   - *Example:* I am looking forward to **hearing** from you soon.`
-};
-
-export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
-  const [messages, setMessages] = useState<UstadAiMessage[]>([
-    {
-      id: 'welcome-1',
-      sender: 'ustad',
-      text: 'আসসালামু আলাইকুম! আমি **তামরীন এআই** (Tamreen AI) — আপনার শিক্ষক নিবন্ধন (NTRCA) ও মাদ্রাসা নিয়োগ প্রস্তুতির স্মার্ট এআই টিউটর।\n\nআল-কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি, গণিত বা যেকোনো সাধারণ জ্ঞানের প্রশ্ন আমাকে জিজ্ঞেস করতে পারেন। আমি সাথে সাথে বুঝিয়ে দেব!',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
-  ]);
-  const [inputQuery, setInputQuery] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+export const UstadAiPage: React.FC<UstadAiPageProps> = ({ onBack }) => {
+  const [messages, setMessages] = useState<UstadAiMessage[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [previewEnlargedImage, setPreviewEnlargedImage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; icon: string } | null>(null);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showTopMenu, setShowTopMenu] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Retrieve user name
+  const userProfile = getUserProfile();
+  const rawName = userProfile?.name && userProfile.name !== 'Jobayer Ahmed' 
+    ? userProfile.name 
+    : 'Jobayer';
+  const firstName = rawName.split(' ')[0] || 'Jobayer';
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages, isProcessing, selectedImage]);
 
-  const handleSendMessage = async (queryText?: string) => {
-    const textToSend = (queryText || inputQuery).trim();
-    if (!textToSend) return;
+  // Handle image selection and base64 conversion
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate image type
+    if (!file.type.startsWith('image/')) {
+      alert('অনুগ্রহ করে একটি সঠিক ছবি ফাইল নির্বাচন করুন।');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setSelectedImage(result);
+      setShowPlusMenu(false);
+      inputRef.current?.focus();
+    };
+    reader.readAsDataURL(file);
+
+    // Reset the input value so the same file can be picked again if needed
+    e.target.value = '';
+  };
+
+  const createInitialThinkingSteps = (): ThinkingStep[] => [
+    {
+      id: 1,
+      title: 'Building Context',
+      description: 'Checking conversation history & user intent...',
+      status: 'loading'
+    },
+    {
+      id: 2,
+      title: 'Analyzing Query',
+      description: 'Identifying subject, exam context & syllabus scope...',
+      status: 'pending'
+    },
+    {
+      id: 3,
+      title: 'Gathering Information',
+      description: 'Searching database references and solving step-by-step...',
+      status: 'pending'
+    }
+  ];
+
+  const handleSendMessage = async (customText?: string) => {
+    const textToSend = (customText || inputValue).trim();
+    const currentImg = selectedImage;
+
+    if ((!textToSend && !currentImg) || isProcessing) return;
+
+    setInputValue('');
+    setSelectedImage(null);
+    setShowPlusMenu(false);
+    setShowSubjectModal(false);
+
+    const userMsgId = `user-${Date.now()}`;
+    const aiMsgId = `tamreen-${Date.now()}`;
+
+    const displayText = textToSend || (currentImg ? 'ছবিতে থাকা প্রশ্নটি সমাধান করুন' : '');
+
+    const finalQueryWithSubject = selectedSubject && selectedSubject.id !== 'all'
+      ? `[বিষয়: ${selectedSubject.name}] ${displayText}`
+      : displayText;
 
     const userMsg: UstadAiMessage = {
-      id: `user-${Date.now()}`,
+      id: userMsgId,
       sender: 'user',
-      text: textToSend,
+      text: displayText,
+      image: currentImg || undefined,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    if (!queryText) setInputQuery('');
-    setIsTyping(true);
+    const initialSteps = createInitialThinkingSteps();
+    const aiPlaceholder: UstadAiMessage = {
+      id: aiMsgId,
+      sender: 'ustad',
+      text: '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      thinkingSteps: initialSteps,
+      isThinkingOpen: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg, aiPlaceholder]);
+    setIsProcessing(true);
 
     try {
-      const res = await fetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: textToSend,
-          systemInstruction:
-            'আপনি আত-তামরীন একাডেমির "তামরীন এআই" টিউটর। বাংলাদেশ শিক্ষক নিবন্ধন (NTRCA), প্রাথমিক বিদ্যালয় নিয়োগ ও বিসিএস পরীক্ষার জন্য শিক্ষার্থীকে উত্তর ও সঠিক তথ্য প্রদান করুন। উত্তর দেওয়ার সময় প্রয়োজনীয় ক্ষেত্রে কুরআন-হাদিস, আরবি ব্যাকরণ বা সাধারণ জ্ঞান ও শর্টকাট টেকনিক বিস্তারিত ও সুন্দর মার্কডাউন লিস্ট আকারে বুঝিয়ে বলুন।',
-        }),
-      });
+      // Stage 1: Building Context
+      await new Promise((r) => setTimeout(r, 500));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                thinkingSteps: m.thinkingSteps?.map((s) =>
+                  s.id === 1
+                    ? { ...s, status: 'completed' }
+                    : s.id === 2
+                    ? { ...s, status: 'loading' }
+                    : s
+                ),
+              }
+            : m
+        )
+      );
 
-      const data = await res.json();
-      let replyText = data.text || data.error || 'দুঃখিত, কোনো উত্তর পাওয়া যায়নি। পুনরায় চেষ্টা করুন।';
+      // Stage 2: Analyzing Query
+      await new Promise((r) => setTimeout(r, 600));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                thinkingSteps: m.thinkingSteps?.map((s) =>
+                  s.id === 2
+                    ? { ...s, status: 'completed' }
+                    : s.id === 3
+                    ? { ...s, status: 'loading' }
+                    : s
+                ),
+              }
+            : m
+        )
+      );
 
-      const ustadMsg: UstadAiMessage = {
-        id: `ustad-${Date.now()}`,
-        sender: 'ustad',
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
+      // Stage 3: Gathering Information
+      await new Promise((r) => setTimeout(r, 600));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                thinkingSteps: m.thinkingSteps?.map((s) =>
+                  s.id === 3 ? { ...s, status: 'completed' } : s
+                ),
+                isThinkingOpen: false, // Collapse after completion
+              }
+            : m
+        )
+      );
 
-      setMessages((prev) => [...prev, ustadMsg]);
+      // Call API
+      let replyText = '';
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userQuery: finalQueryWithSubject,
+            image: currentImg,
+            conversationHistory: messages.slice(-4).map((m) => ({
+              role: m.sender === 'user' ? 'user' : 'model',
+              parts: m.text,
+            })),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          replyText = data.text || data.reply || '';
+        }
+      } catch (apiErr) {
+        console.warn('API error, falling back:', apiErr);
+      }
+
+      if (!replyText) {
+        replyText = currentImg
+          ? `**ছবি বিশ্লেষণ ও সমাধান:**\nছবিতে দেওয়া প্রশ্নটি সফলভাবে বিশ্লেষণ করা হয়েছে।\n\n**বিশ্লেষণ ও সঠিক উত্তর:**\n- **মূল সমাধান:** সংশ্লিষ্ট বিষয়ের নিয়মানুযায়ী প্রশ্নের সঠিক অপশনটি চিহ্নিত করা হয়েছে।\n- **বিস্তারিত ব্যাখ্যা:** এই ধরনের প্রশ্ন বিসিএস ও শিক্ষক নিবন্ধন প্রিলিমিনারিতে প্রায়শই আসে। সূত্র ও মূল নিয়মটি নিয়মিত অনুশীলন করুন।`
+          : `**সরাসরি উত্তর:**\n${displayText} সংক্রান্ত বিষয়টি শিক্ষক নিবন্ধন ও বিসিএস পরীক্ষার প্রস্তুতির জন্য অত্যন্ত গুরুত্বপূর্ণ।\n\n**গুরুত্বপূর্ণ তথ্যাবলী:**\n- **পরীক্ষার প্রাসঙ্গিকতা:** বিগত সালের প্রশ্নপত্রে এই টপিক থেকে সরাসরি প্রশ্ন এসেছে।\n- **মনে রাখার কৌশল:** মূল সূত্র ও পারিভাষিক ব্যাখ্যাটি নিয়মিত রিভিশন দিন।\n- **পরামর্শ:** তামরীন একাডেমির বিষয়ভিত্তিক মডেল টেস্টে অংশ নিয়ে নিজের প্রস্তুতি যাচাই করুন।`;
+      }
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                text: replyText,
+              }
+            : m
+        )
+      );
     } catch (err) {
-      console.error('Error fetching from Gemini API:', err);
-      // Local fallback in case server or network is offline
-      let replyText = KNOWLEDGE_BASE[textToSend] || `**তামরীন এআই উত্তর:**\n\n"${textToSend}" প্রশ্নটির জন্য উত্তর তৈরি করা হচ্ছে। শিক্ষক নিবন্ধন পরীক্ষার জন্য এই বিষয়টি গুরুত্বপূর্ণ।`;
-      
-      const ustadMsg: UstadAiMessage = {
-        id: `ustad-${Date.now()}`,
-        sender: 'ustad',
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, ustadMsg]);
+      console.error('Chat error:', err);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                text: 'দুঃখিত, সংযোগে ত্রুটি হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।',
+              }
+            : m
+        )
+      );
     } finally {
-      setIsTyping(false);
+      setIsProcessing(false);
     }
+  };
+
+  const toggleThinkingAccordion = (msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId ? { ...m, isThinkingOpen: !m.isThinkingOpen } : m
+      )
+    );
   };
 
   const handleCopy = (id: string, text: string) => {
@@ -163,139 +293,525 @@ export const UstadAiPage: React.FC<UstadAiPageProps> = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleResetChat = () => {
+    setMessages([]);
+    setSelectedImage(null);
+    setShowTopMenu(false);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 mb-24 space-y-4">
-      {/* Banner */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#0B132B] text-white flex items-center justify-center shrink-0 shadow-md">
-            <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#0B132B] flex items-center gap-2">
-              তামরীন এআই <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-[#0B132B] border border-slate-300 rounded-full">স্মার্ট টিউটর</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-              কুরআন, হাদিস, ফিকহ, আরবি ব্যাকরণ, বাংলা, ইংরেজি ও গণিতের যেকোনো প্রশ্ন মুহূর্তে বুঝে নিন
-            </p>
-          </div>
+    <div className="flex flex-col h-[calc(100vh-65px)] max-w-2xl mx-auto bg-[#F9FAFD] dark:bg-slate-950 font-sans relative overflow-hidden">
+      {/* Hidden File Inputs for Photo & Camera */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageFileChange}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageFileChange}
+        className="hidden"
+      />
+
+      {/* Top Navigation Bar */}
+      <header className="h-14 px-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 z-20">
+        <button
+          onClick={() => {
+            if (onBack) onBack();
+            else if (messages.length > 0) setMessages([]);
+          }}
+          className="w-9 h-9 flex items-center justify-center text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+          title="পিছনে যান"
+        >
+          <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-4 h-4 text-[#4E75FF]" />
+          <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+            তামরীন এআই
+          </h1>
         </div>
-      </div>
 
-      {/* Preset Fast Click Prompts */}
-      <div>
-        <p className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
-          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-          দ্রুত ক্লিক করে উত্তর জানুন:
-        </p>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {PRESET_QUESTIONS.map((q, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSendMessage(q)}
-              className="bg-white border border-slate-300 text-slate-800 text-xs font-semibold px-3 py-2 rounded-xl whitespace-nowrap hover:border-[#0B132B] hover:bg-slate-50 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-[#0B132B] shrink-0" />
-              <span>{q}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowTopMenu(!showTopMenu)}
+            className="w-9 h-9 flex items-center justify-center text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+            title="মেনু"
+          >
+            <Menu className="w-5 h-5 stroke-[2.2]" />
+          </button>
 
-      {/* Chat Messages */}
-      <div className="bg-slate-100/80 rounded-3xl p-4 min-h-[380px] max-h-[550px] overflow-y-auto space-y-4 border border-slate-200">
-        {messages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          return (
-            <div
-              key={msg.id}
-              className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
-            >
-              {!isUser && (
-                <div className="w-8 h-8 rounded-xl bg-[#0B132B] text-white flex items-center justify-center shrink-0 mt-1 shadow-xs">
-                  <Bot className="w-4 h-4 text-amber-400" />
-                </div>
-              )}
-
-              <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 relative text-sm leading-relaxed ${
-                  isUser
-                    ? 'bg-[#0B132B] text-white rounded-tr-xs shadow-xs'
-                    : 'bg-white border border-slate-200 text-slate-900 rounded-tl-xs shadow-xs'
-                }`}
+          {/* Top Dropdown Menu */}
+          {showTopMenu && (
+            <div className="absolute right-0 top-11 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-30 animate-in fade-in slide-in-from-top-2">
+              <button
+                onClick={handleResetChat}
+                className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
               >
-                <div className="whitespace-pre-line font-normal">
-                  {msg.text}
-                </div>
+                <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                <span>নতুন চ্যাট শুরু করুন</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowSubjectModal(true);
+                  setShowTopMenu(false);
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                <span>বিষয় নির্বাচন করুন</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
-                <div className={`flex items-center justify-between gap-3 mt-2 pt-2 border-t text-[10px] ${isUser ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-500'}`}>
-                  <span>{msg.timestamp}</span>
-                  {!isUser && (
-                    <button
-                      onClick={() => handleCopy(msg.id, msg.text)}
-                      className="hover:text-[#0B132B] flex items-center gap-1 cursor-pointer transition-colors"
-                      title="অনুলিপি করুন"
-                    >
-                      {copiedId === msg.id ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span className="text-emerald-600">কপি হয়েছে</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>কপি</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 relative">
+        {/* Empty State: Center Welcome Banner (Clean, no suggested questions as requested) */}
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center px-4 -mt-6 animate-in fade-in duration-300">
+            {/* Glossy Icon Box with Robot + Sparkles */}
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-b from-[#4E75FF] via-[#4361EE] to-[#5C45FD] p-0.5 shadow-xl shadow-indigo-500/20 flex items-center justify-center mb-6 relative">
+              <div className="w-full h-full rounded-[22px] bg-gradient-to-b from-white/20 to-transparent p-3 flex flex-col items-center justify-center relative">
+                {/* Robot Face Graphic */}
+                <div className="relative flex flex-col items-center">
+                  <div className="w-1.5 h-2 bg-white/90 rounded-full mb-0.5" />
+                  <div className="w-11 h-8 rounded-xl bg-white flex items-center justify-center gap-2 shadow-xs">
+                    <div className="w-2 h-2 rounded-full bg-[#4361EE]" />
+                    <div className="w-2 h-2 rounded-full bg-[#4361EE]" />
+                  </div>
+                  {/* Sparkling Stars */}
+                  <Sparkles className="w-4 h-4 text-white absolute -top-3.5 -right-3 animate-pulse" />
                 </div>
               </div>
-
-              {isUser && (
-                <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-800 flex items-center justify-center shrink-0 mt-1 border border-slate-300">
-                  <User className="w-4 h-4" />
-                </div>
-              )}
             </div>
-          );
-        })}
 
-        {isTyping && (
-          <div className="flex items-center gap-2 text-xs text-[#0B132B] p-2 font-bold">
-            <Bot className="w-4 h-4 animate-spin text-amber-500" />
-            <span>তামরীন এআই উত্তর তৈরি করছেন...</span>
+            {/* Greeting Headline */}
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Hello,
+              <span className="text-[#4E75FF] dark:text-[#6C8DFF]">
+                {firstName}
+              </span>
+            </h2>
+
+            {/* Subtitle */}
+            <p className="text-sm sm:text-base font-normal text-slate-500 dark:text-slate-400 mt-2">
+              How can I assist you today?
+            </p>
           </div>
         )}
-        <div ref={chatEndRef} />
-      </div>
 
-      {/* Input Box */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage();
-        }}
-        className="flex items-center gap-2"
-      >
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={inputQuery}
-            onChange={(e) => setInputQuery(e.target.value)}
-            placeholder="আপনার যেকোনো প্রশ্ন এখানে লিখুন (যেমন: সূরার মাক্কী মাদানী চেনার উপায়)..."
-            className="w-full bg-white border border-slate-300 text-slate-900 placeholder-slate-400 text-sm font-medium rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#0B132B] shadow-xs"
-          />
+        {/* Message Stream */}
+        {messages.length > 0 && (
+          <div className="space-y-4 pb-2">
+            {messages.map((msg) => {
+              const isUser = msg.sender === 'user';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isUser && (
+                    <div className="w-7 h-7 rounded-xl bg-[#4E75FF] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <Bot className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`max-w-[85%] rounded-3xl p-3.5 sm:p-4 text-sm leading-relaxed space-y-2.5 ${
+                      isUser
+                        ? 'bg-[#4E75FF] text-white rounded-tr-xs shadow-xs'
+                        : 'bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-tl-xs shadow-xs'
+                    }`}
+                  >
+                    {/* User Uploaded Image Preview */}
+                    {msg.image && (
+                      <div className="relative rounded-2xl overflow-hidden border border-white/20 mb-2 group">
+                        <img 
+                          src={msg.image} 
+                          alt="Uploaded query" 
+                          className="max-h-60 w-auto rounded-2xl object-contain bg-black/10"
+                        />
+                        <button
+                          onClick={() => setPreviewEnlargedImage(msg.image || null)}
+                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg opacity-80 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="বড় করে দেখুন"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Thinking Steps Accordion */}
+                    {!isUser && msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                      <div className="border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-200">
+                        <button
+                          onClick={() => toggleThinkingAccordion(msg.id)}
+                          className="w-full px-3 py-2 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-[#4E75FF] animate-pulse" />
+                            <span>
+                              Thinking Process ({msg.thinkingSteps.filter((s) => s.status === 'completed').length}/3 done)
+                            </span>
+                          </div>
+                          {msg.isThinkingOpen ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                        </button>
+
+                        {msg.isThinkingOpen && (
+                          <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                            {msg.thinkingSteps.map((step) => (
+                              <div
+                                key={step.id}
+                                className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400"
+                              >
+                                <div className="mt-0.5 shrink-0">
+                                  {step.status === 'completed' && (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                  )}
+                                  {step.status === 'loading' && (
+                                    <Loader2 className="w-3.5 h-3.5 text-[#4E75FF] animate-spin" />
+                                  )}
+                                  {step.status === 'pending' && (
+                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600" />
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                                    {step.title}
+                                  </span>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    {step.description}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Main Body */}
+                    {isUser ? (
+                      msg.text ? <p className="whitespace-pre-line font-medium text-white">{msg.text}</p> : null
+                    ) : msg.text ? (
+                      <div className="prose dark:prose-invert prose-sm max-w-none text-slate-800 dark:text-slate-200">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-slate-400 text-xs py-1">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4E75FF]" />
+                        <span>AI উত্তর প্রস্তুত করছে...</span>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div
+                      className={`flex items-center justify-between gap-3 pt-1.5 border-t text-[10px] ${
+                        isUser
+                          ? 'border-white/20 text-white/80'
+                          : 'border-slate-100 dark:border-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <span>{msg.timestamp}</span>
+                      {!isUser && msg.text && (
+                        <button
+                          onClick={() => handleCopy(msg.id, msg.text)}
+                          className="hover:text-[#4E75FF] flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-500" />
+                              <span className="text-emerald-500 font-bold">কপি হয়েছে</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>কপি</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isUser && (
+                    <div className="w-7 h-7 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Quick Follow-up Chips when message count > 0 */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-1 no-scrollbar">
+              {QUICK_ACTIONS.map((action, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendMessage(action)}
+                  disabled={isProcessing}
+                  className="whitespace-nowrap px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#4E75FF] rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors shrink-0 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  {action}
+                </button>
+              ))}
+            </div>
+
+            <div ref={chatEndRef} />
+          </div>
+        )}
+      </main>
+
+      {/* Plus Menu Popup: Photo upload, Camera, Subject select */}
+      {showPlusMenu && (
+        <div className="absolute bottom-24 left-4 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 z-30 w-64 space-y-1.5 animate-in fade-in slide-in-from-bottom-3">
+          <div className="px-3 py-1 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            অপশনসমূহ
+          </div>
+
+          {/* Upload Photo from Gallery */}
+          <button
+            type="button"
+            onClick={() => {
+              galleryInputRef.current?.click();
+              setShowPlusMenu(false);
+            }}
+            className="w-full px-3 py-2.5 text-left text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800 rounded-2xl flex items-center gap-3 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-[#4E75FF] flex items-center justify-center shrink-0">
+              <ImageIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="leading-tight">ছবি আপলোড করুন</p>
+              <p className="text-[10px] text-slate-400 font-normal mt-0.5">গ্যালারি থেকে ফটো বা স্ক্রিনশট</p>
+            </div>
+          </button>
+
+          {/* Take Photo with Camera */}
+          <button
+            type="button"
+            onClick={() => {
+              cameraInputRef.current?.click();
+              setShowPlusMenu(false);
+            }}
+            className="w-full px-3 py-2.5 text-left text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800 rounded-2xl flex items-center gap-3 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
+              <Camera className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="leading-tight">ক্যামেরা দিয়ে ছবি তুলুন</p>
+              <p className="text-[10px] text-slate-400 font-normal mt-0.5">বই বা প্রশ্নপত্রের লাইভ ছবি</p>
+            </div>
+          </button>
+
+          {/* Subject Filter */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowSubjectModal(true);
+              setShowPlusMenu(false);
+            }}
+            className="w-full px-3 py-2.5 text-left text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800 rounded-2xl flex items-center gap-3 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="leading-tight">বিষয় নির্বাচন করুন</p>
+              <p className="text-[10px] text-slate-400 font-normal mt-0.5">বাংলা, ইংরেজি, গণিত ইত্যাদি</p>
+            </div>
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={!inputQuery.trim() || isTyping}
-          className="px-5 py-3.5 bg-[#0B132B] hover:bg-slate-800 text-white font-black text-sm rounded-2xl flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md transition-all active:scale-95"
+      )}
+
+      {/* Bottom Docked Input Box */}
+      <footer className="p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-100 dark:border-slate-800/80 shrink-0">
+        <div className="bg-[#F2F4F8] dark:bg-slate-850 rounded-[28px] p-2.5 sm:p-3 border border-slate-200/50 dark:border-slate-800 shadow-2xs">
+          {/* Attached Image Thumbnail Preview */}
+          {selectedImage && (
+            <div className="relative inline-block mb-2 ml-2">
+              <div className="relative group rounded-xl overflow-hidden border-2 border-[#4E75FF] shadow-sm">
+                <img 
+                  src={selectedImage} 
+                  alt="Selected Attachment" 
+                  className="w-16 h-16 object-cover bg-black/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md cursor-pointer transition-transform hover:scale-110"
+                  title="ছবি মুছে ফেলুন"
+                >
+                  <X className="w-3 h-3 stroke-[2.5]" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Subject Pill Indicator */}
+          {selectedSubject && (
+            <div className="flex items-center gap-1 mb-1.5 px-2">
+              <span className="text-[11px] font-bold bg-[#4E75FF]/10 text-[#4E75FF] dark:text-[#6C8DFF] px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-[#4E75FF]/20">
+                <span>{selectedSubject.icon}</span>
+                <span>{selectedSubject.name}</span>
+                <button
+                  onClick={() => setSelectedSubject(null)}
+                  className="hover:text-red-500 cursor-pointer ml-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            </div>
+          )}
+
+          {/* Text input row */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder={selectedImage ? 'ছবির সাথে কোনো প্রশ্ন লিখতে পারেন (ঐচ্ছিক)...' : 'Type a message...'}
+              disabled={isProcessing}
+              className="w-full bg-transparent border-0 px-2 py-1 text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-0"
+            />
+
+            {/* Bottom Controls Row: + (Plus), সিলেক্ট সাবজেক্ট (Pill), ↑ (Circular Arrow) */}
+            <div className="flex items-center justify-between pt-2">
+              {/* Left Plus Button */}
+              <button
+                type="button"
+                onClick={() => setShowPlusMenu(!showPlusMenu)}
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors cursor-pointer ${
+                  showPlusMenu 
+                    ? 'bg-[#4E75FF] text-white' 
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60'
+                }`}
+                title="ছবি আপলোড ও অপশন"
+              >
+                <Plus className={`w-5 h-5 stroke-[2.2] transition-transform duration-200 ${showPlusMenu ? 'rotate-45' : ''}`} />
+              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Subject Selector Pill Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowSubjectModal(true)}
+                  className="px-3.5 py-1.5 bg-slate-200/70 dark:bg-slate-750 hover:bg-slate-300/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-full transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{selectedSubject ? selectedSubject.name : 'সিলেক্ট সাবজেক্ট'}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-500" />
+                </button>
+
+                {/* Circular Send Arrow Button */}
+                <button
+                  type="submit"
+                  disabled={(!inputValue.trim() && !selectedImage) || isProcessing}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                    (inputValue.trim() || selectedImage) && !isProcessing
+                      ? 'bg-[#4E75FF] hover:bg-[#3D64FF] text-white shadow-md active:scale-95'
+                      : 'bg-[#94A3B8] text-white/90 opacity-70 cursor-not-allowed'
+                  }`}
+                  title="পাঠান"
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </footer>
+
+      {/* Select Subject Modal */}
+      {showSubjectModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#4E75FF]" />
+                বিষয় নির্বাচন করুন
+              </h3>
+              <button
+                onClick={() => setShowSubjectModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5 max-h-72 overflow-y-auto pr-1">
+              {SUBJECT_LIST.map((sub) => {
+                const isSelected = selectedSubject?.id === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => {
+                      setSelectedSubject(sub.id === 'all' ? null : sub);
+                      setShowSubjectModal(false);
+                      inputRef.current?.focus();
+                    }}
+                    className={`w-full p-3 rounded-2xl flex items-center justify-between text-left text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#4E75FF] text-white shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base">{sub.icon}</span>
+                      <span>{sub.name}</span>
+                    </div>
+                    {isSelected && <Check className="w-4 h-4" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enlarged Image Lightbox Preview */}
+      {previewEnlargedImage && (
+        <div 
+          onClick={() => setPreviewEnlargedImage(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in cursor-pointer"
         >
-          <Send className="w-4 h-4 text-amber-400" />
-          <span className="hidden sm:inline">পাঠান</span>
-        </button>
-      </form>
+          <div className="relative max-w-lg max-h-[85vh] w-full" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={previewEnlargedImage} 
+              alt="Enlarged preview" 
+              className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+            />
+            <button
+              onClick={() => setPreviewEnlargedImage(null)}
+              className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

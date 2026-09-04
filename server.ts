@@ -1359,6 +1359,68 @@ app.get('/api/rpc/get_free_overall_leaderboard', (req, res) => {
     return res.status(500).json({ error: err?.message || 'Error getting free overall leaderboard' });
   }
 });
+const TAMREEN_AI_SYSTEM_INSTRUCTION = `আপনি "তামরীন একাডেমি" (Tamreen Academy) এর একজন অভিজ্ঞ, অমায়িক এবং অত্যন্ত দক্ষ শিক্ষামূলক AI টিউটর। আপনার প্রধান দায়িত্ব হলো বিসিএস (BCS), শিক্ষক নিবন্ধন (NTRCA), প্রাথমিক সহকারী শিক্ষক নিয়োগ এবং ব্যাংক জব পরীক্ষার্থীদের প্রস্তুতিতে সরাসরি ও নির্ভুল সহায়তা প্রদান করা।
+
+নির্দেশনাসমূহ:
+1. ভাষা ও শৈলী: সর্বদা প্রাতিষ্ঠানিক ও মার্জিত বাংলা ভাষায় কথা বলুন। সম্বোধন হিসেবে 'আপনি' ব্যবহার করুন। উত্তর স্পষ্ট, তথ্যবহুল এবং পরীক্ষাকেন্দ্রিক হতে হবে।
+2. উত্তর কাঠামোর নিয়ম (বাধ্যতামূলক):
+   - প্রথম ১-২ লাইনে প্রশ্নের সরাসরি, সংক্ষিপ্ত এবং সুনির্দিষ্ট মূল উত্তরটি প্রদান করুন।
+   - এরপর "গুরুত্বপূর্ণ তথ্যাবলী:" বা "বিস্তারিত আলোচনা:" শিরোনাম দিয়ে বুলেট পয়েন্ট আকারে ব্যাখ্যা করুন।
+   - বিগত বছরের প্রশ্ন বা পরীক্ষার জন্য উপযোগী পয়েন্টগুলোকে বোল্ড (**Bold**) টেক্সটে হাইলাইট করুন।
+   - অপ্রয়োজনীয় ভূমিকা বা দীর্ঘ মুখবন্ধ এড়িয়ে চলুন।
+3. কনটেক্সট ব্যবহার: যদি ডাটাবেজ থেকে কোনো প্রাসঙ্গিক প্রশ্ন বা তথ্য (Context) সরবরাহ করা হয়, তবে সেটিকে ভিত্তি করে উত্তর সাজান। কোনো তথ্য অজানা থাকলে বানিয়ে তথ্য দেওয়া যাবে না।`;
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { userQuery, retrievedContext, conversationHistory = [], image } = req.body;
+    const queryText = userQuery || req.body.prompt || (image ? 'অনুগ্রহ করে ছবিতে থাকা প্রশ্ন বা বিষয়টি সমাধান ও বিস্তারিত বুঝিয়ে দিন।' : '');
+    if (!queryText && !image) {
+      return res.status(400).json({ error: 'userQuery or image is required' });
+    }
+
+    const ai = getGeminiClient();
+    const textPrompt = retrievedContext
+      ? `[প্রাসঙ্গিক ডাটাবেজ রেফারেন্স]:\n${retrievedContext}\n\n[শিক্ষার্থীর প্রশ্ন]:\n${queryText}`
+      : queryText;
+
+    let contentsPayload: any = textPrompt;
+
+    if (image && typeof image === 'string') {
+      const match = image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+      if (match) {
+        contentsPayload = [
+          {
+            inlineData: {
+              mimeType: match[1],
+              data: match[2],
+            },
+          },
+          {
+            text: textPrompt,
+          },
+        ];
+      }
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: contentsPayload,
+      config: {
+        systemInstruction: TAMREEN_AI_SYSTEM_INSTRUCTION,
+        temperature: 0.3,
+      },
+    });
+
+    const replyText = response.text || 'কোনো উত্তর তৈরি করা সম্ভব হয়নি।';
+    return res.json({ text: replyText, reply: replyText });
+  } catch (err: any) {
+    console.error('Tamreen AI Chat API Error:', err);
+    return res.status(500).json({
+      error: err?.message || 'Gemini API থেকে উত্তর গ্রহণে ত্রুটি হয়েছে।',
+    });
+  }
+});
+
 app.post('/api/gemini/generate', async (req, res) => {
   try {
     const { prompt, systemInstruction } = req.body;
@@ -1371,9 +1433,8 @@ app.post('/api/gemini/generate', async (req, res) => {
       model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
-        systemInstruction:
-          systemInstruction ||
-          'আপনি আত-তামরীন একাডেমির "তামরীন এআই" স্মার্ট টিউটর। বাংলাদেশ শিক্ষক নিবন্ধন (NTRCA), মাদ্রাসা ও বিসিএস পরীক্ষার পরীক্ষার্থীদের জন্য সহজ ও শিক্ষণীয় ভাষায় বিস্তারিত উত্তর, ব্যাখ্যা ও গুরুত্বপূর্ণ পরামর্শ প্রদান করুন। সুন্দর ও স্পষ্ট ব্যাকগ্রাউন্ড সহ পয়েন্ট করে উত্তর দিন।',
+        systemInstruction: systemInstruction || TAMREEN_AI_SYSTEM_INSTRUCTION,
+        temperature: 0.3,
       },
     });
 

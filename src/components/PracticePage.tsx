@@ -545,7 +545,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                           key={optionKey}
                           type="button"
                           disabled={isQuestionAnswered}
-                          onClick={() => handleSelectOption(q.id, optionKey)}
+                          onClick={() => handleSelectOption(String(q.id), optionKey)}
                           dir={areOptionsRtl ? 'rtl' : 'ltr'}
                           className={`w-full p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                             isQuestionAnswered ? 'cursor-not-allowed' : 'cursor-pointer'
