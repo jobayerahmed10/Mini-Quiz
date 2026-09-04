@@ -821,13 +821,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-[200px]">
                             {item.userName}
                           </div>
-                          {item.isGuest ? (
-                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
-                              গেস্ট
-                            </span>
-                          ) : (
+                          {item.rollNumber && (
                             <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
-                              {item.rollNumber ? `রোল: ${item.rollNumber}` : 'রেজিস্টার্ড'}
+                              রোল: {item.rollNumber}
                             </span>
                           )}
                           {item.isCurrentUser && (
@@ -1115,7 +1111,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               )}
 
               {/* Current User Mint Card Banner */}
-              {currentUserRankItem ? (
+              {currentUserRankItem && (
                 <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border-2 border-[#10B981] rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-base font-black text-[#0B132B] dark:text-white shrink-0">
@@ -1170,25 +1166,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </span>
                   </div>
                 </div>
-              ) : (
-                <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border border-[#10B981]/60 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black">
-                      <User className="w-5 h-5 text-amber-300" />
-                    </div>
-                    <div>
-                      <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white">
-                        {userName} (আপনি)
-                      </h4>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-                        এই সময়ে এখনো কোনো পরীক্ষা সম্পন্ন করেননি। পরীক্ষা দিয়ে পয়েন্ট অর্জন করুন!
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-bold text-slate-400">০ পয়েন্ট</span>
-                  </div>
-                </div>
               )}
 
               {/* Other Participants Rankings List */}
@@ -1230,13 +1207,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                             <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate max-w-[130px] sm:max-w-[200px]">
                               {item.userName}
                             </h4>
-                            {item.isGuest ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold">
-                                গেস্ট
-                              </span>
-                            ) : (
+                            {item.rollNumber && (
                               <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-[9px] font-bold">
-                                {item.rollNumber ? `রোল: ${item.rollNumber}` : 'রেজিস্টার্ড'}
+                                রোল: {item.rollNumber}
                               </span>
                             )}
                             {item.isCurrentUser && (
