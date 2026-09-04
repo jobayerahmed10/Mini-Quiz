@@ -33,10 +33,11 @@ import {
   fetchLeaderboardEntriesFromSupabase, 
   getDistinctExamParticipantCounts,
   fetchUserCompletedExamsFromSupabase,
-  subscribeToExamsAndQuestionsTable 
+  subscribeToExamsAndQuestionsTable,
+  checkIfExamAlreadyCompleted
 } from '../lib/supabase';
 import { SUBJECT_CATEGORIES, detectQuestionSubject } from '../lib/subjects';
-import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, getUserProfile, UserProfile } from '../lib/utils';
+import { toBengaliNumeral, formatBengaliDateWithDay, isExamCompleted, markExamCompleted, getUserProfile, getUserUniqueId, UserProfile } from '../lib/utils';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { SharedExamEntranceCard } from './SharedExamEntranceCard';
 import { CoursesPage } from './CoursesPage';
@@ -99,7 +100,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [showRegModal, setShowRegModal] = useState(false);
   const [pendingStartOpts, setPendingStartOpts] = useState<ExamStartOptions | null>(null);
 
-  const handleAttemptStartExam = (opts: ExamStartOptions) => {
+  const handleAttemptStartExam = async (opts: ExamStartOptions) => {
+    const profile = getUserProfile();
+    const currentUid = profile?.id || getUserUniqueId();
+
     const isDone = isExamCompleted(opts.examId, opts.examType) ||
       serverCompletedIds.some(id => {
         const cleanId = String(id).trim().toLowerCase();
@@ -121,7 +125,26 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       return;
     }
 
-    const profile = getUserProfile();
+    // Database / Server level verification: ONE-EXAM-ONE-COUNT rule
+    try {
+      const checkRes = await checkIfExamAlreadyCompleted(currentUid, opts.examId, profile?.roll_number);
+      if (checkRes.isCompleted) {
+        if (opts.examId) markExamCompleted(opts.examId);
+        if (onReviewAnswers) {
+          onReviewAnswers({
+            examId: opts.examId,
+            subject: opts.subject,
+            questionCount: opts.questionCount,
+            timeMinutes: opts.timeMinutes,
+            examType: opts.examType,
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn('Attempt check warning:', e);
+    }
+
     if (profile && profile.name) {
       onStartExam(opts);
     } else {

@@ -8,6 +8,8 @@ import {
   ExamItem,
   getExamLeaderboard,
   getFreeOverallLeaderboard,
+  getTamreenLeaderboard,
+  getDhakaDateInfo,
   ExamLeaderboardItem,
   FreeOverallLeaderboardItem,
   subscribeToLeaderboard
@@ -262,36 +264,44 @@ export function computeLeaderboard(
     return itemsList.map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   } else {
-    // For 'today', 'this_week', 'this_month', 'all_time':
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    // ONE-EXAM-ONE-COUNT rule:
+    // Group all entries by (participantKey, examId). Sort attempts by created_at ASC. Keep ONLY attempt 1.
+    const userExamMap = new Map<string, LeaderboardEntry[]>();
+    for (const item of filtered) {
+      if (selectedExamId && selectedExamId !== 'all' && !isExamMatch(item)) continue;
+      const isReg = Boolean(item.user_id && !item.user_id.startsWith('guest_') && !item.user_id.startsWith('anon_'));
+      const participantKey = isReg
+        ? item.user_id!.trim()
+        : (item.guest_name || item.user_name || item.id).trim().toLowerCase();
+      const examKey = (item.exam_id || item.exam_title || 'general').trim().toLowerCase();
+      const groupKey = `${participantKey}:::${examKey}`;
 
-    if (filterType === 'today') {
-      filtered = filtered.filter((e) => {
-        const t = new Date(e.created_at).getTime();
-        return !isNaN(t) && t >= startOfToday;
-      });
-    } else if (filterType === 'this_week') {
-      const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-      filtered = filtered.filter((e) => {
-        const t = new Date(e.created_at).getTime();
-        return !isNaN(t) && (now.getTime() - t <= oneWeekMs);
-      });
-    } else if (filterType === 'this_month') {
-      const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
-      filtered = filtered.filter((e) => {
-        const t = new Date(e.created_at).getTime();
-        return !isNaN(t) && (now.getTime() - t <= oneMonthMs);
-      });
+      if (!userExamMap.has(groupKey)) {
+        userExamMap.set(groupKey, []);
+      }
+      userExamMap.get(groupKey)!.push(item);
     }
 
-    if (selectedExamId && selectedExamId !== 'all') {
-      filtered = filtered.filter(isExamMatch);
+    const firstAttempts: LeaderboardEntry[] = [];
+    for (const attempts of userExamMap.values()) {
+      attempts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      firstAttempts.push(attempts[0]);
     }
+
+    // Filter by Asia/Dhaka time for 'today', 'this_week', 'this_month', 'all_time':
+    const nowDhaka = getDhakaDateInfo(new Date());
+    const periodFiltered = firstAttempts.filter((e) => {
+      if (filterType === 'all_time') return true;
+      const eDhaka = getDhakaDateInfo(e.created_at);
+      if (filterType === 'today') return eDhaka.dateStr === nowDhaka.dateStr;
+      if (filterType === 'this_week') return eDhaka.weekMondayStr === nowDhaka.weekMondayStr;
+      if (filterType === 'this_month') return eDhaka.monthStr === nowDhaka.monthStr;
+      return true;
+    });
 
     // Group entries by distinct participant
     const userGroupMap = new Map<string, LeaderboardEntry[]>();
-    for (const item of filtered) {
+    for (const item of periodFiltered) {
       const isReg = Boolean(item.user_id && !item.user_id.startsWith('guest_') && !item.user_id.startsWith('anon_'));
       const participantKey = isReg
         ? item.user_id!.trim()
@@ -306,7 +316,7 @@ export function computeLeaderboard(
     const itemsList: LeaderboardDisplayItem[] = [];
     for (const [pKey, userEntries] of userGroupMap.entries()) {
       const firstEntry = userEntries[0];
-      const testCount = userEntries.length;
+      const testCount = userEntries.length; // unique completed exams count
 
       const eUserId = (firstEntry.user_id || '').trim();
       const isCurr = Boolean(
@@ -328,31 +338,24 @@ export function computeLeaderboard(
         ? rawClean
         : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
 
+      let totalPoints = 0;
       let totalCorrect = 0;
       let totalQuestions = 0;
-      let totalScore = 0;
-      let earliestCreatedAt = firstEntry.created_at;
+      let lastPointTime = 0;
       let latestAvatar = firstEntry.user_avatar;
 
       for (const e of userEntries) {
-        totalCorrect += Number(e.correct_count || e.score || 0);
-        totalQuestions += Number(e.total_questions || 0);
-        totalScore += Number(e.score || e.correct_count || 0);
+        const pts = Number(e.points !== undefined && e.points !== null ? e.points : (e.correct_count ?? e.score ?? 0));
+        const corr = Number(e.correct_count ?? e.score ?? 0);
+        totalPoints += pts;
+        totalCorrect += corr;
+        totalQuestions += Number(e.total_questions || 10);
         if (e.user_avatar) latestAvatar = e.user_avatar;
-        if (new Date(e.created_at).getTime() < new Date(earliestCreatedAt).getTime()) {
-          earliestCreatedAt = e.created_at;
-        }
+        const t = new Date(e.created_at || 0).getTime();
+        if (t > lastPointTime) lastPointTime = t;
       }
 
-      const points = totalScore;
-
-      let avgAccuracy = 0;
-      if (totalQuestions > 0) {
-        avgAccuracy = Math.round((totalCorrect / totalQuestions) * 100);
-      } else {
-        const sumAcc = userEntries.reduce((acc, e) => acc + (e.accuracy || 0), 0);
-        avgAccuracy = Math.round(sumAcc / testCount);
-      }
+      const avgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 100;
 
       itemsList.push({
         id: `user_agg_${pKey}`,
@@ -363,23 +366,23 @@ export function computeLeaderboard(
         isGuest,
         testCount,
         avgAccuracy,
-        points,
+        points: totalPoints,
         totalQuestions,
         correctCount: totalCorrect,
         wrongCount: Math.max(0, totalQuestions - totalCorrect),
-        score: totalScore,
-        createdAt: earliestCreatedAt,
+        score: totalPoints,
+        createdAt: new Date(lastPointTime || Date.now()).toISOString(),
       });
     }
 
     // Ranking rules:
     // 1. Points (desc)
-    // 2. Average Accuracy (desc)
-    // 3. Test Count (desc)
-    // 4. Submission time (asc)
+    // 2. Correct count (desc)
+    // 3. Test count / unique exams (desc)
+    // 4. Earliest time reaching points (asc)
     itemsList.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
-      if (b.avgAccuracy !== a.avgAccuracy) return b.avgAccuracy - a.avgAccuracy;
+      if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
       if (b.testCount !== a.testCount) return b.testCount - a.testCount;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
@@ -440,6 +443,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [rpcRankedList, setRpcRankedList] = useState<LeaderboardDisplayItem[] | null>(null);
+  const [rpcCurrentUser, setRpcCurrentUser] = useState<LeaderboardDisplayItem | null>(null);
+  const [totalParticipants, setTotalParticipants] = useState<number>(0);
+  const [displayCount, setDisplayCount] = useState<number>(20);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [examList, setExamList] = useState<ExamItem[]>(propsExams || []);
 
@@ -469,6 +475,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   // Fetch Leaderboard entries via secure database RPCs / fallback
   const loadLeaderboardData = useCallback(async () => {
     setIsLoading(true);
+    setDisplayCount(20);
     try {
       if (currentFilter === 'this_exam' && selectedExamId && selectedExamId !== 'all') {
         // A. Call secure Exam-Specific Leaderboard RPC / Direct Query
@@ -529,80 +536,89 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             };
           });
           setRpcRankedList(mapped.length > 0 ? mapped : null);
+          setTotalParticipants(mapped.length);
+          setRpcCurrentUser(null);
         } else {
           setRpcRankedList(null);
+          setTotalParticipants(0);
+          setRpcCurrentUser(null);
         }
       } else {
-        // B. Call secure Free Overall Leaderboard RPC
-        const freeRows = await getFreeOverallLeaderboard(currentFilter);
-        if (freeRows && freeRows.length > 0) {
-          const userProf = getUserProfile();
-          const isReg = isUserRegistered();
-          const userRoll = userProf?.roll_number || userProf?.student_id;
+        // B. Tamreen Dynamic Points Leaderboard (Enforcing ONE-EXAM-ONE-COUNT rule & Asia/Dhaka time)
+        try {
+          const tamreenRes = await getTamreenLeaderboard({
+            periodType: currentFilter as any,
+            pageNumber: 1,
+            pageSize: 100,
+            currentUserId: currentUserId || undefined,
+          });
 
-          const filteredFree = freeRows.filter((r) => {
-            const rawName = (r.full_name || '').trim();
-            if (!rawName) return false;
-            const lower = rawName.toLowerCase();
-            const isPlaceholder = lower === 'anonymous' || lower === 'unknown' || lower === 'test_user';
-            if (isPlaceholder) {
-              const isCurr = Boolean(
-                (r.user_id && currentUserId && r.user_id === currentUserId) ||
-                (normalizedCurrentUserName && lower === normalizedCurrentUserName)
-              );
-              return isCurr;
+          if (tamreenRes && tamreenRes.items && tamreenRes.items.length > 0) {
+            const userProf = getUserProfile();
+            const isReg = isUserRegistered();
+            const userRoll = userProf?.roll_number || userProf?.student_id;
+
+            const mapped: LeaderboardDisplayItem[] = tamreenRes.items.map((row) => {
+              const isCurr = Boolean(row.is_current_user || (currentUserId && row.user_id.toLowerCase() === currentUserId.toLowerCase()));
+              const cleanName = (isCurr && isReg && userProf?.name)
+                ? userProf.name
+                : (row.user_name || (row.is_guest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));
+              const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
+              const rollNumber = (isCurr && userRoll) ? userRoll : row.roll_no;
+
+              return {
+                id: `tamreen_${row.user_id}_${row.rank}`,
+                rank: row.rank,
+                userName: cleanName,
+                userAvatar: cleanAvatar,
+                isCurrentUser: isCurr,
+                isGuest: Boolean(row.is_guest),
+                rollNumber,
+                testCount: row.unique_exam_count,
+                avgAccuracy: row.unique_exam_count > 0 ? Math.min(100, Math.round((row.total_correct / (row.unique_exam_count * 10)) * 100)) : 100,
+                points: row.total_points,
+                totalQuestions: row.unique_exam_count * 10,
+                correctCount: row.total_correct,
+                wrongCount: 0,
+                score: row.total_points,
+                createdAt: new Date().toISOString(),
+              };
+            });
+
+            setRpcRankedList(mapped);
+            setTotalParticipants(tamreenRes.totalCount);
+
+            if (tamreenRes.currentUser) {
+              const cUser = tamreenRes.currentUser;
+              setRpcCurrentUser({
+                id: `tamreen_curr_${cUser.user_id}`,
+                rank: cUser.rank,
+                userName: (isReg && userProf?.name) ? userProf.name : cUser.user_name,
+                userAvatar: userAvatar || cUser.avatar_url,
+                isCurrentUser: true,
+                isGuest: Boolean(cUser.is_guest),
+                rollNumber: userRoll || cUser.roll_no,
+                testCount: cUser.unique_exam_count,
+                avgAccuracy: cUser.unique_exam_count > 0 ? Math.min(100, Math.round((cUser.total_correct / (cUser.unique_exam_count * 10)) * 100)) : 100,
+                points: cUser.total_points,
+                totalQuestions: cUser.unique_exam_count * 10,
+                correctCount: cUser.total_correct,
+                wrongCount: 0,
+                score: cUser.total_points,
+                createdAt: new Date().toISOString(),
+              });
+            } else {
+              setRpcCurrentUser(null);
             }
-            return true;
-          });
-
-          const mapped: LeaderboardDisplayItem[] = filteredFree.map((row, idx) => {
-            const rowUserId = (row.user_id || '').trim();
-            const rowRoll = row.roll_number || row.student_id;
-            const isGuestEntry = Boolean(
-              row.is_guest !== undefined
-                ? row.is_guest
-                : (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_') || Boolean(row.guest_name))
-            );
-
-            // Strict user matching
-            const isCurr = Boolean(
-              currentUserId && (
-                isReg
-                  ? (!isGuestEntry && rowUserId && rowUserId === currentUserId)
-                  : (isGuestEntry && (rowUserId === currentUserId || (row as any).guest_id === currentUserId))
-              )
-            );
-
-            const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
-            const isGuest = isGuestEntry;
-
-            const rawClean = (row.full_name || row.guest_name || '').trim();
-            const cleanName = (isCurr && isReg && userProf?.name)
-              ? userProf.name
-              : ((rawClean && rawClean !== 'আপনি (পরীক্ষার্থী)') ? rawClean : (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));
-            const cleanAvatar = isCurr ? (userAvatar || row.avatar_url) : row.avatar_url;
-
-            return {
-              id: `rpc_free_${row.user_id}_${row.rank || idx + 1}`,
-              rank: Number(row.rank || idx + 1),
-              userName: cleanName,
-              userAvatar: cleanAvatar,
-              isCurrentUser: isCurr,
-              isGuest,
-              rollNumber,
-              testCount: Number(row.free_exam_count || 1),
-              avgAccuracy: Math.round(Number(row.average_percentage || 0)),
-              points: Number(row.total_points || 0),
-              totalQuestions: 0,
-              correctCount: Number(row.total_points || 0),
-              wrongCount: 0,
-              score: Number(row.total_points || 0),
-              createdAt: new Date().toISOString(),
-            };
-          });
-          setRpcRankedList(mapped.length > 0 ? mapped : null);
-        } else {
+          } else {
+            setRpcRankedList(null);
+            setRpcCurrentUser(null);
+            setTotalParticipants(0);
+          }
+        } catch (tamreenErr) {
+          console.warn('Tamreen leaderboard load error:', tamreenErr);
           setRpcRankedList(null);
+          setRpcCurrentUser(null);
         }
       }
 
@@ -612,6 +628,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     } catch {
       setEntries([]);
       setRpcRankedList(null);
+      setRpcCurrentUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -901,11 +918,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               <span>লিডারবোর্ড</span>
             </div>
 
-            {/* Title */}
-            <div className="space-y-1.5 max-w-xl mx-auto text-center">
-              <h1 className="text-lg sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
-                ফ্রি পরীক্ষায় অংশগ্রহণকারীদের লিডারবোর্ড
+            {/* Title & Subtitle */}
+            <div className="space-y-1 max-w-xl mx-auto text-center">
+              <h1 className="text-xl sm:text-2xl font-black text-white leading-snug tracking-tight text-center">
+                তামরীন লিডারবোর্ড
               </h1>
+              <p className="text-xs sm:text-sm font-bold text-emerald-200/90 text-center">
+                পয়েন্ট অর্জন করো, র্যাংক বাড়াও
+              </p>
             </div>
 
             {/* 4 Filter Tabs */}
@@ -919,7 +939,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       : 'text-emerald-100/80 hover:text-white font-extrabold'
                   }`}
                 >
-                  আজকে
+                  আজ
                 </button>
 
                 <button
@@ -930,7 +950,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       : 'text-emerald-100/80 hover:text-white font-extrabold'
                   }`}
                 >
-                  এই সপ্তাহে
+                  এই সপ্তাহ
                 </button>
 
                 <button
@@ -941,7 +961,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       : 'text-emerald-100/80 hover:text-white font-extrabold'
                   }`}
                 >
-                  এই মাসে
+                  এই মাস
                 </button>
 
                 <button
@@ -984,92 +1004,134 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           ) : (
             <div className="space-y-6">
               
-              {/* Champion Podium Section for General Leaderboard */}
+              {/* Champion Podium Section for General Leaderboard (Top 3) */}
               {topOneItem && (
-                <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 text-center">
+                <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 text-center">
                   
                   <div className="flex items-center justify-center gap-1.5 text-base font-black text-[#0B132B] dark:text-white">
                     <Sparkles className="w-5 h-5 text-amber-500" />
                     <span>শীর্ষ ৩ বিজয়ী</span>
                   </div>
 
-                  {/* Champion Card */}
-                  <div className="max-w-xs mx-auto space-y-3">
-                    <div className="relative inline-block pt-3">
-                      {/* Crown Icon */}
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
-                        👑
-                      </div>
-
-                      {/* Avatar */}
-                      {topOneItem.userAvatar ? (
-                        <img
-                          src={topOneItem.userAvatar}
-                          alt={topOneItem.userName}
-                          className="w-24 h-24 rounded-2xl object-cover ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto"
-                        />
-                      ) : (
-                        <div className="w-24 h-24 rounded-2xl bg-[#0B705C] text-white flex items-center justify-center font-black ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto">
-                          <User className="w-12 h-12 text-amber-300" />
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 items-end max-w-md mx-auto pt-2">
+                    {/* 2nd Place */}
+                    {rankedList.length > 1 ? (
+                      <div className="space-y-2 order-1 text-center">
+                        <div className="relative inline-block">
+                          {rankedList[1].userAvatar ? (
+                            <img
+                              src={rankedList[1].userAvatar}
+                              alt={rankedList[1].userName}
+                              className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl object-cover ring-3 ring-slate-300 border-2 border-white shadow mx-auto"
+                            />
+                          ) : (
+                            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-slate-600 text-white flex items-center justify-center font-black ring-3 ring-slate-300 border-2 border-white shadow mx-auto">
+                              <User className="w-7 h-7 text-slate-200" />
+                            </div>
+                          )}
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
+                            🥈
+                          </div>
                         </div>
-                      )}
-
-                      {/* Medal Badge */}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
-                        🥇
+                        <div className="min-w-0">
+                          <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate">
+                            {rankedList[1].userName}
+                          </h4>
+                          <p className="text-[11px] font-black text-slate-600 dark:text-slate-300">
+                            {toBengaliNumeral(rankedList[1].points)} পয়েন্ট
+                          </p>
+                        </div>
+                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 text-center shadow-xs">
+                          <span className="text-xl font-black text-slate-700 dark:text-slate-200">২</span>
+                          <span className="text-[10px] font-bold text-slate-500 block">২য় স্থান</span>
+                        </div>
                       </div>
-                    </div>
+                    ) : <div className="order-1" />}
 
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        <h3 className="font-black text-base sm:text-lg text-[#0B132B] dark:text-white">
+                    {/* 1st Place Champion */}
+                    <div className="space-y-2 order-2 text-center pb-2">
+                      <div className="relative inline-block pt-3">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
+                          👑
+                        </div>
+                        {topOneItem.userAvatar ? (
+                          <img
+                            src={topOneItem.userAvatar}
+                            alt={topOneItem.userName}
+                            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto"
+                          />
+                        ) : (
+                          <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-[#0B705C] text-white flex items-center justify-center font-black ring-4 ring-amber-400 border-2 border-white shadow-md mx-auto">
+                            <User className="w-10 h-10 text-amber-300" />
+                          </div>
+                        )}
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
+                          🥇
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 space-y-0.5">
+                        <h4 className="font-black text-sm sm:text-base text-[#0B132B] dark:text-white truncate">
                           {topOneItem.userName}
-                        </h3>
-                        {topOneItem.isGuest && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
-                            গেস্ট
-                          </span>
-                        )}
-                        {topOneItem.isCurrentUser && (
-                          <span className="px-2 py-0.5 bg-[#0B705C] text-white text-[10px] font-black rounded-full">
-                            আপনি
-                          </span>
-                        )}
+                        </h4>
+                        <p className="text-xs font-black text-amber-600 dark:text-amber-400">
+                          {toBengaliNumeral(topOneItem.points)} পয়েন্ট
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-500">
+                          {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা
+                        </p>
                       </div>
 
-                      <div className="inline-block px-3.5 py-0.5 rounded-full bg-[#FFC107] text-[#05402A] text-xs font-black shadow-2xs">
-                        👑 ১ম স্থান
-                      </div>
-
-                      <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300 pt-0.5">
-                        {toBengaliNumeral(topOneItem.testCount)}টি পরীক্ষা • গড় {toBengaliNumeral(topOneItem.avgAccuracy)}%
-                      </p>
-
-                      <p className="text-sm font-black text-amber-600 dark:text-amber-400">
-                        {toBengaliNumeral(topOneItem.points)} পয়েন্ট
-                      </p>
-                    </div>
-
-                    {/* Gold Podium Card */}
-                    <div className="bg-gradient-to-b from-amber-100 to-amber-200/80 border border-amber-300 rounded-2xl p-4 text-center shadow-xs space-y-0.5">
-                      <div className="text-3xl font-black text-amber-800">
-                        ১
-                      </div>
-                      <div className="text-xs font-black text-amber-900 tracking-wide">
-                        চ্যাম্পিয়ন
+                      <div className="bg-gradient-to-b from-amber-100 to-amber-200/90 border border-amber-300 rounded-xl py-4 sm:py-5 text-center shadow-xs">
+                        <span className="text-2xl sm:text-3xl font-black text-amber-800">১</span>
+                        <span className="text-[10px] font-black text-amber-900 block tracking-wide">চ্যাম্পিয়ন</span>
                       </div>
                     </div>
+
+                    {/* 3rd Place */}
+                    {rankedList.length > 2 ? (
+                      <div className="space-y-2 order-3 text-center">
+                        <div className="relative inline-block">
+                          {rankedList[2].userAvatar ? (
+                            <img
+                              src={rankedList[2].userAvatar}
+                              alt={rankedList[2].userName}
+                              className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl object-cover ring-3 ring-amber-700/50 border-2 border-white shadow mx-auto"
+                            />
+                          ) : (
+                            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-amber-900 text-white flex items-center justify-center font-black ring-3 ring-amber-700/50 border-2 border-white shadow mx-auto">
+                              <User className="w-7 h-7 text-amber-200" />
+                            </div>
+                          )}
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-amber-700 text-white flex items-center justify-center text-xs font-black ring-2 ring-white shadow-xs">
+                            🥉
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white truncate">
+                            {rankedList[2].userName}
+                          </h4>
+                          <p className="text-[11px] font-black text-amber-800 dark:text-amber-300">
+                            {toBengaliNumeral(rankedList[2].points)} পয়েন্ট
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl py-2.5 text-center shadow-xs">
+                          <span className="text-xl font-black text-amber-800 dark:text-amber-300">৩</span>
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 block">৩য় স্থান</span>
+                        </div>
+                      </div>
+                    ) : <div className="order-3" />}
                   </div>
 
                 </div>
               )}
 
               {/* Current User Mint Card Banner */}
-              {currentUserRankItem && (
+              {currentUserRankItem ? (
                 <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border-2 border-[#10B981] rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-base font-black text-[#0B132B] dark:text-white shrink-0">
-                      {toBengaliNumeral(currentUserRankItem.rank)}.
+                      #{toBengaliNumeral(currentUserRankItem.rank)}
                     </span>
 
                     <div className="relative shrink-0">
@@ -1094,14 +1156,19 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         <span className="px-2 py-0.5 bg-[#0B705C] text-white text-[10px] font-black rounded-full">
                           আপনি
                         </span>
+                        {currentUserRankItem.rollNumber && (
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 text-[10px] font-bold rounded-full">
+                            রোল: {currentUserRankItem.rollNumber}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1.5 pt-0.5">
                         <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300 text-[11px] font-extrabold rounded-full">
-                          টেস্ট: {toBengaliNumeral(currentUserRankItem.testCount)}
+                          টেস্ট: {toBengaliNumeral(currentUserRankItem.testCount)}টি
                         </span>
                         <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] font-extrabold rounded-full">
-                          গড়: {toBengaliNumeral(currentUserRankItem.avgAccuracy)}%
+                          সঠিক: {toBengaliNumeral(currentUserRankItem.correctCount || currentUserRankItem.points)}
                         </span>
                       </div>
                     </div>
@@ -1109,10 +1176,29 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                   {/* Right Side Stats */}
                   <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-500 font-bold block">পয়েন্ট</span>
+                    <span className="text-[10px] text-slate-500 font-bold block">মোট পয়েন্ট</span>
                     <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
                       {toBengaliNumeral(currentUserRankItem.points)}
                     </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[#E8F8F5] dark:bg-emerald-950/40 border border-[#10B981]/60 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#0B705C] text-white flex items-center justify-center font-black">
+                      <User className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs sm:text-sm text-[#0B132B] dark:text-white">
+                        {userName} (আপনি)
+                      </h4>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                        এই সময়ে এখনো কোনো পরীক্ষা সম্পন্ন করেননি। পরীক্ষা দিয়ে পয়েন্ট অর্জন করুন!
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-bold text-slate-400">০ পয়েন্ট</span>
                   </div>
                 </div>
               )}
@@ -1120,14 +1206,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               {/* Other Participants Rankings List */}
               <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between text-xs font-black text-[#0B132B] dark:text-white px-1">
-                  <span>অন্যান্য পরীক্ষার্থীদের র‍্যাঙ্কিং</span>
+                  <span>পরীক্ষার্থীদের মেধা তালিকা</span>
                   <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-bold">
-                    মোট পরীক্ষার্থী: {toBengaliNumeral(rankedList.length)} জন
+                    মোট পরীক্ষার্থী: {toBengaliNumeral(totalParticipants || rankedList.length)} জন
                   </span>
                 </div>
 
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {rankedList.map((item) => (
+                  {rankedList.slice(0, displayCount).map((item) => (
                     <div
                       key={item.id}
                       className={`py-3 px-2 flex items-center justify-between gap-3 ${
@@ -1174,10 +1260,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                           <div className="flex items-center gap-1.5">
                             <span className="px-2 py-0.2 bg-blue-100 text-blue-900 text-[10px] font-bold rounded-full">
-                              টেস্ট: {toBengaliNumeral(item.testCount)}
+                              টেস্ট: {toBengaliNumeral(item.testCount)}টি
                             </span>
                             <span className="px-2 py-0.2 bg-emerald-100 text-emerald-900 text-[10px] font-bold rounded-full">
-                              গড়: {toBengaliNumeral(item.avgAccuracy)}%
+                              সঠিক: {toBengaliNumeral(item.correctCount || item.points)}টি
                             </span>
                           </div>
                         </div>
@@ -1192,6 +1278,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </div>
                   ))}
                 </div>
+
+                {/* Show More Button if rankedList has more items */}
+                {rankedList.length > displayCount && (
+                  <div className="pt-2 text-center">
+                    <button
+                      onClick={() => setDisplayCount((prev) => prev + 20)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full text-xs font-bold transition-all cursor-pointer"
+                    >
+                      আরও ২০ জন দেখুন (বাকি {toBengaliNumeral(rankedList.length - displayCount)} জন)
+                    </button>
+                  </div>
+                )}
               </div>
 
             </div>

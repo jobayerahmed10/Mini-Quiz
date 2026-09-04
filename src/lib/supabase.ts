@@ -20,6 +20,7 @@ import {
   getGuestDeviceId, 
   addCompletedExamId, 
   getCompletedExamIds,
+  isExamCompleted,
   getLikedIds,
   getBookmarkedIds,
   getLocalQuestionLikeCount,
@@ -2173,6 +2174,504 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
     ...u,
   }));
 }
+
+export interface TamreenLeaderboardUser {
+  rank: number;
+  user_id: string;
+  user_name: string;
+  roll_no?: string;
+  avatar_url?: string;
+  is_guest?: boolean;
+  is_current_user?: boolean;
+  total_points: number;
+  total_correct: number;
+  unique_exam_count: number;
+}
+
+export interface TamreenLeaderboardResult {
+  items: TamreenLeaderboardUser[];
+  currentUser: TamreenLeaderboardUser | null;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+// Calculate Asia/Dhaka time info (UTC+6)
+export function getDhakaDateInfo(dateInput?: string | number | Date) {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Dhaka',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(d);
+    const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '';
+
+    const year = parseInt(getPart('year'), 10);
+    const month = parseInt(getPart('month'), 10);
+    const day = parseInt(getPart('day'), 10);
+
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+
+    const calDate = new Date(Date.UTC(year, month - 1, day));
+    const dayOfWeek = calDate.getUTCDay(); // 0: Sun, 1: Mon, ... 6: Sat
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(calDate.getTime() + diffToMonday * 86400000);
+    const weekMondayStr = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+
+    return { dateStr, weekMondayStr, monthStr };
+  } catch {
+    const utcTime = d.getTime();
+    const dhakaMs = utcTime + (6 * 3600 * 1000);
+    const dhakaDate = new Date(dhakaMs);
+    const year = dhakaDate.getUTCFullYear();
+    const month = dhakaDate.getUTCMonth() + 1;
+    const day = dhakaDate.getUTCDate();
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const dayOfWeek = dhakaDate.getUTCDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(dhakaDate.getTime() + diffToMonday * 86400000);
+    const weekMondayStr = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+    return { dateStr, weekMondayStr, monthStr };
+  }
+}
+
+/**
+ * Master Tamreen Leaderboard Fetcher enforcing the ONE-EXAM-ONE-COUNT rule.
+ * 
+ * Sources points exclusively from exam.results.points.
+ * Only the first completed result counts per (user_id, exam_id).
+ * Uses Asia/Dhaka timezone for daily, weekly, monthly periods.
+ */
+export async function getTamreenLeaderboard(params: {
+  periodType: 'today' | 'this_week' | 'this_month' | 'all_time';
+  pageNumber?: number;
+  pageSize?: number;
+  currentUserId?: string;
+}): Promise<TamreenLeaderboardResult> {
+  const periodType = params.periodType || 'all_time';
+  const pageNumber = Math.max(1, params.pageNumber || 1);
+  const pageSize = Math.max(1, Math.min(100, params.pageSize || 20));
+  const currentUserId = params.currentUserId ? params.currentUserId.trim() : '';
+
+  // 1. Try Supabase RPC get_leaderboard first if available
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance.rpc('get_leaderboard', {
+        p_period_type: periodType,
+        p_page_number: pageNumber,
+        p_page_size: pageSize,
+        p_user_id: currentUserId || null,
+      });
+
+      if (!error && data) {
+        // Parse RPC return (JSON or TABLE)
+        if (typeof data === 'object') {
+          const items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+          const totalCount = Number(data.total_count ?? data.totalCount ?? items.length);
+          const currentUser = data.current_user ?? data.currentUser ?? null;
+          return {
+            items: items.map((u: any, idx: number) => ({
+              rank: Number(u.rank ?? idx + 1),
+              user_id: String(u.user_id ?? ''),
+              user_name: String(u.user_name ?? u.full_name ?? 'পরীক্ষার্থী'),
+              roll_no: u.roll_no ? String(u.roll_no) : undefined,
+              avatar_url: u.avatar_url ? String(u.avatar_url) : undefined,
+              is_guest: Boolean(u.is_guest),
+              is_current_user: Boolean(currentUserId && String(u.user_id).toLowerCase() === currentUserId.toLowerCase()),
+              total_points: Number(u.total_points ?? u.points ?? 0),
+              total_correct: Number(u.total_correct ?? u.correct_answers ?? 0),
+              unique_exam_count: Number(u.unique_exam_count ?? u.test_count ?? 1),
+            })),
+            currentUser: currentUser ? {
+              rank: Number(currentUser.rank ?? 0),
+              user_id: String(currentUser.user_id ?? currentUserId),
+              user_name: String(currentUser.user_name ?? currentUser.full_name ?? 'পরীক্ষার্থী'),
+              roll_no: currentUser.roll_no ? String(currentUser.roll_no) : undefined,
+              avatar_url: currentUser.avatar_url ? String(currentUser.avatar_url) : undefined,
+              is_guest: Boolean(currentUser.is_guest),
+              is_current_user: true,
+              total_points: Number(currentUser.total_points ?? currentUser.points ?? 0),
+              total_correct: Number(currentUser.total_correct ?? currentUser.correct_answers ?? 0),
+              unique_exam_count: Number(currentUser.unique_exam_count ?? currentUser.test_count ?? 0),
+            } : null,
+            totalCount,
+            page: pageNumber,
+            pageSize,
+            hasMore: (pageNumber * pageSize) < totalCount,
+          };
+        }
+      }
+    } catch (rpcErr) {
+      console.warn('Supabase get_leaderboard RPC warning:', rpcErr);
+    }
+
+    // 2. Direct Supabase Query on exam_results with strict ONE-EXAM-ONE-COUNT rule
+    try {
+      const { data: rawResults, error: qErr } = await supabaseInstance
+        .from('exam_results')
+        .select('id, exam_id, user_id, user_name, full_name, guest_name, guest_id, user_type, points, correct_answers, score, roll_no, roll_number, student_id, time_taken_seconds, submitted_at, created_at')
+        .order('created_at', { ascending: true });
+
+      if (!qErr && Array.isArray(rawResults) && rawResults.length > 0) {
+        // Fetch profiles for avatars and full names
+        const userIds = Array.from(new Set(rawResults.map((r) => r.user_id).filter(Boolean)));
+        const profilesMap = new Map<string, any>();
+        if (userIds.length > 0) {
+          try {
+            const { data: profs } = await supabaseInstance
+              .from('profiles')
+              .select('id, full_name, avatar_url, roll_number, student_id')
+              .in('id', userIds);
+            if (profs && Array.isArray(profs)) {
+              profs.forEach((p) => profilesMap.set(p.id, p));
+            }
+          } catch {}
+        }
+
+        // Group by (user_id, exam_id) and retain ONLY 1st completed attempt
+        const userExamGroups = new Map<string, any[]>();
+        for (const r of rawResults) {
+          const isReg = Boolean(r.user_id && !String(r.user_id).startsWith('guest_') && !String(r.user_id).startsWith('anon_'));
+          const uKey = isReg ? String(r.user_id).trim() : String(r.guest_id || r.guest_name || r.user_name || r.id).trim().toLowerCase();
+          const eKey = String(r.exam_id || 'general').trim().toLowerCase();
+          const groupKey = `${uKey}:::${eKey}`;
+
+          if (!userExamGroups.has(groupKey)) {
+            userExamGroups.set(groupKey, []);
+          }
+          userExamGroups.get(groupKey)!.push(r);
+        }
+
+        // ONE-EXAM-ONE-COUNT: sort attempts by created_at ASC, id ASC and pick attempt_rn === 1
+        const authoritativeFirstAttempts: any[] = [];
+        for (const attempts of userExamGroups.values()) {
+          attempts.sort((a, b) => {
+            const tA = new Date(a.created_at || a.submitted_at || 0).getTime();
+            const tB = new Date(b.created_at || b.submitted_at || 0).getTime();
+            if (tA !== tB) return tA - tB;
+            return String(a.id).localeCompare(String(b.id));
+          });
+          authoritativeFirstAttempts.push(attempts[0]);
+        }
+
+        // Filter authoritative first attempts by Asia/Dhaka period
+        const nowDhaka = getDhakaDateInfo(new Date());
+        const periodFiltered = authoritativeFirstAttempts.filter((att) => {
+          if (periodType === 'all_time') return true;
+          const attDhaka = getDhakaDateInfo(att.created_at || att.submitted_at);
+          if (periodType === 'today') return attDhaka.dateStr === nowDhaka.dateStr;
+          if (periodType === 'this_week') return attDhaka.weekMondayStr === nowDhaka.weekMondayStr;
+          if (periodType === 'this_month') return attDhaka.monthStr === nowDhaka.monthStr;
+          return true;
+        });
+
+        // Compute user aggregates
+        const userAggs = new Map<string, {
+          userId: string;
+          userName: string;
+          rollNo?: string;
+          avatarUrl?: string;
+          isGuest: boolean;
+          totalPoints: number;
+          totalCorrect: number;
+          uniqueExams: Set<string>;
+          lastPointTime: number;
+        }>();
+
+        for (const att of periodFiltered) {
+          const isReg = Boolean(att.user_id && !String(att.user_id).startsWith('guest_') && !String(att.user_id).startsWith('anon_'));
+          const uKey = isReg ? String(att.user_id).trim() : String(att.guest_id || att.guest_name || att.user_name || att.id).trim().toLowerCase();
+          const prof = isReg ? profilesMap.get(att.user_id) : null;
+
+          const userName = prof?.full_name || att.user_name || att.full_name || att.guest_name || (isReg ? 'পরীক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
+          const rollNo = prof?.roll_number || prof?.student_id || att.roll_no || att.roll_number || att.student_id;
+          const avatarUrl = isReg ? (prof?.avatar_url || att.avatar_url) : att.avatar_url;
+
+          // Points source MUST be exam_results.points
+          const points = Number(att.points !== undefined && att.points !== null ? att.points : (att.correct_answers ?? att.score ?? 0));
+          const correct = Number(att.correct_answers ?? att.score ?? 0);
+          const time = new Date(att.created_at || att.submitted_at || 0).getTime();
+          const examId = String(att.exam_id).toLowerCase().trim();
+
+          const existing = userAggs.get(uKey);
+          if (!existing) {
+            const exSet = new Set<string>();
+            exSet.add(examId);
+            userAggs.set(uKey, {
+              userId: uKey,
+              userName,
+              rollNo: rollNo || undefined,
+              avatarUrl: avatarUrl || undefined,
+              isGuest: !isReg,
+              totalPoints: points,
+              totalCorrect: correct,
+              uniqueExams: exSet,
+              lastPointTime: time,
+            });
+          } else {
+            existing.totalPoints += points;
+            existing.totalCorrect += correct;
+            existing.uniqueExams.add(examId);
+            if (time > existing.lastPointTime) {
+              existing.lastPointTime = time;
+            }
+            if (avatarUrl && !existing.avatarUrl) existing.avatarUrl = avatarUrl;
+            if (rollNo && !existing.rollNo) existing.rollNo = rollNo;
+          }
+        }
+
+        // Leaderboard ranking with tie-breakers:
+        // 1. total_points DESC
+        // 2. total_correct DESC
+        // 3. unique_exam_count DESC
+        // 4. earliest time reaching the points ASC
+        // 5. user_id ASC
+        const allSorted = Array.from(userAggs.values()).sort((a, b) => {
+          if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+          if (b.totalCorrect !== a.totalCorrect) return b.totalCorrect - a.totalCorrect;
+          if (b.uniqueExams.size !== a.uniqueExams.size) return b.uniqueExams.size - a.uniqueExams.size;
+          if (a.lastPointTime !== b.lastPointTime) return a.lastPointTime - b.lastPointTime;
+          return a.userId.localeCompare(b.userId);
+        });
+
+        const rankedList: TamreenLeaderboardUser[] = allSorted.map((u, idx) => ({
+          rank: idx + 1,
+          user_id: u.userId,
+          user_name: u.userName,
+          roll_no: u.rollNo,
+          avatar_url: u.avatarUrl,
+          is_guest: u.isGuest,
+          is_current_user: Boolean(currentUserId && u.userId.toLowerCase() === currentUserId.toLowerCase()),
+          total_points: u.totalPoints,
+          total_correct: u.totalCorrect,
+          unique_exam_count: u.uniqueExams.size,
+        }));
+
+        let userRankItem: TamreenLeaderboardUser | null = null;
+        if (currentUserId) {
+          const found = rankedList.find((u) => u.user_id.toLowerCase() === currentUserId.toLowerCase());
+          if (found) userRankItem = { ...found, is_current_user: true };
+        }
+
+        const startIndex = (pageNumber - 1) * pageSize;
+        const pageItems = rankedList.slice(startIndex, startIndex + pageSize);
+
+        return {
+          items: pageItems,
+          currentUser: userRankItem,
+          totalCount: rankedList.length,
+          page: pageNumber,
+          pageSize,
+          hasMore: startIndex + pageSize < rankedList.length,
+        };
+      }
+    } catch (directErr) {
+      console.warn('Direct Supabase leaderboard calculation error:', directErr);
+    }
+  }
+
+  // 3. Fallback to Express Server RPC endpoint: /api/rpc/get_leaderboard
+  try {
+    const queryUrl = `/api/rpc/get_leaderboard?period_type=${encodeURIComponent(periodType)}&page_number=${pageNumber}&page_size=${pageSize}${currentUserId ? `&user_id=${encodeURIComponent(currentUserId)}` : ''}`;
+    const res = await fetch(queryUrl);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) {
+        return {
+          items: json.data.map((u: any) => ({
+            rank: u.rank,
+            user_id: u.user_id,
+            user_name: u.user_name || 'পরীক্ষার্থী',
+            roll_no: u.roll_no,
+            avatar_url: u.avatar_url,
+            is_guest: u.is_guest,
+            is_current_user: Boolean(currentUserId && String(u.user_id).toLowerCase() === currentUserId.toLowerCase()),
+            total_points: u.total_points,
+            total_correct: u.total_correct,
+            unique_exam_count: u.unique_exam_count,
+          })),
+          currentUser: json.currentUser ? {
+            ...json.currentUser,
+            is_current_user: true,
+          } : null,
+          totalCount: Number(json.totalCount || json.data.length),
+          page: pageNumber,
+          pageSize,
+          hasMore: Boolean(json.hasMore),
+        };
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Server get_leaderboard RPC error:', srvErr);
+  }
+
+  // 4. Fallback to local entries with ONE-EXAM-ONE-COUNT rule
+  const localEntries = getLocalLeaderboardEntries();
+  const localMap = new Map<string, LeaderboardEntry[]>();
+  for (const e of localEntries) {
+    const uKey = (e.user_id || e.user_name || 'guest').toLowerCase().trim();
+    const eKey = (e.exam_id || 'general').toLowerCase().trim();
+    const gKey = `${uKey}:::${eKey}`;
+    if (!localMap.has(gKey)) localMap.set(gKey, []);
+    localMap.get(gKey)!.push(e);
+  }
+
+  const localFirsts: LeaderboardEntry[] = [];
+  for (const group of localMap.values()) {
+    group.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+    localFirsts.push(group[0]);
+  }
+
+  const nowDhaka = getDhakaDateInfo(new Date());
+  const periodLocal = localFirsts.filter((e) => {
+    if (periodType === 'all_time') return true;
+    const eDhaka = getDhakaDateInfo(e.created_at);
+    if (periodType === 'today') return eDhaka.dateStr === nowDhaka.dateStr;
+    if (periodType === 'this_week') return eDhaka.weekMondayStr === nowDhaka.weekMondayStr;
+    if (periodType === 'this_month') return eDhaka.monthStr === nowDhaka.monthStr;
+    return true;
+  });
+
+  const localUserMap = new Map<string, {
+    userId: string;
+    userName: string;
+    avatarUrl?: string;
+    totalPoints: number;
+    totalCorrect: number;
+    uniqueExams: Set<string>;
+    lastPointTime: number;
+  }>();
+
+  for (const e of periodLocal) {
+    const uKey = (e.user_id || e.user_name || 'user').toLowerCase().trim();
+    const pts = Number(e.points !== undefined ? e.points : (e.correct_count ?? e.score ?? 0));
+    const correct = Number(e.correct_count ?? e.score ?? 0);
+    const time = new Date(e.created_at || 0).getTime();
+    const examId = (e.exam_id || 'general').toLowerCase().trim();
+
+    const existing = localUserMap.get(uKey);
+    if (!existing) {
+      const set = new Set<string>();
+      set.add(examId);
+      localUserMap.set(uKey, {
+        userId: e.user_id || uKey,
+        userName: e.user_name || 'পরীক্ষার্থী',
+        avatarUrl: e.user_avatar,
+        totalPoints: pts,
+        totalCorrect: correct,
+        uniqueExams: set,
+        lastPointTime: time,
+      });
+    } else {
+      existing.totalPoints += pts;
+      existing.totalCorrect += correct;
+      existing.uniqueExams.add(examId);
+      if (time > existing.lastPointTime) existing.lastPointTime = time;
+    }
+  }
+
+  const localSorted = Array.from(localUserMap.values()).sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    if (b.totalCorrect !== a.totalCorrect) return b.totalCorrect - a.totalCorrect;
+    if (b.uniqueExams.size !== a.uniqueExams.size) return b.uniqueExams.size - a.uniqueExams.size;
+    return a.lastPointTime - b.lastPointTime;
+  });
+
+  const localRanked: TamreenLeaderboardUser[] = localSorted.map((u, idx) => ({
+    rank: idx + 1,
+    user_id: u.userId,
+    user_name: u.userName,
+    avatar_url: u.avatarUrl,
+    is_current_user: Boolean(currentUserId && u.userId.toLowerCase() === currentUserId.toLowerCase()),
+    total_points: u.totalPoints,
+    total_correct: u.totalCorrect,
+    unique_exam_count: u.uniqueExams.size,
+  }));
+
+  let localUserRank: TamreenLeaderboardUser | null = null;
+  if (currentUserId) {
+    const found = localRanked.find((u) => u.user_id.toLowerCase() === currentUserId.toLowerCase());
+    if (found) localUserRank = { ...found, is_current_user: true };
+  }
+
+  const startIndex = (pageNumber - 1) * pageSize;
+  const paged = localRanked.slice(startIndex, startIndex + pageSize);
+
+  return {
+    items: paged,
+    currentUser: localUserRank,
+    totalCount: localRanked.length,
+    page: pageNumber,
+    pageSize,
+    hasMore: startIndex + pageSize < localRanked.length,
+  };
+}
+
+/**
+ * Check whether the user has already taken an exam (Database-level and Server check)
+ */
+export async function checkIfExamAlreadyCompleted(
+  userId?: string | null,
+  examId?: string | null,
+  rollNumber?: string | null
+): Promise<{ isCompleted: boolean; existingResult?: any }> {
+  if (!examId) return { isCompleted: false };
+  const cleanExamId = String(examId).trim().toLowerCase();
+
+  // 1. Check local completed IDs cache
+  if (isExamCompleted(examId)) {
+    return { isCompleted: true };
+  }
+
+  // 2. Check Express server endpoint
+  try {
+    const checkUrl = `/api/exam_results/check_attempt?userId=${encodeURIComponent(userId || '')}&examId=${encodeURIComponent(cleanExamId)}`;
+    const res = await fetch(checkUrl);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.alreadyCompleted) {
+        return { isCompleted: true, existingResult: json.existingResult };
+      }
+    }
+  } catch {}
+
+  // 3. Check Supabase exam_results table directly
+  if (supabaseInstance) {
+    try {
+      let q = supabaseInstance
+        .from('exam_results')
+        .select('id, exam_id, score, points, created_at, submitted_at')
+        .eq('exam_id', cleanExamId)
+        .limit(1);
+
+      const isValidUuid = (str?: string | null) =>
+        Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+      if (userId && isValidUuid(userId)) {
+        q = q.eq('user_id', userId);
+      } else if (rollNumber) {
+        q = q.or(`roll_number.eq.${rollNumber},roll_no.eq.${rollNumber},student_id.eq.${rollNumber}`);
+      }
+
+      const { data, error } = await fetchWithTimeout(Promise.resolve(q), 3000, { data: null, error: null } as any);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return { isCompleted: true, existingResult: data[0] };
+      }
+    } catch {}
+  }
+
+  return { isCompleted: false };
+}
+
 
 export async function saveLeaderboardEntryToSupabase(entry: LeaderboardEntry): Promise<{ success: boolean; error?: string }> {
   saveLocalLeaderboardEntry(entry);

@@ -687,6 +687,8 @@ export function addCompletedExamId(examIdentifier: string): void {
   }
 }
 
+export const markExamCompleted = addCompletedExamId;
+
 export function isExamCompleted(examId?: string | number | null, examTitle?: string | null): boolean {
   const completedList = getCompletedExamIds();
   if (!completedList || completedList.length === 0) return false;
