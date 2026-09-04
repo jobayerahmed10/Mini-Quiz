@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   ArrowLeft,
@@ -6,23 +6,10 @@ import {
   Trophy,
   BookOpen,
   User as UserIcon,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
-  Clock,
-  Sparkles,
-  ChevronRight,
-  ShieldAlert,
-  Award
+  Sparkles
 } from 'lucide-react';
 import { QuizResult, UserAnswer, Question } from '../types';
-import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
-import { 
-  fetchLeaderboardEntriesFromSupabase, 
-  LeaderboardEntry,
-  getExamLeaderboard,
-  ExamLeaderboardItem
-} from '../lib/supabase';
+import { toBengaliNumeral, getUserProfile, OPTION_BENGLI_LABEL, formatArabicText, isFullyArabic } from '../lib/utils';
 import { QuestionActionFooter } from './QuestionActionFooter';
 
 interface ResultPageProps {
@@ -34,42 +21,11 @@ interface ResultPageProps {
   initialViewMode?: 'summary' | 'explanation' | 'leaderboard';
 }
 
-interface ParticipantLeaderboardItem {
-  id: string;
-  rank: number;
-  userName: string;
-  userAvatar?: string;
-  isCurrentUser: boolean;
-  isGuest?: boolean;
-  rollNumber?: string;
-  correctCount: number;
-  wrongCount: number;
-  score: number;
-  totalQuestions: number;
-  accuracy: number;
-  letterAvatar: string;
-  rankBadgeBg: string;
-  rankBadgeText: string;
-  borderTheme: string;
-}
-
 export const ResultPage: React.FC<ResultPageProps> = ({
   result,
-  onRetry,
   onNavigateHome,
-  onOpenLeaderboard,
   showHarakat = true,
-  initialViewMode = 'summary',
 }) => {
-  // Bottom Tab Mode: 'summary' (which contains statistics), 'leaderboard' (মেধাতালিকা), 'explanation' (ব্যাখ্যাসহ উত্তর)
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'explanation'>('explanation');
-  
-  // Leaderboard data state
-  const [leaderboardList, setLeaderboardList] = useState<ParticipantLeaderboardItem[]>([]);
-  const [currentUserRank, setCurrentUserRank] = useState<number>(1);
-  const [totalParticipants, setTotalParticipants] = useState<number>(11);
-  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(true);
-
   // User Profile
   const userProfile = getUserProfile();
   const currentUserName = userProfile?.name?.trim() || (result as any)?.userName || 'গেস্ট পরীক্ষার্থী';
@@ -160,256 +116,11 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     }
   }, [isHighScore]);
 
-  // Load Leaderboard from Supabase / Server without default mock data
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadLeaderboardData() {
-      setIsLoadingLeaderboard(true);
-      try {
-        const currentUserId = getUserUniqueId();
-        const examIdToFetch = result.examId || result.selectedSubject || 'general';
-
-        // 1. Fetch real leaderboard entries from RPC
-        const rpcEntries = await getExamLeaderboard(examIdToFetch);
-
-        // Map real participants by unique user ID or distinct guest key
-        const candidatesMap = new Map<string, any>();
-
-        const currentUserProfile = getUserProfile();
-        const currentRoll = currentUserProfile?.roll_number || currentUserProfile?.student_id;
-        const currentName = (currentUserProfile?.name || currentUserName || '').trim().toLowerCase();
-        const isRegisteredUser = isUserRegistered();
-
-        // Helper to check if an item belongs to the current user (registered or guest)
-        const checkIsUser = (item: any, rawName: string) => {
-          const itemIsGuest = Boolean(
-            item.is_guest !== undefined
-              ? item.is_guest
-              : (!item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name))
-          );
-          if (isRegisteredUser) {
-            // Strictly match registered user ID and ensure it is not a guest record
-            if (!itemIsGuest && currentUserId && item.user_id && item.user_id === currentUserId) return true;
-            return false;
-          } else {
-            // For Guest users: match by guest_id or active guest session
-            if (itemIsGuest && currentUserId && (item.guest_id === currentUserId || item.user_id === currentUserId)) return true;
-            if (itemIsGuest && currentName && ((item.user_name || '').trim().toLowerCase() === currentName || (item.guest_name || '').trim().toLowerCase() === currentName || rawName.toLowerCase() === currentName)) return true;
-            return false;
-          }
-        };
-
-        // Add from RPC
-        for (const item of rpcEntries) {
-          const rawName = (item.full_name || item.user_name || item.guest_name || '').trim();
-          if (!rawName) continue;
-
-          const isUser = checkIsUser(item, rawName);
-          const isGuest = item.is_guest !== undefined
-            ? item.is_guest
-            : (!isRegisteredUser || !item.user_id || item.user_id.startsWith('guest_') || item.user_id.startsWith('anon_') || Boolean(item.guest_name));
-
-          // Compute a stable distinct key for deduplicating participants
-          let key: string;
-          if (isUser) {
-            key = '__CURRENT_USER__';
-          } else if (!isGuest && item.user_id) {
-            key = item.user_id.toLowerCase().trim();
-          } else {
-            // Guest participant key: use guest_id or name
-            key = (item.guest_id || rawName || item.roll_number || item.student_id || 'anon').toLowerCase().trim();
-          }
-
-          const existingCandidate = candidatesMap.get(key);
-          const itemScore = Number(item.score ?? (item as any).obtained_marks ?? item.correct_answers ?? 0);
-          const itemTime = Number(item.time_taken_seconds ?? (item as any).time_taken ?? 999999);
-
-          if (!existingCandidate) {
-            candidatesMap.set(key, {
-              name: rawName,
-              avatar: isUser ? (currentUserAvatar || item.avatar_url) : item.avatar_url,
-              isUser,
-              isGuest,
-              rollNumber: item.roll_number || item.student_id,
-              correct: Number(item.correct_answers ?? item.score ?? 0),
-              wrong: Number(item.wrong_answers ?? 0),
-              score: itemScore,
-              timeTakenSeconds: itemTime,
-              submittedAt: item.submitted_at || new Date().toISOString(),
-              userId: item.user_id,
-            });
-          } else {
-            // Keep the best score / lowest time entry
-            if (itemScore > existingCandidate.score || (itemScore === existingCandidate.score && itemTime < existingCandidate.timeTakenSeconds)) {
-              candidatesMap.set(key, {
-                ...existingCandidate,
-                name: rawName,
-                isUser: isUser || existingCandidate.isUser,
-                correct: Number(item.correct_answers ?? item.score ?? 0),
-                wrong: Number(item.wrong_answers ?? 0),
-                score: itemScore,
-                timeTakenSeconds: itemTime,
-                submittedAt: item.submitted_at || existingCandidate.submittedAt,
-              });
-            }
-          }
-        }
-
-        // Always ensure current user's latest submission is included
-        const isCurrentSubmissionGuest = !isRegisteredUser;
-        const effectiveCurrentUserName = currentUserName || (isCurrentSubmissionGuest ? 'গেস্ট পরীক্ষার্থী' : 'শিক্ষার্থী');
-        const userKey = '__CURRENT_USER__';
-        const timeTakenSeconds = result.timeTakenSeconds || 0;
-        
-        const existingUser = candidatesMap.get(userKey);
-        if (!existingUser) {
-          candidatesMap.set(userKey, {
-            name: effectiveCurrentUserName,
-            avatar: currentUserAvatar,
-            isUser: true,
-            isGuest: isCurrentSubmissionGuest,
-            correct: result.correctCount,
-            wrong: result.wrongCount,
-            score: obtainedMarksVal,
-            timeTakenSeconds: timeTakenSeconds,
-            submittedAt: new Date().toISOString(),
-            userId: currentUserId,
-          });
-        } else {
-          // If local score is higher or equal, update the user entry
-          if (obtainedMarksVal >= existingUser.score) {
-            candidatesMap.set(userKey, {
-              ...existingUser,
-              name: effectiveCurrentUserName || existingUser.name,
-              avatar: currentUserAvatar || existingUser.avatar,
-              isUser: true,
-              score: obtainedMarksVal,
-              correct: result.correctCount,
-              wrong: result.wrongCount,
-              timeTakenSeconds: timeTakenSeconds || existingUser.timeTakenSeconds,
-            });
-          }
-        }
-
-        const allCandidates = Array.from(candidatesMap.values());
-
-        // Sort: 1. Higher score first, 2. Lower timeTakenSeconds first, 3. Earlier submittedAt
-        allCandidates.sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
-          if (a.timeTakenSeconds !== b.timeTakenSeconds) return a.timeTakenSeconds - b.timeTakenSeconds;
-          return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
-        });
-
-        // Theme colors for cards matching Screenshot 3
-        const getCardStyles = (rank: number) => {
-          if (rank === 1) {
-            return {
-              borderTheme: 'border-amber-400 dark:border-amber-500/80 bg-amber-50/20 dark:bg-amber-950/10 shadow-xs',
-              rankBadgeBg: 'bg-amber-400 text-slate-950',
-              rankBadgeText: '১ম স্থান',
-              badgeColor: 'bg-amber-400 text-slate-950',
-              numBadge: 'bg-amber-400 text-slate-950',
-              avatarLetterBg: 'bg-[#00897B] text-white',
-            };
-          }
-          if (rank === 2) {
-            return {
-              borderTheme: 'border-sky-400 dark:border-sky-500/80 bg-sky-50/20 dark:bg-sky-950/10 shadow-xs',
-              rankBadgeBg: 'bg-sky-500 text-white',
-              rankBadgeText: '২য় স্থান',
-              badgeColor: 'bg-sky-500 text-white',
-              numBadge: 'bg-sky-400 text-white',
-              avatarLetterBg: 'bg-[#00897B] text-white',
-            };
-          }
-          if (rank === 3) {
-            return {
-              borderTheme: 'border-amber-700/60 dark:border-amber-600/70 bg-amber-900/5 dark:bg-amber-950/20 shadow-xs',
-              rankBadgeBg: 'bg-amber-700 text-white',
-              rankBadgeText: '৩য় স্থান',
-              badgeColor: 'bg-amber-700 text-white',
-              numBadge: 'bg-amber-700 text-white',
-              avatarLetterBg: 'bg-[#00695C] text-white',
-            };
-          }
-          if (rank === 4) {
-            return {
-              borderTheme: 'border-emerald-400 dark:border-emerald-600/70 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs',
-              rankBadgeBg: 'bg-emerald-600 text-white',
-              rankBadgeText: `${toBengaliNumeral(rank)}র্থ স্থান`,
-              badgeColor: 'bg-emerald-600 text-white',
-              numBadge: 'bg-[#00897B] text-white',
-              avatarLetterBg: 'bg-[#00695C] text-white',
-            };
-          }
-          return {
-            borderTheme: 'border-emerald-400 dark:border-emerald-700/60 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs',
-            rankBadgeBg: 'bg-emerald-600 text-white',
-            rankBadgeText: `${toBengaliNumeral(rank)}ম স্থান`,
-            badgeColor: 'bg-emerald-600 text-white',
-            numBadge: 'bg-[#00897B] text-white',
-            avatarLetterBg: 'bg-[#00695C] text-white',
-          };
-        };
-
-        let userFoundRank = allCandidates.length;
-
-        const mapped: ParticipantLeaderboardItem[] = allCandidates.map((c, idx) => {
-          const rank = idx + 1;
-          if (c.isUser) {
-            userFoundRank = rank;
-          }
-          const styles = getCardStyles(rank);
-          const firstChar = c.name.charAt(0) || 'ম';
-
-          const accuracy = result.totalQuestions > 0 
-            ? Math.round((c.correct / result.totalQuestions) * 100) 
-            : 100;
-
-          return {
-            id: `cand_${rank}_${idx}`,
-            rank,
-            userName: c.name,
-            userAvatar: c.avatar,
-            isCurrentUser: c.isUser,
-            isGuest: c.isGuest,
-            rollNumber: c.rollNumber,
-            correctCount: c.correct,
-            wrongCount: c.wrong,
-            score: c.score,
-            totalQuestions: result.totalQuestions,
-            accuracy,
-            letterAvatar: firstChar,
-            rankBadgeBg: styles.rankBadgeBg,
-            rankBadgeText: styles.rankBadgeText,
-            borderTheme: styles.borderTheme,
-          };
-        });
-
-        if (isMounted) {
-          setLeaderboardList(mapped);
-          setCurrentUserRank(userFoundRank);
-          setTotalParticipants(mapped.length);
-        }
-      } catch (e) {
-        console.error('Error fetching leaderboard in ResultPage:', e);
-      } finally {
-        if (isMounted) {
-          setIsLoadingLeaderboard(false);
-        }
-      }
-    }
-
-    loadLeaderboardData();
-    return () => { isMounted = false; };
-  }, [result, currentUserName, currentUserAvatar, obtainedMarksVal]);
-
   const handleShareResult = () => {
     if (navigator.share) {
       navigator.share({
         title: `${examTitle} - পরীক্ষার ফলাফল`,
-        text: `তামরীন একাডেমিতে ${examTitle} পরীক্ষায় আমার প্রাপ্ত নম্বর: ${toBengaliNumeral(obtainedMarksVal)}/${toBengaliNumeral(result.totalQuestions)} (পজিশন: ${toBengaliNumeral(currentUserRank)}/${toBengaliNumeral(totalParticipants)})`,
+        text: `তামরীন একাডেমিতে ${examTitle} পরীক্ষায় আমার প্রাপ্ত নম্বর: ${toBengaliNumeral(obtainedMarksVal)}/${toBengaliNumeral(result.totalQuestions)}`,
         url: window.location.href,
       }).catch(() => {});
     } else {
@@ -524,15 +235,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             </span>
           </div>
 
-          {/* Row 2: অংশ গ্রহণকারী */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-slate-800 dark:text-slate-200">অংশ গ্রহণকারী</span>
-            <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base">
-              {toBengaliNumeral(totalParticipants)}
-            </span>
-          </div>
-
-          {/* Row 3: সঠিক উত্তর */}
+          {/* Row 2: সঠিক উত্তর */}
           <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
             <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">সঠিক উত্তর</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm sm:text-base">
@@ -540,7 +243,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             </span>
           </div>
 
-          {/* Row 4: ভুল উত্তর */}
+          {/* Row 3: ভুল উত্তর */}
           <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
             <span className="text-rose-600 dark:text-rose-400 font-extrabold">ভুল উত্তর</span>
             <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
@@ -548,7 +251,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             </span>
           </div>
 
-          {/* Row 5: নেগেটিভ মার্ক */}
+          {/* Row 4: নেগেটিভ মার্ক */}
           <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
             <span className="text-rose-600 dark:text-rose-400 font-extrabold">নেগেটিভ মার্ক</span>
             <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
@@ -556,15 +259,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             </span>
           </div>
 
-          {/* Row 6: বর্তমান পজিশন */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-sky-600 dark:text-sky-400 font-extrabold">বর্তমান পজিশন</span>
-            <span className="text-sky-700 dark:text-sky-400 font-black text-sm sm:text-base">
-              {currentUserRank}th of {totalParticipants}
-            </span>
-          </div>
-
-          {/* Row 7: প্রাপ্ত নম্বর */}
+          {/* Row 5: প্রাপ্ত নম্বর */}
           <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
             <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">প্রাপ্ত নম্বর</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-black text-sm sm:text-base">
@@ -590,183 +285,20 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
         </div>
 
-        {/* 4. DUAL SWITCH TABS (মেধাতালিকা vs ব্যাখ্যাসহ উত্তর - EXACT SCREENSHOT 2 & 3) */}
-        <div className="bg-slate-200/80 dark:bg-[#0B132B] p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 shadow-inner">
-          
-          {/* Tab 1: মেধাতালিকা */}
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'leaderboard'
-                ? 'bg-amber-400 text-slate-950 shadow-md'
-                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Trophy className="w-4 h-4 fill-current" />
-            <span>মেধাতালিকা</span>
-          </button>
-
-          {/* Tab 2: ব্যাখ্যাসহ উত্তর */}
-          <button
-            onClick={() => setActiveTab('explanation')}
-            className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'explanation'
-                ? 'bg-white dark:bg-[#0D172A] text-slate-900 dark:text-white shadow-md'
-                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>ব্যাখ্যাসহ উত্তর</span>
-          </button>
-        </div>
-
-        {/* 5. TAB 1 CONTENT: LEADERBOARD LIST (EXACT SCREENSHOT 3) */}
-        {activeTab === 'leaderboard' && (
-          <div className="space-y-3.5 animate-fade-in">
-            {/* Header: অংশগ্রহণকারীদের মেধা তালিকা & আপনার অবস্থান */}
-            <div className="flex items-center justify-between gap-2 px-1 pt-1">
-              <div className="flex items-center gap-2 text-slate-900 dark:text-white">
-                <Trophy className="w-5 h-5 text-amber-500 fill-amber-400" />
-                <h3 className="text-sm sm:text-base font-black">
-                  অংশগ্রহণকারীদের মেধা তালিকা
-                </h3>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  ({toBengaliNumeral(totalParticipants)} জন)
-                </span>
-              </div>
-
-              {/* Your Rank Capsule */}
-              <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-black shrink-0">
-                আপনার অবস্থান: {toBengaliNumeral(currentUserRank)}তম
-              </div>
+        {/* 4. DETAILED EXPLANATIONS & ALL QUESTIONS WITH ANSWERS */}
+        <div className="space-y-4 animate-fade-in">
+          {/* Header Banner */}
+          <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div className="flex items-center gap-2 text-[#046A38] dark:text-emerald-400">
+              <BookOpen className="w-5 h-5 stroke-[2.2]" />
+              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                সকল প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা বিশ্লেষণ
+              </h3>
             </div>
-
-            {/* List of Leaderboard Cards */}
-            <div className="space-y-3">
-              {leaderboardList.map((item) => {
-                return (
-                  <div
-                    key={item.id}
-                    className={`rounded-3xl p-3.5 sm:p-4 bg-white dark:bg-[#0D172A] border-2 transition-all flex items-center justify-between gap-3 ${item.borderTheme}`}
-                  >
-                    {/* Left: Number circle + Letter circle + Name & Accuracy */}
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      {/* Rank Number Circle Badge */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 shadow-xs ${
-                        item.rank === 1 
-                          ? 'bg-amber-400 text-slate-950' 
-                          : item.rank === 2 
-                          ? 'bg-sky-400 text-white' 
-                          : item.rank === 3 
-                          ? 'bg-amber-700 text-white' 
-                          : 'bg-[#00897B] text-white'
-                      }`}>
-                        {toBengaliNumeral(item.rank)}
-                      </div>
-
-                      {/* User Initial Circle / Avatar */}
-                      {item.userAvatar ? (
-                        <img
-                          src={item.userAvatar}
-                          alt={item.userName}
-                          className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 shadow-2xs"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-[#00897B] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
-                          {item.letterAvatar}
-                        </div>
-                      )}
-
-                      {/* Name & Subtitle Details */}
-                      <div className="min-w-0 space-y-1">
-                        {/* Name Capsule Badge or text */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <div className="inline-block px-3 py-0.5 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[220px]">
-                            {item.userName}
-                          </div>
-                          {item.isCurrentUser && (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300">
-                              আপনি
-                            </span>
-                          )}
-                          {item.isGuest ? (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                              গেস্ট
-                            </span>
-                          ) : (
-                            item.rollNumber && (
-                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 dark:bg-sky-950/70 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-300 font-mono">
-                                রোল: {item.rollNumber}
-                              </span>
-                            )
-                          )}
-                        </div>
-
-                        {/* Rank Badge + Question & Accuracy */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {item.rank <= 3 && (
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 ${
-                              item.rank === 1 ? 'bg-amber-400 text-slate-950' : item.rank === 2 ? 'bg-sky-500 text-white' : 'bg-amber-700 text-white'
-                            }`}>
-                              👑 {item.rankBadgeText}
-                            </span>
-                          )}
-
-                          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                            পরীক্ষা • প্রশ্ন: {toBengaliNumeral(item.totalQuestions)}টি • একুরেসি: {toBengaliNumeral(item.accuracy)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Scores breakdown (সঠিক, ভুল, নাম্বার) */}
-                    <div className="flex items-center gap-2 sm:gap-3 shrink-0 text-right">
-                      {/* Correct */}
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-slate-500 block">সঠিক</span>
-                        <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
-                          {toBengaliNumeral(item.correctCount)}টি
-                        </span>
-                      </div>
-
-                      {/* Wrong */}
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-slate-500 block">ভুল</span>
-                        <span className="text-xs sm:text-sm font-black text-rose-600 dark:text-rose-400">
-                          {toBengaliNumeral(item.wrongCount)}টি
-                        </span>
-                      </div>
-
-                      {/* Final Score */}
-                      <div className="text-center pl-1 border-l border-slate-200 dark:border-slate-700">
-                        <span className="text-[10px] font-bold text-slate-500 block">নাম্বার</span>
-                        <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400">
-                          {toBengaliNumeral(item.score)}/{toBengaliNumeral(item.totalQuestions)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              মোট প্রশ্ন: {toBengaliNumeral(result.totalQuestions)}টি
+            </span>
           </div>
-        )}
-
-        {/* 6. TAB 2 CONTENT: DETAILED EXPLANATIONS (EXACT SCREENSHOT 2) */}
-        {activeTab === 'explanation' && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Header Banner */}
-            <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center gap-2 text-[#046A38] dark:text-emerald-400">
-                <BookOpen className="w-5 h-5 stroke-[2.2]" />
-                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                  সকল প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা বিশ্লেষণ
-                </h3>
-              </div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                মোট প্রশ্ন: {toBengaliNumeral(result.totalQuestions)}টি
-              </span>
-            </div>
 
             {/* Questions List */}
             {result.userAnswers.map((answer, index) => {
@@ -893,7 +425,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
               );
             })}
           </div>
-        )}
 
       </div>
     </div>

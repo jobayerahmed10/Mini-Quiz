@@ -19,7 +19,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabChange,
 }) => {
-  const tabs = [
+  const tabs: Array<{
+    id: TabRoute;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: string;
+    badgeColor?: string;
+  }> = [
     {
       id: 'home' as TabRoute,
       label: 'হোম',

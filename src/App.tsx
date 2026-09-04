@@ -468,7 +468,8 @@ export default function App() {
     };
 
     setQuizResult(result);
-    setResultViewMode('summary');
+    setResultViewMode('explanation');
+    navigateWithHistory('result');
 
     // Increment user total exams count
     incrementTotalExamsCount();
@@ -556,8 +557,6 @@ export default function App() {
       if (!res.success) {
         console.warn("Exam submission notice from Supabase:", res.error);
       }
-      // Redirect to Leaderboard Page upon completion
-      handleOpenLeaderboard(examId);
     });
   };
 
@@ -794,7 +793,7 @@ export default function App() {
           <ResultPage
             result={quizResult}
             onRetry={handleRetry}
-            onNavigateHome={handleNavigateHome}
+            onNavigateHome={() => navigateWithHistory('home', 'exam')}
             onOpenLeaderboard={handleOpenLeaderboard}
             showHarakat={showHarakat}
             initialViewMode={resultViewMode}
