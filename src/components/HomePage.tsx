@@ -27,7 +27,6 @@ import {
   Archive,
   Pencil,
   CheckSquare,
-  History,
   Newspaper,
   Plus,
   Radio,
@@ -437,16 +436,16 @@ export const HomePage: React.FC<HomePageProps> = ({
               </span>
             </button>
 
-            {/* 7. হিস্ট্রি */}
+            {/* 7. লিডারবোর্ড */}
             <button
-              onClick={() => onTabNavigate && onTabNavigate('exam')}
-              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-pink-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
+              onClick={() => onOpenLeaderboard ? onOpenLeaderboard() : (onTabNavigate && onTabNavigate('exam'))}
+              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-pink-100/70 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <History className="w-5 h-5 sm:w-6 sm:h-6" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 font-hind">
-                হিস্ট্রি
+                লিডারবোর্ড
               </span>
             </button>
 
@@ -589,16 +588,30 @@ export const HomePage: React.FC<HomePageProps> = ({
           <section className="bg-slate-100/80 dark:bg-slate-800/80 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-700/80 space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500 fill-amber-400" />
-                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind">
+              <div 
+                onClick={() => onOpenLeaderboard && onOpenLeaderboard()}
+                className="flex items-center gap-2 cursor-pointer group"
+              >
+                <Trophy className="w-5 h-5 text-amber-500 fill-amber-400 group-hover:scale-110 transition-transform" />
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind group-hover:text-emerald-600 transition-colors">
                   লিডারবোর্ড | {selectedLeague === 'iron' ? 'আয়রন লীগ' : selectedLeague === 'bronze' ? 'ব্রোঞ্জ লীগ' : selectedLeague === 'silver' ? 'সিলভার লীগ' : 'গোল্ড লীগ'}
                 </h2>
               </div>
 
-              <div className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-2xs">
-                <Star className="w-3.5 h-3.5 fill-current" />
-                <span>১০</span>
+              <div className="flex items-center gap-2">
+                {onOpenLeaderboard && (
+                  <button
+                    onClick={() => onOpenLeaderboard()}
+                    className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span>সম্পূর্ণ দেখুন</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-2xs">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  <span>১০</span>
+                </div>
               </div>
             </div>
 
