@@ -2,16 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X, BookOpen } from 'lucide-react';
 import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered } from '../lib/utils';
 import { 
-  LeaderboardEntry, 
-  fetchLeaderboardEntriesFromSupabase, 
+  LeaderboardEntry,
   fetchExamsFromSupabase, 
   ExamItem,
   getExamLeaderboard,
-  getFreeOverallLeaderboard,
   getTamreenLeaderboard,
   getDhakaDateInfo,
-  ExamLeaderboardItem,
-  FreeOverallLeaderboardItem,
   subscribeToLeaderboard
 } from '../lib/supabase';
 
@@ -441,7 +437,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     }
   }, [effectiveExamOnlyMode, selectedExamId]);
 
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [rpcRankedList, setRpcRankedList] = useState<LeaderboardDisplayItem[] | null>(null);
   const [rpcCurrentUser, setRpcCurrentUser] = useState<LeaderboardDisplayItem | null>(null);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
@@ -621,13 +616,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           setRpcCurrentUser(null);
         }
       }
-
-      // Also sync fallback entries
-      const fallbackEntries = await fetchLeaderboardEntriesFromSupabase('all');
-      setEntries(fallbackEntries);
     } catch {
-      setEntries([]);
-      setRpcRankedList(null);
+      setRpcRankedList([]);
       setRpcCurrentUser(null);
     } finally {
       setIsLoading(false);
@@ -675,10 +665,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     };
   }, [loadLeaderboardData]);
 
-  // Compute ranked list based on current filter & selected exam
-  const rankedList = (rpcRankedList && rpcRankedList.length > 0)
-    ? rpcRankedList
-    : computeLeaderboard(entries, currentFilter, selectedExamId, userName, userAvatar, examList);
+  // Ranked list directly from authoritative API response
+  const rankedList = rpcRankedList || [];
 
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
