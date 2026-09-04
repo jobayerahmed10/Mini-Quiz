@@ -1452,7 +1452,7 @@ export async function submitExamResultToSupabase(params: {
       wrong_answers: Number(params.wrong_answers ?? 0),
       total_questions: Number(params.total_marks ?? 0),
       time_taken: Number(timeTaken ?? 0),
-      points: points, // প্রত্যেক সঠিক উত্তরের জন্য পয়েন্ট
+      points: points, // প্রত্যেক সঠিক উত্তরের জন্য পয়েন্ট (১টি সঠিক উত্তর = ১ পয়েন্ট)
       // Metadata & compatibility fields for roll number & ranking
       roll_no: registeredRollNumber || null,
       roll_number: registeredRollNumber || null,
@@ -1469,9 +1469,9 @@ export async function submitExamResultToSupabase(params: {
       .from('exam_results')
       .insert([fullSubmissionData]);
 
-    // If optional columns are missing in older schema (code 42703 undefined_column), retry with core fields
+    // If optional columns are missing in older schema (code 42703 undefined_column), retry with core fields INCLUDING points
     if (error && (error.code === '42703' || error.message?.includes('column'))) {
-      const baseSubmissionData = {
+      const standardPayload: Record<string, any> = {
         exam_id: String(params.exam_id),
         user_id: dbUserId,
         user_name: userName,
@@ -1481,11 +1481,53 @@ export async function submitExamResultToSupabase(params: {
         wrong_answers: Number(params.wrong_answers ?? 0),
         total_questions: Number(params.total_marks ?? 0),
         time_taken: Number(timeTaken ?? 0),
+        points: points,
+        full_name: userName,
+        submitted_at: submittedAt,
       };
-      const retryRes = await supabaseInstance
+      let retryRes = await supabaseInstance
         .from('exam_results')
-        .insert([baseSubmissionData]);
+        .insert([standardPayload]);
       error = retryRes.error;
+
+      // Retry with minimal fields including points
+      if (error && (error.code === '42703' || error.message?.includes('column'))) {
+        const minimalWithPoints = {
+          exam_id: String(params.exam_id),
+          user_id: dbUserId,
+          user_name: userName,
+          user_type: userType,
+          score: Number(params.score ?? 0),
+          correct_answers: Number(params.correct_answers ?? 0),
+          wrong_answers: Number(params.wrong_answers ?? 0),
+          total_questions: Number(params.total_marks ?? 0),
+          time_taken: Number(timeTaken ?? 0),
+          points: points,
+        };
+        retryRes = await supabaseInstance
+          .from('exam_results')
+          .insert([minimalWithPoints]);
+        error = retryRes.error;
+
+        // Fallback without points column if points column itself was missing
+        if (error && (error.code === '42703' || error.message?.includes('column'))) {
+          const minimal = {
+            exam_id: String(params.exam_id),
+            user_id: dbUserId,
+            user_name: userName,
+            user_type: userType,
+            score: Number(params.score ?? 0),
+            correct_answers: Number(params.correct_answers ?? 0),
+            wrong_answers: Number(params.wrong_answers ?? 0),
+            total_questions: Number(params.total_marks ?? 0),
+            time_taken: Number(timeTaken ?? 0),
+          };
+          retryRes = await supabaseInstance
+            .from('exam_results')
+            .insert([minimal]);
+          error = retryRes.error;
+        }
+      }
     }
 
     if (error) {
@@ -1673,24 +1715,40 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
     examParticipantSets[cleanKey].add(participantKey.toLowerCase().trim());
   };
 
-  // 1. Try global_leaderboard or exam_results from Supabase
+  // 1. Try exam_results from Supabase
   if (supabaseInstance) {
     try {
-      let query = supabaseInstance
-        .from('exam_results')
-        .select('exam_id, exam_title, user_id, guest_id, user_name, full_name, guest_name, id');
+      let { data, error } = await fetchWithTimeout(
+        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        5000,
+        { data: null, error: null } as any
+      );
 
-      const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
+      if (error || !data) {
+        const fallbackRes = await fetchWithTimeout(
+          Promise.resolve(supabaseInstance.from('exam_results').select('id, exam_id, user_id, user_name')),
+          5000,
+          { data: null, error: null } as any
+        );
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
       if (!error && Array.isArray(data) && data.length > 0) {
         for (const row of data) {
-          const isReg = Boolean(row.user_id && !row.user_id.startsWith('guest_') && !row.user_id.startsWith('anon_'));
+          const isReg = Boolean(row.user_id && !String(row.user_id).startsWith('guest_') && !String(row.user_id).startsWith('anon_'));
+          const hasSpecificName = (row.full_name || row.user_name || row.guest_name) &&
+            !['গেস্ট পরীক্ষার্থী', 'পরীক্ষার্থী', 'শিক্ষার্থী', 'guest', 'anonymous'].includes(String(row.full_name || row.user_name || row.guest_name).trim().toLowerCase());
+
           const pKey = isReg
             ? String(row.user_id)
-            : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '');
+            : String(row.guest_id || row.roll_number || row.roll_no || row.student_id || (hasSpecificName ? (row.full_name || row.user_name || row.guest_name) : '') || row.id || '');
+
           if (row.exam_id) {
-            addParticipant(row.exam_id, pKey);
-          } else if (row.exam_title) {
-            addParticipant(row.exam_title, pKey);
+            addParticipant(String(row.exam_id), pKey);
+          }
+          if (row.exam_title) {
+            addParticipant(String(row.exam_title), pKey);
           }
         }
       }
@@ -1708,7 +1766,8 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
       : String(entry.guest_name || entry.user_name || entry.full_name || entry.id || '');
     if (entry.exam_id) {
       addParticipant(entry.exam_id, pKey);
-    } else if (entry.exam_title) {
+    }
+    if (entry.exam_title) {
       addParticipant(entry.exam_title, pKey);
     }
   }
@@ -1722,47 +1781,86 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
 }
 
 /**
- * Fetch exam-specific leaderboard via Supabase `exam_results` table (Sort by score DESC)
+ * Auto-heal routine: Updates existing records in Supabase `exam_results` where points = 0 or NULL
+ * to match their `correct_answers` count (1 correct = 1 point).
+ */
+export async function autoHealSupabaseExamResultsPoints(): Promise<void> {
+  if (!supabaseInstance) return;
+  try {
+    const { data, error } = await supabaseInstance
+      .from('exam_results')
+      .select('id, points, correct_answers, score')
+      .or('points.is.null,points.eq.0');
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      for (const row of data) {
+        const correctCount = Number(row.correct_answers ?? row.score ?? 0);
+        if (correctCount > 0 && row.id) {
+          try {
+            await supabaseInstance
+              .from('exam_results')
+              .update({ points: correctCount })
+              .eq('id', row.id);
+          } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('autoHealSupabaseExamResultsPoints notice:', err);
+  }
+}
+
+/**
+ * Fetch exam-specific leaderboard via Supabase `exam_results` table (Sort by score/points DESC)
  * or via secure RPC `get_exam_leaderboard`.
  * Falls back gracefully to server RPC API and local store.
  */
 export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboardItem[]> {
   if (!examId || examId === 'all') return [];
 
-  // 1. Direct Supabase Query from `exam_results` table sorted by score DESC, time_taken ASC
+  const cleanExamId = examId.trim();
+  const lowerExamId = cleanExamId.toLowerCase();
+
+  // Trigger background auto-healing for any 0-point records in Supabase
+  autoHealSupabaseExamResultsPoints().catch(() => {});
+
+  // 1. Direct Supabase Query from `exam_results` table
   if (supabaseInstance) {
     try {
-      const cleanExamId = examId.trim();
-      const escapedExamId = cleanExamId.replace(/"/g, '\\"');
-      
-      // Query exam_results directly with LEFT JOIN to profiles on user_id
-      let query = supabaseInstance
-        .from('exam_results')
-        .select('*, profiles(full_name, avatar_url, roll_number, student_id)')
-        .or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`)
-        .order('score', { ascending: false })
-        .order('time_taken', { ascending: true });
+      // Query all rows from exam_results safely with select('*')
+      let { data, error } = await fetchWithTimeout(
+        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        6000,
+        { data: null, error: null } as any
+      );
 
-      const directRes = await fetchWithTimeout(Promise.resolve(query), 6000, { data: null, error: null } as any);
-      let data = directRes.data;
-      let error = directRes.error;
-
-      // Fallback for query without embed if join query fails or returns empty
       if (error || !data || data.length === 0) {
-        let queryFallback = supabaseInstance
-          .from('exam_results')
-          .select('*')
-          .or(`exam_id.eq."${escapedExamId}",exam_title.eq."${escapedExamId}",exam_id.ilike."%${escapedExamId}%",exam_title.ilike."%${escapedExamId}%"`)
-          .order('score', { ascending: false })
-          .order('time_taken_seconds', { ascending: true });
-        const fallbackRes = await fetchWithTimeout(Promise.resolve(queryFallback), 6000, { data: null, error: null } as any);
+        const fallbackRes = await fetchWithTimeout(
+          Promise.resolve(supabaseInstance.from('exam_results').select('id, exam_id, user_id, user_name, score, correct_answers, wrong_answers, total_questions, time_taken, points, submitted_at, created_at')),
+          6000,
+          { data: null, error: null } as any
+        );
         data = fallbackRes.data || [];
         error = fallbackRes.error;
       }
 
       if (!error && Array.isArray(data) && data.length > 0) {
+        // Filter rows matching this exam
+        const matchingRows = data.filter((r: any) => {
+          const rowExamId = String(r.exam_id || '').trim().toLowerCase();
+          const rowExamTitle = String(r.exam_title || '').trim().toLowerCase();
+          return (
+            rowExamId === lowerExamId ||
+            rowExamTitle === lowerExamId ||
+            (rowExamId && (rowExamId.includes(lowerExamId) || lowerExamId.includes(rowExamId))) ||
+            (rowExamTitle && (rowExamTitle.includes(lowerExamId) || lowerExamId.includes(rowExamTitle)))
+          );
+        });
+
+        const targetRows = matchingRows.length > 0 ? matchingRows : data;
+
         // Fetch profiles separately as a backup to map names, avatars, and roll numbers
-        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+        const userIds = Array.from(new Set(targetRows.map((r: any) => r.user_id).filter(Boolean)));
         let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
         if (userIds.length > 0) {
           try {
@@ -1780,28 +1878,42 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
 
         // Deduplicate best result per distinct participant
         const bestMap = new Map<string, any>();
-        for (const row of data) {
+        for (const row of targetRows) {
           const uIdStr = row.user_id ? String(row.user_id).trim() : '';
           const isReg = Boolean(row.is_guest === false || (uIdStr && !uIdStr.startsWith('guest_') && !uIdStr.startsWith('anon_')));
-          const uKey = isReg
-            ? (uIdStr || String(row.roll_number || row.student_id || row.full_name || row.user_name || row.id || '').trim().toLowerCase())
-            : String(row.guest_id || row.guest_name || row.user_name || row.full_name || row.id || '').trim().toLowerCase();
-          
+          const hasSpecificName = (row.full_name || row.user_name || row.guest_name) &&
+            !['গেস্ট পরীক্ষার্থী', 'পরীক্ষার্থী', 'শিক্ষার্থী', 'guest', 'anonymous'].includes(String(row.full_name || row.user_name || row.guest_name).trim().toLowerCase());
+
+          let uKey: string;
+          if (isReg && uIdStr) {
+            uKey = uIdStr;
+          } else if (row.roll_number || row.roll_no || row.student_id) {
+            uKey = `roll_${String(row.roll_number || row.roll_no || row.student_id).trim().toLowerCase()}`;
+          } else if (row.guest_id) {
+            uKey = String(row.guest_id).trim().toLowerCase();
+          } else if (hasSpecificName) {
+            uKey = `name_${String(row.full_name || row.user_name || row.guest_name).trim().toLowerCase()}`;
+          } else {
+            uKey = `entry_${String(row.id || Math.random())}`;
+          }
+
           const existing = bestMap.get(uKey);
-          const scoreVal = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
+          const pointsVal = Number(row.points && row.points > 0 ? row.points : (row.correct_answers ?? row.correct_count ?? row.score ?? 0));
+          const scoreVal = Number(row.obtained_marks ?? row.score ?? pointsVal);
           const timeVal = Number(row.time_taken ?? row.time_taken_seconds ?? 999999);
           const rowDate = new Date(row.submitted_at || row.created_at || 0).getTime();
 
           if (!existing) {
             bestMap.set(uKey, row);
           } else {
-            const existScore = Number(existing.obtained_marks ?? existing.score ?? existing.correct_answers ?? existing.correct_count ?? 0);
+            const existPoints = Number(existing.points && existing.points > 0 ? existing.points : (existing.correct_answers ?? existing.correct_count ?? existing.score ?? 0));
+            const existScore = Number(existing.obtained_marks ?? existing.score ?? existPoints);
             const existTime = Number(existing.time_taken ?? existing.time_taken_seconds ?? 999999);
             const existDate = new Date(existing.submitted_at || existing.created_at || 0).getTime();
 
-            if (scoreVal > existScore) {
+            if (scoreVal > existScore || pointsVal > existPoints) {
               bestMap.set(uKey, row);
-            } else if (scoreVal === existScore) {
+            } else if (scoreVal === existScore && pointsVal === existPoints) {
               if (timeVal < existTime) {
                 bestMap.set(uKey, row);
               } else if (rowDate > existDate) {
@@ -1811,44 +1923,49 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
           }
         }
 
-        // Sort: 1. Score DESC, 2. Time Taken ASC, 3. Submitted At ASC
+        // Sort: 1. Score/Points DESC, 2. Time Taken ASC, 3. Submitted At ASC
         const sortedRows = Array.from(bestMap.values()).sort((a, b) => {
-          const scoreA = Number(a.obtained_marks ?? a.score ?? a.correct_answers ?? a.correct_count ?? 0);
-          const scoreB = Number(b.obtained_marks ?? b.score ?? b.correct_answers ?? b.correct_count ?? 0);
+          const pointsA = Number(a.points && a.points > 0 ? a.points : (a.correct_answers ?? a.correct_count ?? a.score ?? 0));
+          const pointsB = Number(b.points && b.points > 0 ? b.points : (b.correct_answers ?? b.correct_count ?? b.score ?? 0));
+          const scoreA = Number(a.obtained_marks ?? a.score ?? pointsA);
+          const scoreB = Number(b.obtained_marks ?? b.score ?? pointsB);
+
           if (scoreB !== scoreA) return scoreB - scoreA;
+          if (pointsB !== pointsA) return pointsB - pointsA;
+
           const timeA = Number(a.time_taken ?? a.time_taken_seconds ?? 999999);
           const timeB = Number(b.time_taken ?? b.time_taken_seconds ?? 999999);
           if (timeA !== timeB) return timeA - timeB;
-          return new Date(a.submitted_at || 0).getTime() - new Date(b.submitted_at || 0).getTime();
+          return new Date(a.submitted_at || a.created_at || 0).getTime() - new Date(b.submitted_at || b.created_at || 0).getTime();
         });
 
         return sortedRows.map((row: any, idx: number) => {
           const uId = row.user_id ? String(row.user_id).trim() : null;
           const isRegistered = Boolean(row.is_guest === false || (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')));
-          const profFromEmbed = row.profiles && typeof row.profiles === 'object' ? row.profiles : null;
           const profFromMap = (isRegistered && uId) ? profilesMap.get(uId) : null;
           const isGuest = !isRegistered;
 
-          // Strict Name Priority: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
-          const profileName = profFromEmbed?.full_name || profFromMap?.full_name;
-          const fullName = profileName || row.user_name || row.guest_name || row.full_name || 'Anonymous';
+          // Strict Name Priority: profiles.full_name ?? exam_results.user_name ?? exam_results.full_name ?? exam_results.guest_name ?? 'পরীক্ষার্থী'
+          const profileName = profFromMap?.full_name;
+          const fullName = profileName || row.full_name || row.user_name || row.guest_name || (isGuest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী');
           
-          // ID/Roll fallback: profiles.roll_number ?? exam_results.roll_number ?? exam_results.guest_id ?? 'N/A'
-          const rawRollOrId = profFromEmbed?.roll_number || profFromEmbed?.student_id || profFromMap?.roll_number || profFromMap?.student_id || row.roll_number || row.student_id || row.guest_id;
+          // ID/Roll fallback
+          const rawRollOrId = profFromMap?.roll_number || profFromMap?.student_id || row.roll_number || row.roll_no || row.student_id || row.guest_id;
           const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
-          const avatarUrl = isRegistered ? (profFromEmbed?.avatar_url || profFromMap?.avatar_url || row.avatar_url) : row.avatar_url;
-          const score = Number(row.obtained_marks ?? row.score ?? row.correct_answers ?? row.correct_count ?? 0);
-          const totalMarks = Number(row.total_marks ?? row.total_questions ?? (Number(row.correct_answers ?? row.correct_count ?? 0) + Number(row.wrong_answers ?? row.wrong_count ?? 0)) ?? 0);
+          const avatarUrl = isRegistered ? (profFromMap?.avatar_url || row.avatar_url) : row.avatar_url;
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
+          const calculatedPoints = Number(row.points && row.points > 0 ? row.points : correctAnswers);
+          const score = Number(row.obtained_marks ?? row.score ?? calculatedPoints);
           const wrongAnswers = Number(row.wrong_answers ?? row.wrong_count ?? 0);
+          const totalMarks = Number(row.total_marks ?? row.total_questions ?? (correctAnswers + wrongAnswers) ?? 0);
           const timeTaken = Number(row.time_taken ?? row.time_taken_seconds ?? 0);
 
           return {
             rank: idx + 1,
             user_id: uId || undefined,
             full_name: fullName,
-            user_name: row.user_name || fullName,
+            user_name: fullName,
             guest_name: isGuest ? (row.guest_name || fullName) : undefined,
             guest_id: row.guest_id || undefined,
             avatar_url: avatarUrl,
@@ -1858,7 +1975,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
             total_marks: totalMarks,
             correct_answers: correctAnswers,
             wrong_answers: wrongAnswers,
-            points: Number(row.points ?? correctAnswers),
+            points: calculatedPoints,
             time_taken_seconds: timeTaken,
             is_guest: isGuest,
             submitted_at: row.submitted_at || row.created_at,
@@ -1870,7 +1987,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     }
   }
 
-  // 3. Fetch from Express Server RPC endpoint
+  // 2. Fetch from Express Server RPC endpoint
   try {
     const res = await fetch(`/api/rpc/get_exam_leaderboard?p_exam_id=${encodeURIComponent(examId)}`);
     if (res.ok) {
@@ -1883,7 +2000,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     console.warn('Server get_exam_leaderboard error:', srvErr);
   }
 
-  // 4. Fallback to computing from local entries (sorted by score DESC)
+  // 3. Fallback to computing from local entries (sorted by score DESC)
   const local = getLocalLeaderboardEntries().filter((e) => {
     const eId = (e.exam_id || '').toLowerCase().trim();
     const eTitle = (e.exam_title || '').toLowerCase().trim();
@@ -1919,8 +2036,10 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
     total_marks: e.total_questions,
     correct_answers: e.correct_count,
     wrong_answers: e.wrong_count,
-    points: Number(e.points !== undefined ? e.points : e.correct_count),
-    time_taken_seconds: e.time_taken_seconds || 0,
+    points: Number(e.points !== undefined && e.points !== null ? e.points : e.correct_count),
+    time_taken_seconds: e.time_taken_seconds,
+    is_guest: e.is_guest,
+    submitted_at: e.created_at,
   }));
 }
 
@@ -2319,10 +2438,24 @@ export async function getTamreenLeaderboard(params: {
 
     // 2. Direct Supabase Query on exam_results with strict ONE-EXAM-ONE-COUNT rule
     try {
-      const { data: rawResults, error: qErr } = await supabaseInstance
-        .from('exam_results')
-        .select('id, exam_id, user_id, user_name, full_name, guest_name, guest_id, user_type, points, correct_answers, score, roll_no, roll_number, student_id, time_taken_seconds, submitted_at, created_at')
-        .order('created_at', { ascending: true });
+      // Trigger background auto-healing for 0-point rows in Supabase
+      autoHealSupabaseExamResultsPoints().catch(() => {});
+
+      let { data: rawResults, error: qErr } = await fetchWithTimeout(
+        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        6000,
+        { data: null, error: null } as any
+      );
+
+      if (qErr || !rawResults) {
+        const retryRes = await fetchWithTimeout(
+          Promise.resolve(supabaseInstance.from('exam_results').select('id, exam_id, user_id, user_name, score, correct_answers, wrong_answers, total_questions, time_taken, points, submitted_at, created_at')),
+          6000,
+          { data: null, error: null } as any
+        );
+        rawResults = retryRes.data;
+        qErr = retryRes.error;
+      }
 
       if (!qErr && Array.isArray(rawResults) && rawResults.length > 0) {
         // Fetch profiles for avatars and full names
@@ -2340,26 +2473,42 @@ export async function getTamreenLeaderboard(params: {
           } catch {}
         }
 
-        // Group by (user_id, exam_id) and retain ONLY 1st completed attempt
+        // Group by (user_identifier, exam_id) and retain ONLY 1st completed attempt
         const userExamGroups = new Map<string, any[]>();
         for (const r of rawResults) {
-          const isReg = Boolean(r.user_id && !String(r.user_id).startsWith('guest_') && !String(r.user_id).startsWith('anon_'));
-          const uKey = isReg ? String(r.user_id).trim() : String(r.guest_id || r.guest_name || r.user_name || r.id).trim().toLowerCase();
-          const eKey = String(r.exam_id || 'general').trim().toLowerCase();
+          const uIdStr = r.user_id ? String(r.user_id).trim() : '';
+          const isReg = Boolean(r.is_guest === false || (uIdStr && !uIdStr.startsWith('guest_') && !uIdStr.startsWith('anon_')));
+          const hasSpecificName = (r.full_name || r.user_name || r.guest_name) &&
+            !['গেস্ট পরীক্ষার্থী', 'পরীক্ষার্থী', 'শিক্ষার্থী', 'guest', 'anonymous'].includes(String(r.full_name || r.user_name || r.guest_name).trim().toLowerCase());
+
+          let uKey: string;
+          if (isReg && uIdStr) {
+            uKey = uIdStr;
+          } else if (r.roll_number || r.roll_no || r.student_id) {
+            uKey = `roll_${String(r.roll_number || r.roll_no || r.student_id).trim().toLowerCase()}`;
+          } else if (r.guest_id) {
+            uKey = String(r.guest_id).trim().toLowerCase();
+          } else if (hasSpecificName) {
+            uKey = `name_${String(r.full_name || r.user_name || r.guest_name).trim().toLowerCase()}`;
+          } else {
+            uKey = `entry_${String(r.id || Math.random())}`;
+          }
+
+          const eKey = String(r.exam_id || r.exam_title || 'general').trim().toLowerCase();
           const groupKey = `${uKey}:::${eKey}`;
 
           if (!userExamGroups.has(groupKey)) {
             userExamGroups.set(groupKey, []);
           }
-          userExamGroups.get(groupKey)!.push(r);
+          userExamGroups.get(groupKey)!.push({ ...r, _uKey: uKey, _isReg: isReg });
         }
 
-        // ONE-EXAM-ONE-COUNT: sort attempts by created_at ASC, id ASC and pick attempt_rn === 1
+        // ONE-EXAM-ONE-COUNT: sort attempts by created_at/submitted_at ASC, id ASC and pick attempt_rn === 1
         const authoritativeFirstAttempts: any[] = [];
         for (const attempts of userExamGroups.values()) {
           attempts.sort((a, b) => {
-            const tA = new Date(a.created_at || a.submitted_at || 0).getTime();
-            const tB = new Date(b.created_at || b.submitted_at || 0).getTime();
+            const tA = new Date(a.submitted_at || a.created_at || 0).getTime();
+            const tB = new Date(b.submitted_at || b.created_at || 0).getTime();
             if (tA !== tB) return tA - tB;
             return String(a.id).localeCompare(String(b.id));
           });
@@ -2370,7 +2519,9 @@ export async function getTamreenLeaderboard(params: {
         const nowDhaka = getDhakaDateInfo(new Date());
         const periodFiltered = authoritativeFirstAttempts.filter((att) => {
           if (periodType === 'all_time') return true;
-          const attDhaka = getDhakaDateInfo(att.created_at || att.submitted_at);
+          const dateVal = att.submitted_at || att.created_at;
+          if (!dateVal) return true; // Keep attempts with unset timestamp
+          const attDhaka = getDhakaDateInfo(dateVal);
           if (periodType === 'today') return attDhaka.dateStr === nowDhaka.dateStr;
           if (periodType === 'this_week') return attDhaka.weekMondayStr === nowDhaka.weekMondayStr;
           if (periodType === 'this_month') return attDhaka.monthStr === nowDhaka.monthStr;
@@ -2391,19 +2542,19 @@ export async function getTamreenLeaderboard(params: {
         }>();
 
         for (const att of periodFiltered) {
-          const isReg = Boolean(att.user_id && !String(att.user_id).startsWith('guest_') && !String(att.user_id).startsWith('anon_'));
-          const uKey = isReg ? String(att.user_id).trim() : String(att.guest_id || att.guest_name || att.user_name || att.id).trim().toLowerCase();
+          const uKey = att._uKey || String(att.user_id || att.id).trim().toLowerCase();
+          const isReg = Boolean(att._isReg);
           const prof = isReg ? profilesMap.get(att.user_id) : null;
 
-          const userName = prof?.full_name || att.user_name || att.full_name || att.guest_name || (isReg ? 'পরীক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
-          const rollNo = prof?.roll_number || prof?.student_id || att.roll_no || att.roll_number || att.student_id;
+          const userName = prof?.full_name || att.full_name || att.user_name || att.guest_name || (isReg ? 'পরীক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
+          const rollNo = prof?.roll_number || prof?.student_id || att.roll_number || att.roll_no || att.student_id;
           const avatarUrl = isReg ? (prof?.avatar_url || att.avatar_url) : att.avatar_url;
 
-          // Points source MUST be exam_results.points
-          const points = Number(att.points !== undefined && att.points !== null ? att.points : (att.correct_answers ?? att.score ?? 0));
-          const correct = Number(att.correct_answers ?? att.score ?? 0);
-          const time = new Date(att.created_at || att.submitted_at || 0).getTime();
-          const examId = String(att.exam_id).toLowerCase().trim();
+          // Points source MUST be exam_results.points (fallback to correct_answers)
+          const correct = Number(att.correct_answers ?? att.correct_count ?? att.score ?? 0);
+          const points = Number(att.points && att.points > 0 ? att.points : correct);
+          const time = new Date(att.submitted_at || att.created_at || 0).getTime();
+          const examId = String(att.exam_id || att.exam_title || 'general').toLowerCase().trim();
 
           const existing = userAggs.get(uKey);
           if (!existing) {
@@ -2412,8 +2563,8 @@ export async function getTamreenLeaderboard(params: {
             userAggs.set(uKey, {
               userId: uKey,
               userName,
-              rollNo: rollNo || undefined,
-              avatarUrl: avatarUrl || undefined,
+              rollNo: rollNo ? String(rollNo) : undefined,
+              avatarUrl: avatarUrl ? String(avatarUrl) : undefined,
               isGuest: !isReg,
               totalPoints: points,
               totalCorrect: correct,
@@ -2428,12 +2579,12 @@ export async function getTamreenLeaderboard(params: {
               existing.lastPointTime = time;
             }
             if (avatarUrl && !existing.avatarUrl) existing.avatarUrl = avatarUrl;
-            if (rollNo && !existing.rollNo) existing.rollNo = rollNo;
+            if (rollNo && !existing.rollNo) existing.rollNo = String(rollNo);
           }
         }
 
         // Leaderboard ranking with tie-breakers:
-        // 1. total_points DESC
+        // 1. total_points DESC (1 correct answer = 1 point)
         // 2. total_correct DESC
         // 3. unique_exam_count DESC
         // 4. earliest time reaching the points ASC
