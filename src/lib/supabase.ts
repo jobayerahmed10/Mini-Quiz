@@ -3098,19 +3098,22 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
  * Helper to normalize category strings across Bengali and English identifiers
  */
 export function normalizeCourseCategory(cat: string | undefined): string {
-  if (!cat) return 'general';
-  const c = String(cat).trim();
-  if (c.includes('আরবি') || c.includes('প্রভাষক') || c.toLowerCase().includes('arabic')) {
-    return 'arabic_lecturer';
+  if (!cat) return 'ntrca';
+  const c = String(cat).trim().toLowerCase();
+  if (c.includes('নিবন্ধন') || c.includes('ntrca') || c.includes('শিক্ষক নিবন্ধন') || c.includes('আরবি') || c.includes('মৌলভী') || c.includes('ইবতেদায়ী')) {
+    return 'ntrca';
   }
-  if (c.includes('মৌলভী') || c.includes('মৌলভি') || c.toLowerCase().includes('assistant_moulvi') || c.toLowerCase().includes('moulvi')) {
-    return 'assistant_moulvi';
+  if (c.includes('প্রাইমারী') || c.includes('primary') || c.includes('প্রাথমিক') || c.includes('সহকারী শিক্ষক')) {
+    return 'primary';
   }
-  if (c.includes('ইবতেদায়ী') || c.includes('ইবতেদায়ি') || c.includes('কারী') || c.includes('ক্বারী') || c.toLowerCase().includes('ebtedayi') || c.toLowerCase().includes('qari')) {
-    return 'ebtedayi';
+  if (c.includes('বিসিএস') || c.includes('bcs')) {
+    return 'bcs';
   }
-  if (c.includes('জেনারেল') || c.toLowerCase().includes('general')) {
-    return 'general';
+  if (c.includes('১১-২০') || c.includes('11-20') || c.includes('grade_11_20') || c.includes('গ্রেড')) {
+    return 'grade_11_20';
+  }
+  if (c.includes('সমাজসেবা') || c.includes('social_services') || c.includes('সমাজকর্মী') || c.includes('dss')) {
+    return 'social_services';
   }
   return c;
 }

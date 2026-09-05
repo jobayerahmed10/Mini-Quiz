@@ -51,18 +51,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   onReviewAnswers,
   onOpenLeaderboard
 }) => {
-  const [courses, setCourses] = useState<CourseModule[]>(() => {
-    try {
-      const raw = localStorage.getItem('tamreen_courses_cache');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return INITIAL_COURSES;
-  });
+  const [courses, setCourses] = useState<CourseModule[]>([]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeCourseModal, setActiveCourseModal] = useState<CourseModule | null>(null);
@@ -98,6 +87,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
       const map = new Map<string, CourseModule>();
 
+      // Overlay any remote courses from Supabase
       if (result.courses && result.courses.length > 0) {
         result.courses.forEach((c) => {
           const isApproved = approvedIds.has(c.id) || c.isEnrolled;
@@ -159,43 +149,46 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
 
   const subjects = [
     {
-      id: 'all',
-      name: 'সকল বিষয়',
-      icon: SlidersHorizontal,
-      colorClass: 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-    },
-    {
-      id: 'arabic_lecturer',
-      name: 'আরবি প্রভাষক',
+      id: 'ntrca',
+      name: 'শিক্ষক নিবন্ধন প্রস্তুতি',
+      subtitle: 'NTRCA স্পেশাল প্রস্তুতি',
       icon: BookOpenCheck,
       colorClass: 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
     },
     {
-      id: 'assistant_moulvi',
-      name: 'সহকারী মৌলভী',
+      id: 'primary',
+      name: 'প্রাইমারী শিক্ষক নিয়োগ',
+      subtitle: 'সহকারী শিক্ষক প্রস্তুতি',
       icon: Scroll,
       colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300'
     },
     {
-      id: 'ebtedayi',
-      name: 'ইবতেদায়ী মৌলবি',
+      id: 'bcs',
+      name: 'বিসিএস প্রস্তুতি',
+      subtitle: 'প্রিলি পূর্ণাঙ্গ প্রস্তুতি',
       icon: Landmark,
       colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
     },
     {
-      id: 'general',
-      name: 'জেনারেল বিষয়',
+      id: 'grade_11_20',
+      name: '১১-২০ গ্রেড প্রস্তুতি',
+      subtitle: 'সরকারি চাকরি প্রস্তুতি',
       icon: Globe,
       colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300'
+    },
+    {
+      id: 'social_services',
+      name: 'সমাজসেবা অধিদপ্তর',
+      subtitle: 'সমাজসেবা স্পেশাল প্রস্তুতি',
+      icon: Award,
+      colorClass: 'bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300'
     }
   ];
 
-  const filteredCourses = selectedCategory === 'all'
-    ? courses
-    : courses.filter((c) => {
-        const norm = normalizeCourseCategory(c.category);
-        return c.category === selectedCategory || norm === selectedCategory;
-      });
+  const filteredCourses = courses.filter((c) => {
+    const norm = normalizeCourseCategory(c.category);
+    return c.category === selectedCategory || norm === selectedCategory;
+  });
 
   const handleOpenEnrollment = (course: CourseModule) => {
     setEnrollmentModalCourse(course);
@@ -268,21 +261,15 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
           <h2 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
             বিষয় নির্বাচন করুন
           </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => loadRemoteCoursesAndEnrollments(true)}
-              disabled={isRefreshing || isLoading}
-              className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-all cursor-pointer"
-              title="সুপাবেজ থেকে রিফ্রেশ করুন"
-            >
-              <RefreshCw className={`w-3 h-3 ${isRefreshing || isLoading ? 'animate-spin text-emerald-600' : ''}`} />
-              <span>{isRefreshing ? 'রিফ্রেশ হচ্ছে...' : 'রিফ্রেশ'}</span>
-            </button>
-
-            <span className="text-[11px] sm:text-xs font-bold px-3 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full">
-              {filteredCourses.length}টি কোর্স সহজলভ্য
-            </span>
-          </div>
+          <button
+            onClick={() => loadRemoteCoursesAndEnrollments(true)}
+            disabled={isRefreshing || isLoading}
+            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-all cursor-pointer"
+            title="রিফ্রেশ করুন"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefreshing || isLoading ? 'animate-spin text-emerald-600' : ''}`} />
+            <span>{isRefreshing ? 'রিফ্রেশ হচ্ছে...' : 'রিফ্রেশ'}</span>
+          </button>
         </div>
 
         {/* Horizontal Scrollable Row of Subject Buttons */}
@@ -312,34 +299,13 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
         </div>
       </div>
 
-      {/* Course Cards List */}
-      <div className="space-y-3">
-        {filteredCourses.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
-            <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 text-[#046A38] dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800/60">
-              <GraduationCap className="w-8 h-8" />
-            </div>
-            <div className="max-w-md mx-auto space-y-1.5">
-              <h3 className="text-base sm:text-lg font-black text-[#0B132B] dark:text-white">
-                বর্তমানে কোনো কোর্স পাওয়া যায়নি
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                {selectedCategory !== 'all' 
-                  ? 'এই ক্যাটাগরিতে কোনো কোর্স নেই। সকল বিষয় নির্বাচন করে দেখতে পারেন।' 
-                  : 'সুপাবেজ ডাটাবেসে নতুন কোর্স যুক্ত হলে তা স্বয়ংক্রিয়ভাবে এখানে প্রদর্শিত হবে।'}
-              </p>
-            </div>
-            {selectedCategory !== 'all' && (
-              <button
-                onClick={() => setSelectedCategory('all')}
-                className="px-4 py-2 bg-[#046A38] hover:bg-[#03522b] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs transition-all"
-              >
-                সকল কোর্স দেখুন
-              </button>
-            )}
-          </div>
-        ) : (
-          filteredCourses.map((course) => {
+      {/* If courses exist in Supabase for selected category, show them */}
+      {filteredCourses.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <h2 className="text-base font-black text-[#0B132B] dark:text-white">
+            সহজলভ্য কোর্স ({filteredCourses.length}টি)
+          </h2>
+          {filteredCourses.map((course) => {
           const isEnrolled = course.isEnrolled;
 
           const borderAccentClass = isEnrolled
@@ -480,9 +446,9 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
               </div>
             </div>
           );
-        })
-        )}
-      </div>
+        })}
+        </div>
+      )}
 
       {/* Course Enrollment Modal */}
       {enrollmentModalCourse && (

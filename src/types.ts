@@ -145,6 +145,7 @@ export interface CourseModule {
   topics?: string[];
   instructor?: string;
   pdfAvailable?: boolean;
+  status?: string;
 }
 
 export interface ThinkingStep {
