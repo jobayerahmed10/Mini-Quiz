@@ -1870,16 +1870,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             {/* NEW MODAL 2: AVATAR EDIT MODAL */}
       {showAvatarEditModal && (() => {
-        const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
           const file = e.target.files?.[0];
           if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              setAvatar(result);
-              saveUserProfile(name, phone, result, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
-            };
-            reader.readAsDataURL(file);
+            try {
+              const compressed = await compressAndResizeAvatar(file, 280, 0.82);
+              if (compressed) {
+                setAvatar(compressed);
+                saveUserProfile(name, phone, compressed, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+                await supabaseUpdateUserProfile({ fullName: name, avatarUrl: compressed, phone });
+              }
+            } catch (err) {
+              const reader = new FileReader();
+              reader.onloadend = async () => {
+                const result = reader.result as string;
+                setAvatar(result);
+                saveUserProfile(name, phone, result, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+                await supabaseUpdateUserProfile({ fullName: name, avatarUrl: result, phone });
+              };
+              reader.readAsDataURL(file);
+            }
           }
         };
 
@@ -1935,9 +1945,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   {PRESET_AVATARS.map((url, idx) => (
                     <button
                       key={idx}
-                      onClick={() => {
+                      onClick={async () => {
                         setAvatar(url);
                         saveUserProfile(name, phone, url, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+                        await supabaseUpdateUserProfile({ fullName: name, avatarUrl: url, phone });
                       }}
                       className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
                         avatar === url ? 'border-[#0b705c] scale-105 shadow-md' : 'border-slate-200 opacity-70 hover:opacity-100'
@@ -1950,7 +1961,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
 
               <button
-                onClick={() => {
+                onClick={async () => {
+                  await supabaseUpdateUserProfile({ fullName: name, avatarUrl: avatar, phone });
                   setShowAvatarEditModal(false);
                   setSuccessMsg('অ্যাভাটার আপডেট করা হয়েছে!');
                   setTimeout(() => setSuccessMsg(''), 2000);

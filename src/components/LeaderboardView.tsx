@@ -491,13 +491,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                 : (!rowUserId || rowUserId.startsWith('guest_') || rowUserId.startsWith('anon_') || Boolean(row.guest_name))
             );
 
-            // Strict user matching
+            // Robust registered/guest user matching
             const isCurr = Boolean(
-              currentUserId && (
-                isReg
-                  ? (!isGuestEntry && rowUserId && rowUserId === currentUserId)
-                  : (isGuestEntry && (rowUserId === currentUserId || row.guest_id === currentUserId))
-              )
+              isReg
+                ? (!isGuestEntry && (
+                    (currentUserId && rowUserId && rowUserId === currentUserId) ||
+                    (userRoll && rowRoll && String(userRoll).trim().toLowerCase() === String(rowRoll).trim().toLowerCase())
+                  ))
+                : (isGuestEntry && (
+                    (currentUserId && (rowUserId === currentUserId || row.guest_id === currentUserId))
+                  ))
             );
 
             const rollNumber = (isCurr && userRoll) ? userRoll : rowRoll;
@@ -555,7 +558,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             const userRoll = userProf?.roll_number || userProf?.student_id;
 
             const mapped: LeaderboardDisplayItem[] = tamreenRes.items.map((row) => {
-              const isCurr = Boolean(row.is_current_user || (currentUserId && row.user_id.toLowerCase() === currentUserId.toLowerCase()));
+              const isCurr = Boolean(
+                row.is_current_user ||
+                (currentUserId && row.user_id && row.user_id.toLowerCase() === currentUserId.toLowerCase()) ||
+                (userRoll && row.roll_no && String(row.roll_no).trim().toLowerCase() === String(userRoll).trim().toLowerCase())
+              );
               const cleanName = (isCurr && isReg && userProf?.name)
                 ? userProf.name
                 : (row.user_name || (row.is_guest ? 'গেস্ট পরীক্ষার্থী' : 'পরীক্ষার্থী'));

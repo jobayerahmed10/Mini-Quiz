@@ -111,6 +111,8 @@ interface ServerLeaderboardEntry {
   is_guest?: boolean;
   user_avatar?: string;
   roll_number?: string;
+  phone?: string;
+  email?: string;
   score: number;
   total_questions: number;
   correct_count: number;
@@ -134,6 +136,8 @@ interface ServerExamResult {
   avatar_url?: string;
   roll_number?: string;
   student_id?: string;
+  phone?: string;
+  email?: string;
   score: number;
   total_marks: number;
   correct_answers: number;
@@ -846,6 +850,7 @@ app.post('/api/exam_results', (req, res) => {
       is_guest: isGuest,
       avatar_url: item.avatar_url || item.avatar || item.user_avatar || '',
       roll_number: item.roll_number || item.student_id || item.user_roll || undefined,
+      phone: item.phone ? normalizePhoneNumber(String(item.phone)) : undefined,
       score: Number(item.score ?? item.correct_answers ?? item.correctCount ?? 0),
       total_marks: Number(item.total_marks ?? item.total_questions ?? item.totalQuestions ?? 0),
       correct_answers: Number(item.correct_answers ?? item.correct_count ?? item.correctCount ?? 0),
@@ -919,19 +924,64 @@ app.post('/api/exam_results', (req, res) => {
 });
 
 /**
- * Endpoint to check and return all completed exam IDs for a user or guest
+ * Endpoint to check and return all completed exam IDs for a user or guest.
+ * Performs deep multi-identifier lookup across user_id, phone, roll number, and progress store.
  */
 app.get('/api/exam/completed', (req, res) => {
   try {
     const rawUserId = String(req.query.userId || '').trim();
     const rawGuestId = String(req.query.guestId || '').trim();
+    const rawPhone = String(req.query.phone || '').trim();
+    const rawRoll = String(req.query.roll || req.query.rollNumber || '').trim();
+    const rawEmail = String(req.query.email || '').trim().toLowerCase();
+    const normPhone = rawPhone ? normalizePhoneNumber(rawPhone) : '';
 
     const completedExamIdsSet = new Set<string>();
-    const isRegistered = Boolean(rawUserId && !rawUserId.startsWith('guest_') && !rawUserId.startsWith('anon_'));
 
+    // Collect all candidate identifiers for registered user
+    const matchedUserIds = new Set<string>();
+    const matchedRolls = new Set<string>();
+    if (rawUserId && !rawUserId.startsWith('guest_') && !rawUserId.startsWith('anon_')) {
+      matchedUserIds.add(rawUserId);
+      matchedUserIds.add(rawUserId.toLowerCase());
+    }
+    if (rawRoll) {
+      matchedRolls.add(rawRoll.toLowerCase());
+    }
+
+    // Match registered account in server store
+    serverRegisteredUsersStore.forEach((acc) => {
+      const accPhone = acc.phone ? normalizePhoneNumber(acc.phone) : '';
+      const accRoll = String(acc.roll_number || acc.student_id || '').toLowerCase();
+      const phoneMatch = Boolean(normPhone && accPhone && normPhone === accPhone);
+      const idMatch = Boolean(rawUserId && acc.id && (acc.id === rawUserId || acc.id.toLowerCase() === rawUserId.toLowerCase()));
+      const rollMatch = Boolean(rawRoll && accRoll && (accRoll === rawRoll.toLowerCase()));
+      const emailMatch = Boolean(rawEmail && acc.email && acc.email.toLowerCase() === rawEmail);
+
+      if (phoneMatch || idMatch || rollMatch || emailMatch) {
+        if (acc.id) {
+          matchedUserIds.add(acc.id);
+          matchedUserIds.add(acc.id.toLowerCase());
+        }
+        if (acc.roll_number) matchedRolls.add(String(acc.roll_number).toLowerCase());
+        if (acc.student_id) matchedRolls.add(String(acc.student_id).toLowerCase());
+      }
+    });
+
+    const isRegistered = matchedUserIds.size > 0 || matchedRolls.size > 0 || Boolean(normPhone);
+
+    // 1. Scan serverExamResultsStore
     serverExamResultsStore.forEach((r) => {
       if (isRegistered) {
-        if (r.user_id && (r.user_id === rawUserId || r.user_id.toLowerCase() === rawUserId.toLowerCase()) && !r.is_guest) {
+        const rUserId = r.user_id ? String(r.user_id).toLowerCase() : '';
+        const rRoll = String(r.roll_number || (r as any).student_id || '').toLowerCase();
+        const rPhone = (r as any).phone ? normalizePhoneNumber(String((r as any).phone)) : '';
+
+        const isIdMatch = Boolean(rUserId && matchedUserIds.has(rUserId));
+        const isRollMatch = Boolean(rRoll && matchedRolls.has(rRoll));
+        const isPhoneMatch = Boolean(normPhone && rPhone && normPhone === rPhone);
+
+        if ((isIdMatch || isRollMatch || isPhoneMatch) && !r.is_guest) {
           if (r.exam_id) completedExamIdsSet.add(String(r.exam_id).trim());
           if (r.exam_title) completedExamIdsSet.add(String(r.exam_title).trim());
         }
@@ -943,25 +993,42 @@ app.get('/api/exam/completed', (req, res) => {
       }
     });
 
+    // 2. Scan serverLeaderboardStore
     serverLeaderboardStore.forEach((e) => {
       if (isRegistered) {
-        if (e.user_id && (e.user_id === rawUserId || e.user_id.toLowerCase() === rawUserId.toLowerCase()) && !e.is_guest) {
+        const eUserId = e.user_id ? String(e.user_id).toLowerCase() : '';
+        const eRoll = String((e as any).roll_number || (e as any).student_id || '').toLowerCase();
+        const ePhone = (e as any).phone ? normalizePhoneNumber(String((e as any).phone)) : '';
+
+        const isIdMatch = Boolean(eUserId && matchedUserIds.has(eUserId));
+        const isRollMatch = Boolean(eRoll && matchedRolls.has(eRoll));
+        const isPhoneMatch = Boolean(normPhone && ePhone && normPhone === ePhone);
+
+        if ((isIdMatch || isRollMatch || isPhoneMatch) && !e.is_guest) {
           if (e.exam_id) completedExamIdsSet.add(String(e.exam_id).trim());
           if (e.exam_title) completedExamIdsSet.add(String(e.exam_title).trim());
         }
       }
     });
 
-    if (isRegistered) {
-      serverUserProgressStore.forEach((p) => {
-        const uMatch = p.userId && (p.userId === rawUserId || p.userId.toLowerCase() === rawUserId.toLowerCase());
-        if (uMatch && Array.isArray(p.completedExams)) {
+    // 3. Scan serverUserProgressStore
+    serverUserProgressStore.forEach((p) => {
+      const pUserId = p.userId ? String(p.userId).toLowerCase() : '';
+      const pPhone = p.phone ? normalizePhoneNumber(p.phone) : '';
+      const pEmail = p.email ? String(p.email).toLowerCase() : '';
+
+      const isIdMatch = Boolean(pUserId && matchedUserIds.has(pUserId));
+      const isPhoneMatch = Boolean(normPhone && pPhone && normPhone === pPhone);
+      const isEmailMatch = Boolean(rawEmail && pEmail && rawEmail === pEmail);
+
+      if (isIdMatch || isPhoneMatch || isEmailMatch) {
+        if (Array.isArray(p.completedExams)) {
           p.completedExams.forEach((id) => {
             if (id) completedExamIdsSet.add(String(id).trim());
           });
         }
-      });
-    }
+      }
+    });
 
     return res.json({
       success: true,
@@ -1026,17 +1093,30 @@ app.get('/api/rpc/get_exam_leaderboard', (req, res) => {
     const formatted = list.map((r, idx) => {
       const isReg = r.is_guest === false || Boolean(r.user_id && !r.user_id.startsWith('guest_') && !r.user_id.startsWith('anon_'));
       const isGuest = !isReg;
-      const fullName = r.user_name || r.full_name || r.guest_name || 'Anonymous';
       const rollNumber = r.roll_number || r.student_id || r.guest_id || 'N/A';
+
+      const userAcc = isReg ? serverRegisteredUsersStore.find(u =>
+        (r.user_id && u.id === r.user_id) ||
+        (r.phone && u.phone === r.phone) ||
+        (rollNumber !== 'N/A' && (u.roll_number === rollNumber || u.student_id === rollNumber))
+      ) : null;
+      const userProg = isReg ? serverUserProgressStore.find(p =>
+        (r.user_id && p.userId === r.user_id) ||
+        (r.phone && p.phone === r.phone)
+      ) : null;
+
+      const effectiveAvatar = userAcc?.avatar_url || userProg?.avatarUrl || r.avatar_url || '';
+      const effectiveName = userAcc?.full_name || userProg?.fullName || r.user_name || r.full_name || r.guest_name || 'পরীক্ষার্থী';
+
       return {
         rank: idx + 1,
         user_id: r.user_id || undefined,
-        full_name: fullName,
-        user_name: fullName,
-        guest_name: isGuest ? (r.guest_name || fullName) : undefined,
+        full_name: effectiveName,
+        user_name: effectiveName,
+        guest_name: isGuest ? (r.guest_name || effectiveName) : undefined,
         guest_id: r.guest_id || undefined,
         is_guest: isGuest,
-        avatar_url: r.avatar_url || '',
+        avatar_url: effectiveAvatar,
         roll_number: rollNumber !== 'N/A' ? rollNumber : undefined,
         student_id: rollNumber !== 'N/A' ? rollNumber : undefined,
         score: r.score,
@@ -1189,8 +1269,20 @@ function computeTamreenLeaderboard(params: {
     const points = Number(att.points !== undefined && att.points !== null ? att.points : (att.correct_answers ?? att.score ?? 0));
     const correctCount = Number(att.correct_answers ?? att.score ?? 0);
     const subTime = new Date(att.submitted_at || 0).getTime();
-    const name = att.full_name || att.user_name || att.guest_name || 'পরীক্ষার্থী';
     const roll = att.roll_number || att.student_id || 'N/A';
+
+    const userAcc = isReg ? serverRegisteredUsersStore.find(u =>
+      (att.user_id && u.id === att.user_id) ||
+      ((att as any).phone && u.phone === (att as any).phone) ||
+      (roll !== 'N/A' && (u.roll_number === roll || u.student_id === roll))
+    ) : null;
+    const userProg = isReg ? serverUserProgressStore.find(p =>
+      (att.user_id && p.userId === att.user_id) ||
+      ((att as any).phone && p.phone === (att as any).phone)
+    ) : null;
+
+    const effectiveAvatar = userAcc?.avatar_url || userProg?.avatarUrl || att.avatar_url || '';
+    const effectiveName = userAcc?.full_name || userProg?.fullName || att.full_name || att.user_name || att.guest_name || 'পরীক্ষার্থী';
 
     const existing = userAggregates.get(userIdentifier);
     if (!existing) {
@@ -1198,9 +1290,9 @@ function computeTamreenLeaderboard(params: {
       examSet.add(String(att.exam_id).toLowerCase().trim());
       userAggregates.set(userIdentifier, {
         userId: userIdentifier,
-        userName: name,
+        userName: effectiveName,
         rollNo: roll,
-        avatarUrl: att.avatar_url || '',
+        avatarUrl: effectiveAvatar,
         isGuest: !isReg,
         totalPoints: points,
         totalCorrect: correctCount,
@@ -1214,7 +1306,8 @@ function computeTamreenLeaderboard(params: {
       if (subTime > existing.lastPointTime) {
         existing.lastPointTime = subTime;
       }
-      if (att.avatar_url) existing.avatarUrl = att.avatar_url;
+      if (effectiveAvatar) existing.avatarUrl = effectiveAvatar;
+      if (effectiveName && effectiveName !== 'পরীক্ষার্থী') existing.userName = effectiveName;
       if (roll !== 'N/A' && existing.rollNo === 'N/A') existing.rollNo = roll;
     }
   }
@@ -1509,50 +1602,87 @@ app.post('/api/leaderboard', (req, res) => {
 app.post('/api/leaderboard/update-profile', (req, res) => {
   try {
     const { userId, newName, newAvatar, phone, rollNumber, email } = req.body;
-    if (!newName) {
+    if (!newName && !newAvatar) {
       return res.json({ success: true, updatedCount: 0 });
     }
 
-    const cleanNew = String(newName).trim();
-    const cleanAvatar = newAvatar ? String(newAvatar) : '';
-    const cleanPhone = phone ? String(phone).trim() : '';
+    const cleanNew = newName ? String(newName).trim() : '';
+    const cleanAvatar = newAvatar !== undefined ? String(newAvatar) : '';
+    const cleanPhone = phone ? normalizePhoneNumber(String(phone)) : '';
     const cleanRoll = rollNumber ? String(rollNumber).trim() : '';
     const cleanEmail = email ? String(email).trim().toLowerCase() : '';
 
     let updatedCount = 0;
+
+    // 1. Update serverRegisteredUsersStore
+    serverRegisteredUsersStore.forEach((u) => {
+      const uPhone = u.phone ? normalizePhoneNumber(u.phone) : '';
+      const uRoll = String(u.roll_number || u.student_id || '').toLowerCase();
+      const matchId = Boolean(userId && u.id && u.id === userId);
+      const matchPhone = Boolean(cleanPhone && uPhone && uPhone === cleanPhone);
+      const matchRoll = Boolean(cleanRoll && uRoll && uRoll === cleanRoll.toLowerCase());
+      const matchEmail = Boolean(cleanEmail && u.email && u.email.toLowerCase() === cleanEmail);
+
+      if (matchId || matchPhone || matchRoll || matchEmail) {
+        if (cleanNew) u.full_name = cleanNew;
+        if (cleanAvatar) u.avatar_url = cleanAvatar;
+        updatedCount++;
+      }
+    });
+
+    // 2. Update serverLeaderboardStore
     serverLeaderboardStore.forEach((e: any) => {
       if (e.is_guest) return;
+      const ePhone = e.phone ? normalizePhoneNumber(String(e.phone)) : '';
       const matchId = Boolean(userId && e.user_id && e.user_id === userId);
-      const matchPhone = Boolean(cleanPhone && e.phone && e.phone === cleanPhone);
+      const matchPhone = Boolean(cleanPhone && ePhone && ePhone === cleanPhone);
       const matchRoll = Boolean(cleanRoll && ((e.roll_number && e.roll_number === cleanRoll) || (e.student_id && e.student_id === cleanRoll)));
       const matchEmail = Boolean(cleanEmail && e.email && e.email.toLowerCase() === cleanEmail);
 
       if (matchId || matchPhone || matchRoll || matchEmail) {
-        e.user_name = cleanNew;
-        e.full_name = cleanNew;
+        if (cleanNew) {
+          e.user_name = cleanNew;
+          e.full_name = cleanNew;
+        }
         if (cleanAvatar) e.user_avatar = cleanAvatar;
         updatedCount++;
       }
     });
 
+    // 3. Update serverExamResultsStore
     serverExamResultsStore.forEach((er: any) => {
       if (er.is_guest) return;
+      const erPhone = er.phone ? normalizePhoneNumber(String(er.phone)) : '';
       const matchId = Boolean(userId && er.user_id && er.user_id === userId);
-      const matchPhone = Boolean(cleanPhone && er.phone && er.phone === cleanPhone);
+      const matchPhone = Boolean(cleanPhone && erPhone && erPhone === cleanPhone);
       const matchRoll = Boolean(cleanRoll && ((er.roll_number && er.roll_number === cleanRoll) || (er.student_id && er.student_id === cleanRoll)));
       const matchEmail = Boolean(cleanEmail && er.email && er.email.toLowerCase() === cleanEmail);
 
       if (matchId || matchPhone || matchRoll || matchEmail) {
-        er.full_name = cleanNew;
-        er.user_name = cleanNew;
+        if (cleanNew) {
+          er.full_name = cleanNew;
+          er.user_name = cleanNew;
+        }
         if (cleanAvatar) er.avatar_url = cleanAvatar;
+        updatedCount++;
       }
     });
 
-    if (updatedCount > 0) {
-      saveLeaderboardStoreToDisk();
-      saveExamResultsStoreToDisk();
-    }
+    // 4. Update serverUserProgressStore
+    serverUserProgressStore.forEach((p) => {
+      const pPhone = p.phone ? normalizePhoneNumber(p.phone) : '';
+      const matchId = Boolean(userId && p.userId && p.userId === userId);
+      const matchPhone = Boolean(cleanPhone && pPhone && pPhone === cleanPhone);
+
+      if (matchId || matchPhone) {
+        if (cleanNew) p.fullName = cleanNew;
+        if (cleanAvatar) p.avatarUrl = cleanAvatar;
+      }
+    });
+
+    saveLeaderboardStoreToDisk();
+    saveExamResultsStoreToDisk();
+    saveRegisteredUsersStoreToDisk();
 
     return res.json({ success: true, updatedCount });
   } catch (err: any) {

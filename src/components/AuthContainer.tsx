@@ -134,7 +134,9 @@ export const AuthContainer: React.FC<AuthContainerProps> = ({
       }
 
       // Fetch and restore user completed exams from Supabase immediately
-      fetchUserCompletedExamsFromSupabase(u.id).catch(() => {});
+      try {
+        await fetchUserCompletedExamsFromSupabase(u.id);
+      } catch {}
 
       window.dispatchEvent(new Event('tamreen_profile_updated'));
       window.dispatchEvent(new Event('tamreen_auth_status_changed'));

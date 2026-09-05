@@ -1611,14 +1611,14 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
     } catch {}
   }
 
-  // 1. Try Supabase exam_results table with type-safe query
+  // 1. Try Supabase exam_results table with type-safe select
   if (supabaseInstance) {
     try {
       if (isReg) {
         const rollNum = prof?.roll_number || prof?.student_id || (prof?.phone ? getUserRollNumber(prof.phone) : null);
         let query = supabaseInstance
           .from('exam_results')
-          .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free');
+          .select('exam_id, exam_title');
 
         if (currentUId && isValidUuid(currentUId)) {
           if (rollNum) {
@@ -1651,7 +1651,7 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
       if (persistentGuestId) {
         const query = supabaseInstance
           .from('exam_results')
-          .select('exam_id, exam_title, score, total_marks, correct_count, wrong_count, time_taken, is_free')
+          .select('exam_id, exam_title')
           .eq('guest_id', persistentGuestId);
 
         const { data, error } = await fetchWithTimeout(Promise.resolve(query), 5000, { data: null, error: null } as any);
@@ -1667,11 +1667,19 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
     }
   }
 
-  // 2. Also check Server API completed exams
+  // 2. Also check Server API completed exams with rich identifier metadata
   try {
-    const queryUrl = isReg
-      ? `/api/exam/completed?userId=${encodeURIComponent(currentUId || '')}`
-      : `/api/exam/completed?guestId=${encodeURIComponent(persistentGuestId || '')}`;
+    const rollNum = prof?.roll_number || prof?.student_id || (prof?.phone ? getUserRollNumber(prof.phone) : '');
+    const queryParams = new URLSearchParams();
+    if (isReg) {
+      if (currentUId) queryParams.set('userId', currentUId);
+      if (prof?.phone) queryParams.set('phone', prof.phone.trim());
+      if (rollNum) queryParams.set('roll', String(rollNum).trim());
+      if (prof?.email) queryParams.set('email', prof.email.trim());
+    } else {
+      if (persistentGuestId) queryParams.set('guestId', persistentGuestId);
+    }
+    const queryUrl = `/api/exam/completed?${queryParams.toString()}`;
     const srvRes = await fetch(queryUrl);
     if (srvRes.ok) {
       const srvJson = await srvRes.json();
@@ -1688,13 +1696,15 @@ export async function fetchUserCompletedExamsFromSupabase(userId?: string): Prom
 
   const finalCompletedList = Array.from(new Set(completedExamIds));
 
-  // Sync to local storage strictly for the current identity
+  // Sync to local storage strictly for the current identity and fire event
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('tamreen_completed_exams', JSON.stringify(finalCompletedList));
       finalCompletedList.forEach((id) => {
         if (id) addCompletedExamId(id);
       });
+      window.dispatchEvent(new Event('tamreen_completed_exams_synced'));
+      window.dispatchEvent(new Event('tamreen_data_changed'));
     } catch {}
   }
 
@@ -4831,7 +4841,9 @@ export async function syncUserProfileFromSupabase(user: any): Promise<any> {
   }
 
   // Automatically fetch and restore all completed exams from Supabase
-  fetchUserCompletedExamsFromSupabase(user.id).catch(() => {});
+  try {
+    await fetchUserCompletedExamsFromSupabase(user.id);
+  } catch {}
 
   return profile;
 }
@@ -4930,7 +4942,7 @@ export async function supabaseUpdateUserProfile(updates: {
         }
       }
 
-      // Sync avatar and name to past exam_results in Supabase
+      // Sync avatar and name to past exam_results in Supabase safely
       try {
         const erPayload: any = {};
         if (updates.fullName) {
@@ -4946,7 +4958,11 @@ export async function supabaseUpdateUserProfile(updates: {
             await supabaseInstance.from('exam_results').update(erPayload).eq('user_id', targetUserId);
           }
           if (targetPhone) {
-            await supabaseInstance.from('exam_results').update(erPayload).eq('phone', targetPhone);
+            const roll = getUserRollNumber(targetPhone);
+            if (roll) {
+              await supabaseInstance.from('exam_results').update(erPayload).eq('roll_number', roll);
+              await supabaseInstance.from('exam_results').update(erPayload).eq('student_id', roll);
+            }
           }
         }
       } catch {}
@@ -4960,10 +4976,14 @@ export async function supabaseUpdateUserProfile(updates: {
         }
         if (updates.avatarUrl !== undefined) {
           lbPayload.user_avatar = updates.avatarUrl;
+          lbPayload.avatar_url = updates.avatarUrl;
         }
         if (Object.keys(lbPayload).length > 0) {
           if (targetUserId) {
             await supabaseInstance.from('leaderboard_entries').update(lbPayload).eq('user_id', targetUserId);
+          }
+          if (targetPhone) {
+            await supabaseInstance.from('leaderboard_entries').update(lbPayload).eq('phone', targetPhone);
           }
         }
       } catch {}
@@ -4971,6 +4991,37 @@ export async function supabaseUpdateUserProfile(updates: {
       console.warn('Supabase public.profiles update notice:', dbErr);
     }
   }
+
+  // Also sync to server leaderboard update-profile endpoint
+  try {
+    let uId = authUserId;
+    let targetPhone = updates.phone;
+    let targetRoll = '';
+    if (typeof window !== 'undefined') {
+      if (!uId) uId = localStorage.getItem('tamreen_user_id') || '';
+      const raw = localStorage.getItem('tamreen_user_profile');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (!targetPhone && parsed.phone) targetPhone = parsed.phone;
+          targetRoll = parsed.roll_number || parsed.student_id || '';
+        } catch {}
+      }
+    }
+    if (!targetRoll && targetPhone) targetRoll = getUserRollNumber(targetPhone);
+
+    await fetch('/api/leaderboard/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uId,
+        phone: targetPhone || '',
+        rollNumber: targetRoll || '',
+        newName: updates.fullName || '',
+        newAvatar: updates.avatarUrl !== undefined ? updates.avatarUrl : '',
+      }),
+    });
+  } catch {}
 
   // Also sync to server user progress
   try {
@@ -4985,7 +5036,7 @@ export async function supabaseUpdateUserProfile(updates: {
         userId,
         phone: updates.phone || '',
         fullName: updates.fullName || '',
-        avatarUrl: updates.avatarUrl || '',
+        avatarUrl: updates.avatarUrl !== undefined ? updates.avatarUrl : '',
       }),
     });
   } catch {}
@@ -4993,6 +5044,7 @@ export async function supabaseUpdateUserProfile(updates: {
   // Dispatch profile update event so other components refresh immediately
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('tamreen_profile_updated'));
+    window.dispatchEvent(new Event('tamreen_auth_status_changed'));
     window.dispatchEvent(new Event('tamreen_data_changed'));
   }
 
