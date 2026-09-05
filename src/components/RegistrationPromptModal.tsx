@@ -81,7 +81,7 @@ export const RegistrationPromptModal: React.FC<RegistrationPromptModalProps> = (
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>মেধাতালিকা ও ব্যক্তিগত পারফরম্যান্স অগ্রগতি ট্র্যাকিং</span>
+            <span>লিডারবোর্ড ও ব্যক্তিগত পারফরম্যান্স অগ্রগতি ট্র্যাকিং</span>
           </div>
         </div>
 

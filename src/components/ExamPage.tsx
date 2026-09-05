@@ -660,7 +660,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   );
                 })()}
 
-                {/* Action Buttons: Before exam -> Only 'পরীক্ষা দিন' full width. After exam -> 'ব্যাখ্যা সহ উত্তর' + 'মেধাতালিকা' */}
+                {/* Action Buttons: Before exam -> Only 'পরীক্ষা দিন' full width. After exam -> 'ব্যাখ্যা সহ উত্তর' + 'লিডারবোর্ড' */}
                 {isExamCompleted(exam.id, exam.title) || serverCompletedIds.some(id => {
                   const cleanId = String(id).trim().toLowerCase();
                   const targetId = String(exam.id || '').trim().toLowerCase();
@@ -695,7 +695,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                       className="py-3 px-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:bg-amber-100 transition-all active:scale-95"
                     >
                       <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <span>মেধাতালিকা</span>
+                      <span>লিডারবোর্ড</span>
                     </button>
                   </div>
                 ) : (
@@ -811,7 +811,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   পরীক্ষা শেয়ার করুন
                 </h3>
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  বন্ধুদের সাথে শেয়ার করে মেধা তালিকায় প্রতিযোগিতা করুন!
+                  বন্ধুদের সাথে শেয়ার করে লিডারবোর্ডে প্রতিযোগিতা করুন!
                 </p>
               </div>
             </div>

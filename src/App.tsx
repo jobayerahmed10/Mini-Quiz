@@ -626,8 +626,6 @@ export default function App() {
   const handleOpenLeaderboard = (examId?: string) => {
     if (examId) {
       setSelectedLeaderboardExamId(examId);
-    } else if (activeExamId) {
-      setSelectedLeaderboardExamId(activeExamId);
     } else {
       setSelectedLeaderboardExamId('all');
     }

@@ -335,7 +335,7 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
                   আপনি এই পরীক্ষাটি ইতোমধ্যে সম্পন্ন করেছেন
                 </h3>
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  পরীক্ষার উত্তরমালা, বিস্তারিত ব্যাখ্যা এবং জাতীয় মেধাতালিকা নিচে দেখুন।
+                  পরীক্ষার উত্তরমালা, বিস্তারিত ব্যাখ্যা এবং জাতীয় লিডারবোর্ড নিচে দেখুন।
                 </p>
               </div>
 
@@ -364,7 +364,7 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
                     className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                   >
                     <Trophy className="w-4 h-4" />
-                    <span>জাতীয় মেধাতালিকা</span>
+                    <span>জাতীয় লিডারবোর্ড</span>
                   </button>
                 )}
               </div>
@@ -418,7 +418,7 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
                   </p>
                 ) : (
                   <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    💡 এই নামটি পরীক্ষার জাতীয় মেধা তালিকায় (Leaderboard) প্রদর্শিত হবে।
+                    💡 এই নামটি পরীক্ষার জাতীয় লিডারবোর্ডে (Leaderboard) প্রদর্শিত হবে।
                   </p>
                 )}
               </div>

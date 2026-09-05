@@ -407,7 +407,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   onReviewAnswers,
 }) => {
   const [selectedExamId, setSelectedExamId] = useState<string>(() => {
-    if (initialExamId && initialExamId !== 'all') return initialExamId;
+    if (initialExamId === 'all') return 'all';
+    if (initialExamId) return initialExamId;
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const urlExam = urlParams.get('exam') || urlParams.get('examId') || urlParams.get('test');
@@ -416,11 +417,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       const match = pathname.match(/\/exam\/([^/]+)/);
       if (match && match[1]) return match[1];
     }
-    return initialExamId;
+    return 'all';
   });
   
   useEffect(() => {
-    if (initialExamId && initialExamId !== 'all') {
+    if (initialExamId) {
       setSelectedExamId(initialExamId);
     }
   }, [initialExamId]);
@@ -714,12 +715,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           
           {/* 1. TOP 2 TABS / PILL BUTTONS */}
           <div className="bg-slate-100/90 dark:bg-slate-800/80 p-1.5 rounded-2xl flex items-center gap-2 max-w-xl mx-auto shadow-xs border border-slate-200/80 dark:border-slate-700/60">
-            {/* Active Tab: মেধাতালিকা */}
+            {/* Active Tab: লিডারবোর্ড */}
             <button
               className="flex-1 py-2.5 px-4 rounded-xl bg-[#FFC107] text-[#05402A] font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
             >
               <Trophy className="w-4 h-4 text-[#05402A] fill-[#05402A]" />
-              <span>মেধাতালিকা</span>
+              <span>লিডারবোর্ড</span>
             </button>
 
             {/* Inactive Tab: ব্যাখ্যাসহ উত্তর */}
@@ -740,12 +741,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             </button>
           </div>
 
-          {/* 2. HEADER: অংশগ্রহণকারীদের মেধা তালিকা (১১ জন) & আপনার অবস্থান */}
+          {/* 2. HEADER: অংশগ্রহণকারীদের লিডারবোর্ড & আপনার অবস্থান */}
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
             <div className="flex items-center gap-2 text-slate-900 dark:text-white">
               <Trophy className="w-5 h-5 text-amber-500 fill-amber-400" />
               <h3 className="text-sm sm:text-base font-black">
-                অংশগ্রহণকারীদের মেধা তালিকা
+                অংশগ্রহণকারীদের লিডারবোর্ড
               </h3>
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                 ({toBengaliNumeral(rankedList.length)} জন)
@@ -762,7 +763,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           {isLoading ? (
             <div className="p-12 text-center bg-white dark:bg-[#0D172A] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs">
               <RefreshCw className="w-8 h-8 text-[#0B705C] animate-spin mx-auto mb-3" />
-              <p className="text-xs font-bold text-slate-500">মেধা তালিকা লোড হচ্ছে...</p>
+              <p className="text-xs font-bold text-slate-500">লিডারবোর্ড লোড হচ্ছে...</p>
             </div>
           ) : rankedList.length === 0 ? (
             /* Empty State */
@@ -776,7 +777,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   এখনো কোনো পরীক্ষার্থী অংশ নেয়নি
                 </h3>
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
-                  "{selectedExamTitle}" পরীক্ষায় এখনো কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে মেধা তালিকায় স্থান অর্জন করুন!
+                  "{selectedExamTitle}" পরীক্ষায় এখনো কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে লিডারবোর্ডে স্থান অর্জন করুন!
                 </p>
               </div>
             </div>
@@ -967,7 +968,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           {isLoading ? (
             <div className="p-12 text-center bg-white dark:bg-[#0D172A] rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm">
               <RefreshCw className="w-8 h-8 text-[#0B705C] animate-spin mx-auto mb-3" />
-              <p className="text-xs font-bold text-slate-500">মেধা তালিকা লোড হচ্ছে...</p>
+              <p className="text-xs font-bold text-slate-500">লিডারবোর্ড লোড হচ্ছে...</p>
             </div>
           ) : rankedList.length === 0 ? (
             /* Empty State */
@@ -981,7 +982,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   এখনো কোনো পরীক্ষার্থী অংশ নেয়নি
                 </h3>
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
-                  এই সময়ের মধ্যে কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে মেধা তালিকায় স্থান অর্জন করুন!
+                  এই সময়ের মধ্যে কোনো রেজাল্ট জমা হয়নি। আপনিই প্রথম পরীক্ষা দিয়ে শীর্ষে লিডারবোর্ডে স্থান অর্জন করুন!
                 </p>
               </div>
             </div>
@@ -1171,7 +1172,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               {/* Other Participants Rankings List */}
               <div className="bg-white dark:bg-[#0D172A] rounded-[28px] p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between text-xs font-black text-[#0B132B] dark:text-white px-1">
-                  <span>পরীক্ষার্থীদের মেধা তালিকা</span>
+                  <span>পরীক্ষার্থীদের লিডারবোর্ড</span>
                   <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-bold">
                     মোট পরীক্ষার্থী: {toBengaliNumeral(totalParticipants || rankedList.length)} জন
                   </span>

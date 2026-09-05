@@ -610,7 +610,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
               সকল প্রশ্নের উত্তর শেষ হয়েছে?
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed font-semibold">
-              পরীক্ষা জমা দিলে আপনার অর্জিত ফলাফল ও বিস্তারিত বিশ্লেষণ মেধা তালিকায় যুক্ত হবে।
+              পরীক্ষা জমা দিলে আপনার অর্জিত ফলাফল ও বিস্তারিত বিশ্লেষণ লিডারবোর্ডে যুক্ত হবে।
             </p>
           </div>
 
@@ -638,7 +638,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                 আপনার নাম লিখুন
               </h3>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                মেধা তালিকায় আপনার পরীক্ষার রেজাল্ট ও স্কোর দেখতে আপনার নাম প্রবেশ করুন।
+                লিডারবোর্ডে আপনার পরীক্ষার রেজাল্ট ও স্কোর দেখতে আপনার নাম প্রবেশ করুন।
               </p>
             </div>
 

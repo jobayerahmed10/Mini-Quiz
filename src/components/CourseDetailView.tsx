@@ -1106,10 +1106,10 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                             setShowLeaderboardModal(true);
                           }}
                           className="py-2.5 px-3 rounded-xl border border-emerald-300/80 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                          title="মেধা তালিকা"
+                          title="লিডারবোর্ড"
                         >
                           <Trophy className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>মেধা তালিকা</span>
+                          <span>লিডারবোর্ড</span>
                         </button>
                       </div>
                     </div>
@@ -1150,7 +1150,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                           className="py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
                         >
                           <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>মেধা তালিকা</span>
+                          <span>লিডারবোর্ড</span>
                         </button>
                       </div>
                     </div>
@@ -1181,10 +1181,10 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-black">
-                {course.title} - মেধা তালিকা
+                {course.title} - লিডারবোর্ড
               </h3>
               <p className="text-xs text-emerald-200 font-medium">
-                লাইভ মেধা তালিকা • পরীক্ষায় অংশগ্রহণকারীদের ফলাফল ও র‍্যাংকিং
+                লাইভ লিডারবোর্ড • পরীক্ষায় অংশগ্রহণকারীদের ফলাফল ও র‍্যাংকিং
               </p>
             </div>
           </div>
@@ -1200,7 +1200,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
                 এখনো কোনো পরীক্ষার্থী পরীক্ষা সম্পন্ন করেনি
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                প্রথম পরীক্ষার্থী হিসেবে আপনি পরীক্ষা সম্পন্ন করে মেধা তালিকায় নাম যুক্ত করুন!
+                প্রথম পরীক্ষার্থী হিসেবে আপনি পরীক্ষা সম্পন্ন করে লিডারবোর্ডে নাম যুক্ত করুন!
               </p>
             </div>
 
