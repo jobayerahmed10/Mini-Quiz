@@ -74,6 +74,7 @@ export default function App() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [selectedSubject, setSelectedSubject] = useState<string>('সকল বিষয়');
+  const [practiceSubTab, setPracticeSubTab] = useState<'mock' | 'quick'>('mock');
   const [selectedTopic, setSelectedTopic] = useState<string | undefined>(undefined);
   const [examQuestionCount, setExamQuestionCount] = useState<number | undefined>(undefined);
   const [examTimeMinutes, setExamTimeMinutes] = useState<number>(30);
@@ -695,8 +696,11 @@ export default function App() {
     navigateWithHistory('practice');
   };
 
-  const handleTabChange = (tab: TabRoute) => {
+  const handleTabChange = (tab: TabRoute, subTab?: 'mock' | 'quick') => {
     const normalizedTab = (tab as string) === 'circular' ? 'circulars' : tab;
+    if (subTab) {
+      setPracticeSubTab(subTab);
+    }
     navigateWithHistory('home', normalizedTab as TabRoute);
   };
 
@@ -886,6 +890,7 @@ export default function App() {
 
             {activeTab === 'subjects' && (
               <SubjectsPage
+                initialSubTab={practiceSubTab}
                 onSelectSubject={(subj) => handleStartPractice(subj)}
                 onOpenCourses={() => handleTabChange('courses')}
               />

@@ -51,7 +51,7 @@ interface HomePageProps {
   onStartPractice: (subjectOrOpts: string | { subject: string; questionCount?: number; timeMinutes?: number; examId?: string; examType?: string }) => void;
   onRefreshQuestions?: () => void;
   onOpenSupabaseModal?: () => void;
-  onTabNavigate?: (tab: TabRoute) => void;
+  onTabNavigate?: (tab: TabRoute, subTab?: 'mock' | 'quick') => void;
   onOpenLeaderboard?: (examId?: string) => void;
   onReviewAnswers?: (opts: { examId?: string; subject?: string; questionCount?: number; timeMinutes?: number; examType?: string }) => void;
   searchQuery?: string;
@@ -343,7 +343,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* 2. দ্রুত প্র্যাকটিস */}
             <button
-              onClick={() => onTabNavigate && onTabNavigate('subjects')}
+              onClick={() => onTabNavigate && onTabNavigate('subjects', 'quick')}
               className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-yellow-100/70 dark:bg-yellow-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -356,7 +356,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* 3. মক পরীক্ষা */}
             <button
-              onClick={() => onTabNavigate && onTabNavigate('exam')}
+              onClick={() => onTabNavigate && onTabNavigate('subjects', 'mock')}
               className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-rose-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-rose-100/70 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -382,7 +382,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* 5. আমার প্রস্তুতি */}
             <button
-              onClick={() => onTabNavigate && onTabNavigate('subjects')}
+              onClick={() => onTabNavigate && onTabNavigate('subjects', 'mock')}
               className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -393,16 +393,16 @@ export const HomePage: React.FC<HomePageProps> = ({
               </span>
             </button>
 
-            {/* 6. প্রশ্নব্যাংক */}
+            {/* 6. পরীক্ষা (পূর্ববর্তী প্রশ্নব্যাংকের পরিবর্তে) */}
             <button
-              onClick={() => onTabNavigate && onTabNavigate('subjects')}
+              onClick={() => onTabNavigate && onTabNavigate('exam')}
               className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-sky-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-sky-100/70 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
+                <FileCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 font-hind">
-                প্রশ্নব্যাংক
+                পরীক্ষা
               </span>
             </button>
 

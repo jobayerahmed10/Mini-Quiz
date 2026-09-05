@@ -11,6 +11,7 @@ import {
 interface SubjectsPageProps {
   onSelectSubject: (options: { subject: string; topic?: string; questionCount?: number; timeMinutes?: number } | string) => void;
   onOpenCourses?: () => void;
+  initialSubTab?: 'mock' | 'quick';
 }
 
 interface SubjectItem {
@@ -144,8 +145,17 @@ const SubjectIcon: React.FC<{ type: string }> = ({ type }) => {
   }
 };
 
-export const SubjectsPage: React.FC<SubjectsPageProps> = ({ onSelectSubject }) => {
-  const [activeTab, setActiveTab] = useState<'mock' | 'quick'>('mock');
+export const SubjectsPage: React.FC<SubjectsPageProps> = ({ 
+  onSelectSubject, 
+  initialSubTab = 'mock' 
+}) => {
+  const [activeTab, setActiveTab] = useState<'mock' | 'quick'>(initialSubTab);
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   const handleCardClick = (subjectName: string) => {
     onSelectSubject({
