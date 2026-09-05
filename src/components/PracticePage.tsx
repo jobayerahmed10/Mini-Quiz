@@ -21,6 +21,7 @@ import {
 import { User, Sparkles } from 'lucide-react';
 import { detectQuestionSubject } from '../lib/subjects';
 import { fetchQuestionsByExamId } from '../lib/supabase';
+import { QuestionActionFooter } from './QuestionActionFooter';
 
 interface PracticePageProps {
   questions: Question[];
@@ -593,6 +594,11 @@ export const PracticePage: React.FC<PracticePageProps> = ({
                   </div>
                 );
               })()}
+
+              {/* Question Action Footer (Likes, Bookmarks, Reports, Explanations) */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <QuestionActionFooter question={q} />
+              </div>
             </div>
           );
         })}
