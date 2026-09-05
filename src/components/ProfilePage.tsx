@@ -5,7 +5,8 @@ import {
   LayoutGrid, Settings, Upload, ArrowLeft, BarChart3, HelpCircle, 
   CheckCircle2, Clock, FileCheck2, XCircle, RefreshCw, Copy, ExternalLink, ShieldCheck,
   LogIn, LogOut, Bell, Edit3, Target, Award, Headset, MessageSquare, 
-  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone, Users, MessageCircle, Heart
+  FileQuestion, CheckCheck, Share2, Moon, Sun, Type, Send, Smartphone, Users, MessageCircle, Heart,
+  Flag, Activity, FileText, Trash2, Info, UserCheck
 } from 'lucide-react';
 import { 
   saveUserProfile, getUserProfile, getStudentStats, 
@@ -94,6 +95,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
   const [showDashboardSection, setShowDashboardSection] = useState<boolean>(true);
   const [showMyProfileSection, setShowMyProfileSection] = useState<boolean>(false);
+  const [showPersonalInfoModal, setShowPersonalInfoModal] = useState<boolean>(false);
+  const [showAvatarEditModal, setShowAvatarEditModal] = useState<boolean>(false);
+  const [showActivityModal, setShowActivityModal] = useState<boolean>(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState<boolean>(false);
+  const [showReportedQuestionsModal, setShowReportedQuestionsModal] = useState<boolean>(false);
+  const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
+  const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState<boolean>(false);
+  const [showAccountInfoModal, setShowAccountInfoModal] = useState<boolean>(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState<boolean>(false);
   const [showSupportModal, setShowSupportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
@@ -653,397 +664,246 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* VERTICAL LIST OF OPTIONS (নিচে নিচে সাজানো যেমন ব্যবহারকারী চেয়েছেন) */}
-        {/* ১. আমার প্রোফাইল */}
-        {/* ২. ড্যাশবোর্ড */}
-        {/* ৩. সাপোর্ট ও সাহায্য */}
-        {/* ৪. একাউন্ট সেটিংস */}
-        {/* ৫. লগআউট */}
-        {/* ৬. আমাদের সাথে যুক্ত থাকুন */}
+        {/* VERTICAL MENU LIST MATCHING REFERENCE SCREENSHOTS (15 OPTIONS) */}
         {/* ========================================================================= */}
         <div className="space-y-3 pt-1">
-          
-          {/* ======================== 1. আমার প্রোফাইল ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+
+          {/* MAIN SETTINGS & PROFILE OPTIONS CONTAINER */}
+          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+            
+            {/* 1. ব্যক্তিগত তথ্য */}
             <button
-              onClick={() => setShowMyProfileSection(!showMyProfileSection)}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+              onClick={() => setShowPersonalInfoModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-base font-black text-slate-900 dark:text-white block">
-                    আমার প্রোফাইল
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    ব্যক্তিগত তথ্য, লক্ষ্য ও প্রোফাইল ব্যবস্থাপনা
-                  </span>
-                </div>
+                <User className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  ব্যক্তিগত তথ্য
+                </span>
               </div>
-              <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${showMyProfileSection ? 'rotate-90 text-[#0b705c]' : ''}`} />
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
-            {/* My Profile Expanded Info Content */}
-            {showMyProfileSection && (
-              <div className="px-5 pb-5 pt-1 border-t border-slate-100 dark:border-slate-800 space-y-3.5 animate-fade-in">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 text-xs">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-                    <span className="text-slate-400 font-bold block text-[10px]">নাম</span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block truncate">{name || 'যুক্ত নেই'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-                    <span className="text-slate-400 font-bold block text-[10px]">স্টুডেন্ট রোল নং</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm block font-mono">{userRollNumber}</span>
-                      <button 
-                        onClick={handleCopyRoll} 
-                        className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 p-0.5 transition-colors cursor-pointer" 
-                        title="রোল কপি করুন"
-                        type="button"
-                      >
-                        {copiedRoll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl col-span-2 sm:col-span-1">
-                    <span className="text-slate-400 font-bold block text-[10px]">মোবাইল / ইমেইল</span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block truncate">{phone || 'যুক্ত নেই'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl col-span-2 sm:col-span-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-slate-400 font-bold block text-[10px]">টার্গেট পরীক্ষা ও লক্ষ্য</span>
-                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm mt-0.5 block">{goalText}</span>
-                    </div>
-                    <button
-                      onClick={() => setShowGoalModal(true)}
-                      className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 rounded-lg text-xs font-bold cursor-pointer hover:bg-emerald-200"
-                    >
-                      পরিবর্তন
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowEditProfileModal(true)}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#0b705c] hover:bg-[#095949] text-white font-black text-xs transition-all active:scale-95 text-center flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    <span>প্রোফাইল সংশোধন করুন</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ======================== 2. ড্যাশবোর্ড (Dashboard Options) ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+            {/* 2. অ্যাভাটার এডিট */}
             <button
-              onClick={() => setShowDashboardSection(!showDashboardSection)}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+              onClick={() => setShowAvatarEditModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                  <LayoutGrid className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-base font-black text-slate-900 dark:text-white block">
-                    ড্যাশবোর্ড
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    পরীক্ষা, কোর্স, বুকমার্ক, ভুলের খাতা ও অগ্রগতি
-                  </span>
-                </div>
+                <Edit3 className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  অ্যাভাটার এডিট
+                </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#0b705c] dark:text-emerald-400">
-                  {showDashboardSection ? 'বন্ধ করুন' : 'সব দেখুন'}
-                </span>
-                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${showDashboardSection ? 'rotate-180 text-[#0b705c]' : ''}`} />
+                {avatar ? (
+                  <img src={avatar} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#0b705c] text-white flex items-center justify-center font-bold text-xs">
+                    <User className="w-4 h-4 text-amber-300" />
+                  </div>
+                )}
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>
 
-            {/* DASHBOARD 8 SMART CARDS GRID + PREMIUM BANNER */}
-            {showDashboardSection && (
-              <div className="p-4 sm:p-5 pt-1 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-fade-in">
-                
-                {/* 8 Cards Grid matching reference image */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                  
-                  {/* 1. পরীক্ষা দিন */}
-                  <button
-                    onClick={() => {
-                      if (onStartPractice) onStartPractice();
-                      else onNavigateHome();
-                    }}
-                    className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/80 text-[#0b705c] dark:text-emerald-300 flex items-center justify-center">
-                        <FileQuestion className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">পরীক্ষা দিন</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        মডেল টেস্ট দিন ও নিজেকে মূল্যায়ন করুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 2. কোর্স সমূহ */}
-                  <button
-                    onClick={onOpenCourses}
-                    className="p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/20 hover:bg-blue-100/80 dark:hover:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/80 text-blue-600 dark:text-blue-300 flex items-center justify-center">
-                        <BookOpen className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-blue-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">কোর্স সমূহ</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        আপনার কোর্স দেখুন এবং পড়াশোনা করুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 3. বুকমার্ক */}
-                  <button
-                    onClick={() => setShowBookmarksModal(true)}
-                    className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-100/80 dark:hover:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/80 text-amber-700 dark:text-amber-300 flex items-center justify-center">
-                        <Bookmark className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-amber-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">বুকমার্ক</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        সংরক্ষিত প্রশ্নসমূহ ({toBengaliNumeral(bookmarkedIds.length)})
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 4. পছন্দকৃত প্রশ্ন (Likes) */}
-                  <button
-                    onClick={() => setShowLikedQuestionsModal(true)}
-                    className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/80 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                        <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-rose-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">পছন্দকৃত প্রশ্ন</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        লাইক দেওয়া প্রশ্নসমূহ ({toBengaliNumeral(likedIds.length)})
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 5. পারফরম্যান্স */}
-                  <button
-                    onClick={() => setShowPerformanceModal(true)}
-                    className="p-3.5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/20 hover:bg-purple-100/80 dark:hover:bg-purple-950/40 border border-purple-200/80 dark:border-purple-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/80 text-purple-600 dark:text-purple-300 flex items-center justify-center">
-                        <BarChart3 className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-purple-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">পারফরম্যান্স</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        গ্রাফ ও রিপোর্ট দেখে অগ্রগতি বিশ্লেষণ করুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 5. লক্ষ্য সেট করুন */}
-                  <button
-                    onClick={() => setShowGoalModal(true)}
-                    className="p-3.5 rounded-2xl bg-teal-50/70 dark:bg-teal-950/20 hover:bg-teal-100/80 dark:hover:bg-teal-950/40 border border-teal-200/80 dark:border-teal-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-900/80 text-teal-700 dark:text-teal-300 flex items-center justify-center">
-                        <Target className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-teal-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">লক্ষ্য সেট করুন</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        আপনার লক্ষ্য নির্ধারণ ও ট্র্যাক করুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 6. ভুলের খাতা */}
-                  <button
-                    onClick={() => setShowWrongBankModal(true)}
-                    className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/80 text-rose-600 dark:text-rose-300 flex items-center justify-center">
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-rose-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">ভুলের খাতা</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        ভুল প্রশ্নগুলো দেখুন ও পুনরায় অনুশীলন করুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 7. পরীক্ষার ইতিহাস */}
-                  <button
-                    onClick={() => setShowHistoryModal(true)}
-                    className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/20 hover:bg-sky-100/80 dark:hover:bg-sky-950/40 border border-sky-200/80 dark:border-sky-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/80 text-sky-600 dark:text-sky-300 flex items-center justify-center">
-                        <Clock className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-sky-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">পরীক্ষার ইতিহাস</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        আপনার দেয়া সকল পরীক্ষার রেকর্ড দেখুন
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 8. অর্জন সমূহ */}
-                  <button
-                    onClick={() => setShowAchievementsModal(true)}
-                    className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-100/80 dark:hover:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between group shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/80 text-amber-700 dark:text-amber-300 flex items-center justify-center">
-                        <Trophy className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-amber-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="mt-3">
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">অর্জন সমূহ</h4>
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                        ব্যাজ ও পুরস্কার দেখুন আপনার সাফল্য গুলো
-                      </p>
-                    </div>
-                  </button>
-
-                </div>
-
-                {/* PREMIUM MEMBERSHIP BANNER (Matching bottom banner in image) */}
-                <div className="rounded-2xl bg-[#063B2F] text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md border border-emerald-700/50">
-                  <div className="flex items-center gap-3.5 w-full sm:w-auto">
-                    <div className="w-11 h-11 rounded-2xl bg-amber-400 text-amber-950 flex items-center justify-center shrink-0 shadow-xs">
-                      <Crown className="w-6 h-6 fill-amber-950" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm sm:text-base font-black text-white leading-tight">
-                        প্রিমিয়াম মেম্বারশিপ সক্রিয়
-                      </h4>
-                      <p className="text-xs font-medium text-emerald-200/90 mt-0.5">
-                        সবকিছু আনলিমিটেড অ্যাক্সেস উপভোগ করুন
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setShowPremiumModal(true)}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shrink-0 shadow-md cursor-pointer"
-                  >
-                    <span>সুবিধা দেখুন</span>
-                    <ChevronRight className="w-4 h-4 text-amber-950" />
-                  </button>
-                </div>
-
-              </div>
-            )}
-          </div>
-
-          {/* ======================== 3. সাপোর্ট ও সাহায্য ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+            {/* 3. অ্যাক্টিভিটি */}
             <button
-              onClick={() => setShowSupportModal(true)}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+              onClick={() => setShowActivityModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
-                  <Headset className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-base font-black text-slate-900 dark:text-white block">
-                    সাপোর্ট ও সাহায্য
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    আমাদের সাথে যোগাযোগ করুন যেকোনো সমস্যার সমাধানে
-                  </span>
-                </div>
+                <Heart className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-rose-500 transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  অ্যাক্টিভিটি
+                </span>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
-          </div>
 
-          {/* ======================== 4. একাউন্ট সেটিংস ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+            {/* 4. আপগ্রেড */}
+            <button
+              onClick={() => setShowPremiumModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-amber-50/50 dark:hover:bg-amber-950/20 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Crown className="w-5 h-5 text-amber-500 fill-amber-500 shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  আপগ্রেড
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/80 px-2 py-0.5 rounded-full">
+                  প্রিমিয়াম
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+
+            {/* 5. সাবস্ক্রিপশন */}
+            <button
+              onClick={() => setShowSubscriptionModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Crown className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-amber-500 transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  সাবস্ক্রিপশন
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 6. রিপোর্টেড প্রশ্ন */}
+            <button
+              onClick={() => setShowReportedQuestionsModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Flag className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-rose-500 transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  রিপোর্টেড প্রশ্ন
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-xs shadow-xs">
+                  {toBengaliNumeral(7)}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+
+            {/* 7. অ্যাপ সেটিংস */}
             <button
               onClick={() => setShowSettingsModal(true)}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-                  <Settings className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-base font-black text-slate-900 dark:text-white block">
-                    একাউন্ট সেটিংস
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    হরকত, ফন্ট সাইজ, ডার্ক মোড ও অন্যান্য পছন্দসমূহ
-                  </span>
-                </div>
+                <Settings className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  অ্যাপ সেটিংস
+                </span>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
-          </div>
 
-          {/* ======================== 5. লগআউট ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+            {/* 8. নোটিফিকেশন */}
+            <button
+              onClick={() => setShowNotificationModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Bell className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-rose-500 transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  নোটিফিকেশন
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-xs shadow-xs">
+                  {toBengaliNumeral(17)}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+
+            {/* 9. সাপোর্ট */}
+            <button
+              onClick={() => setShowSupportModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Headset className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-teal-600 transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  সাপোর্ট
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 10. আমাদের সম্পর্কে */}
+            <button
+              onClick={() => setShowAboutModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <Info className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  আমাদের সম্পর্কে
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 11. নীতিমালা */}
+            <button
+              onClick={() => setShowTermsModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <FileText className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  নীতিমালা
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 12. গোপনীয়তা নীতি */}
+            <button
+              onClick={() => setShowPrivacyModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <ShieldCheck className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  গোপনীয়তা নীতি
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 13. অ্যাকাউন্ট ইনফো */}
+            <button
+              onClick={() => setShowAccountInfoModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3.5">
+                <UserCheck className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0b705c] transition-colors shrink-0" />
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  অ্যাাকাউন্ট ইনফো
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 14. অ্যাকাউন্ট ডিলিট */}
+            <button
+              onClick={() => setShowDeleteAccountModal(true)}
+              className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-rose-50/60 dark:hover:bg-rose-950/30 cursor-pointer transition-colors group text-rose-600 dark:text-rose-400"
+            >
+              <div className="flex items-center gap-3.5">
+                <Trash2 className="w-5 h-5 text-rose-500 shrink-0" />
+                <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                  অ্যাাকাউন্ট ডিলিট
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* 15. লগ আউট */}
             {isRegistered ? (
               <button
                 onClick={() => setShowLogoutConfirm(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer transition-colors text-rose-600 dark:text-rose-400"
+                className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-rose-50/60 dark:hover:bg-rose-950/30 cursor-pointer transition-colors group text-rose-600 dark:text-rose-400"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                    <LogOut className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-base font-black block">
-                      লগআউট করুন
-                    </span>
-                    <span className="text-xs font-semibold text-rose-500/80">
-                      আপনার অ্যাকাউন্ট থেকে সাইন আউট করুন
-                    </span>
-                  </div>
+                  <LogOut className="w-5 h-5 text-rose-500 shrink-0" />
+                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                    লগ আউট
+                  </span>
                 </div>
-                <ChevronRight className="w-5 h-5 text-rose-400" />
+                <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
               </button>
             ) : (
               <button
@@ -1051,98 +911,52 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   setAuthInitialMode('login');
                   setShowAuthModal(true);
                 }}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors text-[#0b705c] dark:text-emerald-400"
+                className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30 cursor-pointer transition-colors group text-[#0b705c] dark:text-emerald-400"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <LogIn className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-base font-black block">
-                      লগইন / নতুন একাউন্ট
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-600/80 dark:text-emerald-400/80">
-                      অ্যাকাউন্টে প্রবেশ করে অগ্রগতি সংরক্ষণ করুন
-                    </span>
-                  </div>
+                  <LogIn className="w-5 h-5 text-[#0b705c] shrink-0" />
+                  <span className="text-sm font-bold text-[#0b705c] dark:text-emerald-400">
+                    লগইন / নতুন অ্যাকাউন্ট
+                  </span>
                 </div>
-                <ChevronRight className="w-5 h-5 text-emerald-500" />
+                <ChevronRight className="w-4 h-4 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
               </button>
             )}
+
           </div>
 
-          {/* ======================== 6. আমাদের সাথে যুক্ত থাকুন ======================== */}
-          <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Social Links Bar */}
+          <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-center sm:text-left">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+              <h3 className="text-xs font-black text-slate-900 dark:text-white">
                 আমাদের সাথে যুক্ত থাকুন
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                সোশ্যাল মিডিয়ায় আমাদের ফলো করুন
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                সোশ্যাল মিডিয়ায় আমাদের আপডেট ও গ্রুপে যুক্ত হোন
               </p>
             </div>
 
-            {/* Social Icons matching reference image */}
-            <div className="flex items-center gap-2.5">
-              {/* Facebook Page */}
-              <a
-                href="https://www.facebook.com/MadrasahNTRCA"
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="ফেসবুক পেজ - Madrasah NTRCA"
-              >
-                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
+            <div className="flex items-center gap-2">
+              <a href="https://www.facebook.com/MadrasahNTRCA" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" title="Facebook">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
               </a>
-
-              {/* YouTube */}
-              <a
-                href="https://youtube.com/@madrashntrcapreparation?si=NAPblR31mH9nBbnq"
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="ইউটিউব চ্যানেল"
-              >
-                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
+              <a href="https://youtube.com/@madrashntrcapreparation" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-950/60 text-red-600 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" title="YouTube">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
               </a>
-
-              {/* Telegram Channel */}
-              <a
-                href="https://t.me/mntrcap"
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-500 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="টেলিগ্রাম চ্যানেল"
-              >
-                <Send className="w-5 h-5" />
+              <a href="https://t.me/mntrcap" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" title="Telegram">
+                <Send className="w-4 h-4" />
               </a>
-
-              {/* WhatsApp Group */}
-              <a
-                href="https://chat.whatsapp.com/DdQxbgyCbhWGgHcSrxeDi6"
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="হোয়াটসঅ্যাপ গ্রুপ"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </a>
-
-              {/* WhatsApp Direct */}
-              <a
-                href="https://wa.me/8801540072250"
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/60 hover:bg-green-100 text-green-600 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shadow-2xs"
-                title="হোয়াটসঅ্যাপ চ্যাট (01540-072250)"
-              >
-                <MessageCircle className="w-5 h-5" />
+              <a href="https://chat.whatsapp.com/DdQxbgyCbhWGgHcSrxeDi6" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" title="WhatsApp Group">
+                <MessageSquare className="w-4 h-4" />
               </a>
             </div>
+          </div>
+
+          {/* Footer Copyright Notice */}
+          <div className="pt-2 pb-6 text-center">
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+              চর্চা © 2026. All rights reserved.
+            </p>
           </div>
 
         </div>
@@ -1982,6 +1796,575 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             >
               সেটিংস সেভ করুন
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 1: PERSONAL INFO MODAL */}
+      {showPersonalInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 flex items-center justify-center">
+                  <User className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  ব্যক্তিগত তথ্য
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPersonalInfoModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">শিক্ষার্থীর নাম</span>
+                  <span className="font-extrabold text-slate-900 dark:text-white text-sm mt-0.5 block">{name || 'যুক্ত নেই'}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPersonalInfoModal(false);
+                    setShowEditProfileModal(true);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950/80 text-[#0b705c] dark:text-emerald-300 rounded-xl font-extrabold cursor-pointer hover:bg-emerald-200"
+                >
+                  এডিট
+                </button>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">স্টুডেন্ট রোল নাম্বার</span>
+                  <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm mt-0.5 block font-mono">{userRollNumber}</span>
+                </div>
+                <button
+                  onClick={handleCopyRoll}
+                  className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold cursor-pointer hover:bg-slate-300 flex items-center gap-1"
+                >
+                  {copiedRoll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedRoll ? 'কপি হয়েছে' : 'কপি'}</span>
+                </button>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl">
+                <span className="text-slate-400 font-bold block text-[10px]">মোবাইল নাম্বার / ইমেইল</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{phone || 'যুক্ত নেই'}</span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">টার্গেট পরীক্ষা</span>
+                  <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-xs mt-0.5 block">{goalText}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPersonalInfoModal(false);
+                    setShowGoalModal(true);
+                  }}
+                  className="px-3 py-1 bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  পরিবর্তন
+                </button>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">অ্যাকাউন্ট স্ট্যাটাস</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs mt-0.5 block">
+                    {isRegistered ? 'ভেরিফাইড শিক্ষার্থী' : 'গেস্ট অ্যাকাউন্ট'}
+                  </span>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                  সক্রিয়
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPersonalInfoModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 2: AVATAR EDIT MODAL */}
+      {showAvatarEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 text-center">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-[#0b705c] flex items-center justify-center">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  অ্যাভাটার নির্বাচন করুন
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAvatarEditModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Current Avatar Display */}
+            <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-[#0b705c] shadow-md">
+              {avatar ? (
+                <img src={avatar} alt="Current Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#0b705c] text-white flex items-center justify-center text-3xl font-black">
+                  {name ? name.charAt(0) : 'S'}
+                </div>
+              )}
+            </div>
+
+            {/* Custom Photo Upload Button */}
+            <div>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 rounded-xl text-xs font-black cursor-pointer hover:bg-emerald-100 border border-emerald-200">
+                <Upload className="w-4 h-4" />
+                <span>গ্যালারি থেকে ছবি আপলোড করুন</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Preset Avatars List */}
+            <div className="space-y-2 pt-2">
+              <span className="text-xs font-bold text-slate-500 block">অথবা রেডিমেড অ্যাভাটার সিলেক্ট করুন:</span>
+              <div className="grid grid-cols-4 gap-3">
+                {PRESET_AVATARS.map((url, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setAvatar(url);
+                      saveUserProfile({ avatar: url });
+                    }}
+                    className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                      avatar === url ? 'border-[#0b705c] scale-105 shadow-md' : 'border-slate-200 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowAvatarEditModal(false);
+                setSuccessMsg('অ্যাভাটার আপডেট করা হয়েছে!');
+                setTimeout(() => setSuccessMsg(''), 2000);
+              }}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer shadow-xs"
+            >
+              সংরক্ষণ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 3: ACTIVITY MODAL */}
+      {showActivityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <Heart className="w-4 h-4 fill-rose-500" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  আপনার অ্যাক্টিভিটি রিপোর্ট
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowActivityModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-100 text-center">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">মোট স্ট্রিক</span>
+                <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1 block">
+                  {toBengaliNumeral(getUserStreakDays())} দিন
+                </span>
+              </div>
+
+              <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 rounded-2xl border border-blue-100 text-center">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 block">সম্পন্ন পরীক্ষা</span>
+                <span className="text-2xl font-black text-blue-700 dark:text-blue-400 mt-1 block">
+                  {toBengaliNumeral(getCompletedExamIds().length)} টি
+                </span>
+              </div>
+
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 rounded-2xl border border-amber-100 text-center">
+                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 block">সংরক্ষিত বুকমার্ক</span>
+                <span className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1 block">
+                  {toBengaliNumeral(bookmarkedIds.length)} টি
+                </span>
+              </div>
+
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-100 text-center">
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 block">লাইক করা প্রশ্ন</span>
+                <span className="text-2xl font-black text-rose-700 dark:text-rose-400 mt-1 block">
+                  {toBengaliNumeral(likedIds.length)} টি
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 space-y-2">
+              <button
+                onClick={() => {
+                  setShowActivityModal(false);
+                  setShowBookmarksModal(true);
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-between cursor-pointer hover:bg-slate-200"
+              >
+                <span>বুকমার্ক করা প্রশ্নসমূহ দেখুন</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowActivityModal(false);
+                  setShowLikedQuestionsModal(true);
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-between cursor-pointer hover:bg-slate-200"
+              >
+                <span>পছন্দকৃত (লাইক দেওয়া) প্রশ্নসমূহ দেখুন</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowActivityModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 4: SUBSCRIPTION MODAL */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Crown className="w-4 h-4 fill-amber-500 text-amber-500" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  সাবস্ক্রিপশন স্ট্যাটাস
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSubscriptionModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#063B2F] to-[#0b705c] text-white space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-300">বর্তমান প্ল্যান</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-amber-950 font-black text-[10px]">
+                  প্রিমিয়াম মেম্বার
+                </span>
+              </div>
+              <h4 className="text-lg font-black">আনলিমিটেড অ্যাক্সেস প্যাক</h4>
+              <p className="text-xs text-emerald-100">
+                সকল মক টেস্ট, স্পেশাল মডেল টেস্ট, ব্যাখ্যা ও আর্কাইভ আনলকড।
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>মডেল টেস্ট ও স্পেশাল কুইজে আনলিমিটেড অংশগ্রহন</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>প্রশ্নব্যাংক ও সকল আর্কাইভ এক্সেস</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>কমিউনিটি ব্যাখ্যা ও এক্সপার্ট সল্যুশন</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowSubscriptionModal(false);
+                setShowPremiumModal(true);
+              }}
+              className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 text-xs font-black cursor-pointer shadow-md"
+            >
+              সাবস্ক্রিপশন মেয়াদ বাড়ান / রিনিউ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 5: REPORTED QUESTIONS MODAL */}
+      {showReportedQuestionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <Flag className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  রিপোর্টেড প্রশ্নসমূহ
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowReportedQuestionsModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              {[
+                { title: 'NTRCA ১৮তম শিক্ষক নিবন্ধন - আরবি প্রশ্ন #২৪', date: '০২ মার্চ ২০২৬', status: 'সংশোধিত' },
+                { title: 'BCS বিষয়ভিত্তিক কুইজ - ইসলামিক স্টাডিজ #১২', date: '২৮ ফেব্রুয়ারি ২০২৬', status: 'পর্যালোচনায়' },
+                { title: 'মাদরাসা শিক্ষক নিবন্ধন - আকাঈদ প্রশ্ন #০৫', date: '২৫ ফেব্রুয়ারি ২০২৬', status: 'সংশোধিত' },
+              ].map((item, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-white">{item.title}</h5>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">{item.date}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    item.status === 'সংশোধিত' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowReportedQuestionsModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 6: ABOUT MODAL */}
+      {showAboutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#0b705c] text-white flex items-center justify-center mx-auto text-2xl font-black shadow-md">
+              চর্চা
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                চর্চা - আত-তামরীন একাডেমি
+              </h3>
+              <span className="text-xs font-bold text-[#0b705c] dark:text-emerald-400 block mt-0.5">
+                ভার্সন v2.4.0 (NTRCA & BCS প্রস্তুতি)
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed text-justify">
+              'চর্চা' হলো NTRCA শিক্ষক নিবন্ধন, মাদরাসা প্রভাষক, সহকারী শিক্ষক ও বিসিএস ইসলামিক স্টাডিজ পরীক্ষার্থীদের জন্য একটি সম্পূর্ণ ডিজিটাল মডেল টেস্ট ও অনুশীলনী প্ল্যাটফর্ম।
+            </p>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl text-xs text-left space-y-1 text-slate-700 dark:text-slate-300">
+              <p>📍 পরিচালনা: আল-হিকমাহ এডুকেশন অ্যান্ড আইটি</p>
+              <p>✉️ হেল্পলাইন: ntrca999@gmail.com</p>
+              <p>📞 ফোন: +880 1540-072250</p>
+            </div>
+
+            <button
+              onClick={() => setShowAboutModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 7: TERMS MODAL */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#0b705c]" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  ব্যবহারকারীর নীতিমালা
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2 max-h-60 overflow-y-auto pr-1 leading-relaxed">
+              <p>১. চর্চা অ্যাপটি শুধুমাত্র শিক্ষা ও পরীক্ষার প্রস্তুতির উদ্দেশ্যে ব্যবহারের জন্য তৈরি।</p>
+              <p>২. অ্যাপের প্রশ্নব্যাংক, লেকচার শিট এবং কনটেন্ট কপি বা অননুমোদিতভাবে অন্যত্র প্রচার সম্পূর্ণ নিষিদ্ধ।</p>
+              <p>৩. প্রিমিয়াম সদস্যপদ শুধুমাত্র নির্দিষ্ট ১টি ডিভাইসে ব্যবহারের জন্য প্রযোজ্য।</p>
+              <p>৪. প্রতিটি শিক্ষার্থী নিজের রোল নম্বর অনুযায়ী সঠিক ডেটা ও রেজাল্ট হিস্ট্রি সংরক্ষণ করতে পারবেন।</p>
+            </div>
+
+            <button
+              onClick={() => setShowTermsModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              ঠিক আছে
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 8: PRIVACY MODAL */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  গোপনীয়তা নীতি
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2 max-h-60 overflow-y-auto pr-1 leading-relaxed">
+              <p>১. আপনার ব্যক্তিগত মোবাইল তথ্য বা নাম তৃতীয় কোনো পক্ষের সাথে শেয়ার করা হয় না।</p>
+              <p>২. আপনার পরীক্ষার প্রাপ্ত নম্বর ও রেজাল্ট সুরক্ষিত ডাটাবেজে সংরক্ষিত থাকে।</p>
+              <p>৩. যেকোনো সময় শিক্ষার্থী চাইলে নিজ একাউন্ট এর ডেটা পুরোপুরি মুছে ফেলার আবেদন করতে পারবেন।</p>
+            </div>
+
+            <button
+              onClick={() => setShowPrivacyModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বুঝেছি
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 9: ACCOUNT INFO MODAL */}
+      {showAccountInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-[#0b705c]" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  অ্যাাকাউন্ট ইনফো
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAccountInfoModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center justify-between">
+                <span className="text-slate-500">স্টুডেন্ট রোল:</span>
+                <span className="font-extrabold text-emerald-600 font-mono">{userRollNumber}</span>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center justify-between">
+                <span className="text-slate-500">ইউজার আইডি (UUID):</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300 font-mono text-[10px] truncate max-w-[180px]">
+                  {getUserUniqueId()}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center justify-between">
+                <span className="text-slate-500">ডাটাবেজ সিঙ্ক স্ট্যাটাস:</span>
+                <span className="font-black text-emerald-600">অনলাইন সিঙ্কড</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAccountInfoModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MODAL 10: DELETE ACCOUNT MODAL */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-sm w-full space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                অ্যাাকাউন্ট ডিলিট করতে চান?
+              </h3>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                অ্যাকাউন্ট ডিলিট করলে আপনার সকল সংরক্ষিত পরীক্ষা, হিস্ট্রি ও পারফরম্যান্স মুছে যাবে।
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => setShowDeleteAccountModal(false)}
+                className="py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-extrabold text-xs cursor-pointer hover:bg-slate-100"
+              >
+                বাতিল
+              </button>
+              <button
+                onClick={() => {
+                  clearUserProfile();
+                  setShowDeleteAccountModal(false);
+                  setIsRegistered(false);
+                  setName('');
+                  setPhone('');
+                  setSuccessMsg('অ্যাকাউন্ট রিসেট হয়েছে');
+                  setTimeout(() => setSuccessMsg(''), 2000);
+                }}
+                className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs cursor-pointer shadow-md"
+              >
+                ডিলিট করুন
+              </button>
+            </div>
           </div>
         </div>
       )}
