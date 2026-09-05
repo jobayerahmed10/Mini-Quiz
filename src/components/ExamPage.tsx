@@ -605,10 +605,18 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   {exam.title}
                 </h2>
 
-                {/* Subject Name */}
-                <p className="text-xs sm:text-sm font-extrabold text-slate-600 dark:text-slate-300 mb-4">
-                  বিষয়: <span className="text-[#0B132B] dark:text-amber-300">{exam.subject}</span>
-                </p>
+                {/* Subject & Topic */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm font-extrabold text-slate-600 dark:text-slate-300 mb-4">
+                  <p>
+                    বিষয়: <span className="text-[#0B132B] dark:text-amber-300">{exam.subject}</span>
+                  </p>
+                  {exam.topic && (
+                    <p className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-lg border border-emerald-200/80 dark:border-emerald-800">
+                      <span className="text-slate-500 dark:text-slate-400 font-bold">টপিক:</span>
+                      <span className="font-black text-[#046A38] dark:text-emerald-400">{exam.topic}</span>
+                    </p>
+                  )}
+                </div>
 
                 {/* 3 Stat Badges (Time, Questions, Marks) */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
@@ -729,6 +737,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
               examId={previewEntranceExam.id}
               title={previewEntranceExam.title}
               subject={previewEntranceExam.subject}
+              topic={previewEntranceExam.topic}
               category={previewEntranceExam.subject.includes('বাংলা') ? 'BENGALI LESSON' : 'EXAM LESSON'}
               instructor="প্রভাষক আরবি"
               institution="আত-তামরীন একাডেমি"

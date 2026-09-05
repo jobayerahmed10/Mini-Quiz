@@ -27,6 +27,7 @@ export interface SharedExamEntranceCardProps {
   examId?: string;
   title: string;
   subject?: string;
+  topic?: string;
   category?: string;
   instructor?: string;
   institution?: string;
@@ -44,6 +45,7 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
   examId,
   title,
   subject = 'সাধারণ ও মাদ্রাসা কারিকুলাম',
+  topic,
   category = 'BENGALI LESSON',
   instructor = 'প্রভাষক আরবি',
   institution = 'আত-তামরীন একাডেমি',
@@ -219,12 +221,17 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
               </h1>
             </div>
 
-            {/* Category Pill Tag */}
-            <div className="flex justify-center">
+            {/* Category Pill Tag & Topic */}
+            <div className="flex justify-center items-center gap-2 flex-wrap">
               <span className="bg-white/20 backdrop-blur-md text-white font-black text-[10px] sm:text-[11px] tracking-wider uppercase px-3.5 py-1 rounded-full border border-white/25 flex items-center gap-1.5 shadow-xs">
                 <Sparkles className="w-3 h-3 text-amber-300" />
                 <span>{displayCategory}</span>
               </span>
+              {topic && (
+                <span className="bg-emerald-500/80 backdrop-blur-md text-white font-black text-[10px] sm:text-[11px] px-3.5 py-1 rounded-full border border-emerald-300/40 flex items-center gap-1 shadow-xs">
+                  <span>টপিক: {topic}</span>
+                </span>
+              )}
             </div>
 
             {/* Instructor & Institution Badges */}

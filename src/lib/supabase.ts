@@ -257,6 +257,7 @@ export interface ExamItem {
   badge: string;
   badge_type: 'free' | 'daily' | 'weekly' | 'live';
   subject: string;
+  topic?: string;
   question_count: number;
   time_minutes: number;
   negative_marks: number;
@@ -370,6 +371,7 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
           badge: String(item.badge || 'ফ্রি পরীক্ষা'),
           badge_type: (item.badge_type || 'free') as 'free' | 'daily' | 'weekly' | 'live',
           subject: String(item.subject || 'সকল বিষয়'),
+          topic: item.topic ? String(item.topic) : (item.topic_name ? String(item.topic_name) : (item.topics ? String(item.topics) : undefined)),
           question_count: qCount,
           time_minutes: Number(item.time_minutes || 20),
           negative_marks: Number(item.negative_marks || 0.5),
@@ -422,6 +424,7 @@ export async function addExamToSupabase(input: Omit<ExamItem, 'id'>): Promise<{ 
       badge: input.badge.trim(),
       badge_type: input.badge_type || 'free',
       subject: input.subject.trim(),
+      topic: input.topic?.trim() || null,
       question_count: input.question_count,
       time_minutes: input.time_minutes,
       negative_marks: input.negative_marks,

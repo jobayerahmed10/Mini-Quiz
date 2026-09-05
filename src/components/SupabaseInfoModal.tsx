@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS public.exams (
   badge TEXT NOT NULL, -- যেমন: 'দৈনিক মডেল টেস্ট', 'সাপ্তাহিক মডেল টেস্ট', 'ফ্রি পরীক্ষা', 'লাইভ টেস্ট'
   badge_type TEXT DEFAULT 'free', -- 'free', 'daily', 'weekly', বা 'live'
   subject TEXT DEFAULT 'সকল বিষয়',
+  topic TEXT, -- পরীক্ষার সুনির্দিষ্ট টপিক (যদি থাকে)
   question_count INT DEFAULT 25,
   time_minutes INT DEFAULT 20,
   negative_marks NUMERIC DEFAULT 0.50,
@@ -79,6 +80,9 @@ CREATE TABLE IF NOT EXISTS public.exams (
   status TEXT DEFAULT 'active', -- 'active' বা 'draft'
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- বিদ্যমান টেবিলে topic কলাম যুক্ত করতে:
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS topic TEXT;
 
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
 
