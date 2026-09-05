@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -10,7 +11,11 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Gzip/Brotli Compression for Mobile Data Speed
+app.use(compression());
+
 app.use(express.json({ limit: '10mb' }));
+
 
 // Shared Server Leaderboard, Exam Results, and User Accounts Persistence
 const LEADERBOARD_FILE_PATH = path.join(process.cwd(), 'leaderboard_store.json');
@@ -2005,11 +2010,22 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        } else if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$/)) {
+          res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);

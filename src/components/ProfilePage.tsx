@@ -799,12 +799,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   নোটিফিকেশন
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-xs shadow-xs">
-                  {toBengaliNumeral(17)}
-                </span>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
             {/* 9. সাপোর্ট */}
@@ -955,7 +950,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           {/* Footer Copyright Notice */}
           <div className="pt-2 pb-6 text-center">
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-              চর্চা © 2026. All rights reserved.
+              তামরীন © 2026. All rights reserved.
             </p>
           </div>
 
@@ -1117,36 +1112,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-72 overflow-y-auto">
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">আজকের আরবি মডেল টেস্ট উন্মুক্ত</span>
-                  <span className="text-[10px] text-emerald-600">১০ মি. আগে</span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
-                  ১৮তম নিবন্ধন স্পেশাল ৫০ নম্বরের পূর্ণাঙ্গ মডেল টেস্ট এখন লাইভ। অংশগ্রহণ করে নিজের মেধা যাচাই করুন।
-                </p>
+            <div className="py-8 text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                <Bell className="w-6 h-6 opacity-60" />
               </div>
-
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-blue-800 dark:text-blue-300">নতুন লেকচার শিট আপলোড</span>
-                  <span className="text-[10px] text-blue-600">১ ঘণ্টা আগে</span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
-                  নাহু ও সরফ এর গুরুত্বপূর্ণ নিয়মাবলীর হ্যান্ডনোট কোর্স সেকশনে যোগ করা হয়েছে।
-                </p>
-              </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-amber-800 dark:text-amber-300">ধারাবাহিক স্টাডি স্ট্রিক ৫ দিন!</span>
-                  <span className="text-[10px] text-amber-600">গতকাল</span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
-                  মাশাআল্লাহ! আপনি গত ৫ দিন ধরে নিয়মিত প্রশ্ন অনুশীলন করছেন। এই ধারা বজায় রাখুন।
-                </p>
-              </div>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                এই মুহূর্তে কোনো নতুন নোটিফিকেশন নেই।
+              </p>
             </div>
 
             <button
@@ -1896,88 +1868,105 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </div>
       )}
 
-      {/* NEW MODAL 2: AVATAR EDIT MODAL */}
-      {showAvatarEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 text-center">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-[#0b705c] flex items-center justify-center">
-                  <Edit3 className="w-4 h-4" />
+            {/* NEW MODAL 2: AVATAR EDIT MODAL */}
+      {showAvatarEditModal && (() => {
+        const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              setAvatar(result);
+              saveUserProfile(name, phone, result, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 text-center">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-[#0b705c] flex items-center justify-center">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    অ্যাভাটার নির্বাচন করুন
+                  </h3>
                 </div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white">
-                  অ্যাভাটার নির্বাচন করুন
-                </h3>
+                <button
+                  onClick={() => setShowAvatarEditModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+
+              {/* Current Avatar Display */}
+              <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-[#0b705c] shadow-md">
+                {avatar ? (
+                  <img src={avatar} alt="Current Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-[#0b705c] text-white flex items-center justify-center text-3xl font-black">
+                    {name ? name.charAt(0) : 'S'}
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Photo Upload Button */}
+              <div>
+                <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 rounded-xl text-xs font-black cursor-pointer hover:bg-emerald-100 border border-emerald-200">
+                  <Upload className="w-4 h-4" />
+                  <span>গ্যালারি থেকে ছবি আপলোড করুন</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Preset Avatars List */}
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-bold text-slate-500 block">অথবা রেডিমেড অ্যাভাটার সিলেক্ট করুন:</span>
+                <div className="grid grid-cols-4 gap-3">
+                  {PRESET_AVATARS.map((url, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setAvatar(url);
+                        saveUserProfile(name, phone, url, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+                      }}
+                      className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        avatar === url ? 'border-[#0b705c] scale-105 shadow-md' : 'border-slate-200 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
-                onClick={() => setShowAvatarEditModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                onClick={() => {
+                  setShowAvatarEditModal(false);
+                  setSuccessMsg('অ্যাভাটার আপডেট করা হয়েছে!');
+                  setTimeout(() => setSuccessMsg(''), 2000);
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer mt-2"
               >
-                <X className="w-4 h-4" />
+                সংরক্ষণ করুন
               </button>
             </div>
-
-            {/* Current Avatar Display */}
-            <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-[#0b705c] shadow-md">
-              {avatar ? (
-                <img src={avatar} alt="Current Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-[#0b705c] text-white flex items-center justify-center text-3xl font-black">
-                  {name ? name.charAt(0) : 'S'}
-                </div>
-              )}
-            </div>
-
-            {/* Custom Photo Upload Button */}
-            <div>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-[#0b705c] dark:text-emerald-400 rounded-xl text-xs font-black cursor-pointer hover:bg-emerald-100 border border-emerald-200">
-                <Upload className="w-4 h-4" />
-                <span>গ্যালারি থেকে ছবি আপলোড করুন</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Preset Avatars List */}
-            <div className="space-y-2 pt-2">
-              <span className="text-xs font-bold text-slate-500 block">অথবা রেডিমেড অ্যাভাটার সিলেক্ট করুন:</span>
-              <div className="grid grid-cols-4 gap-3">
-                {PRESET_AVATARS.map((url, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setAvatar(url);
-                      saveUserProfile({ avatar: url });
-                    }}
-                    className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
-                      avatar === url ? 'border-[#0b705c] scale-105 shadow-md' : 'border-slate-200 opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setShowAvatarEditModal(false);
-                setSuccessMsg('অ্যাভাটার আপডেট করা হয়েছে!');
-                setTimeout(() => setSuccessMsg(''), 2000);
-              }}
-              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer shadow-xs"
-            >
-              সংরক্ষণ করুন
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* NEW MODAL 3: ACTIVITY MODAL */}
+
       {showActivityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
@@ -2179,12 +2168,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {showAboutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-[#0b705c] text-white flex items-center justify-center mx-auto text-2xl font-black shadow-md">
-              চর্চা
+            <div className="w-14 h-14 rounded-2xl bg-[#0b705c] text-white flex items-center justify-center mx-auto text-xl font-black shadow-md">
+              তামরীন
             </div>
             <div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                চর্চা - আত-তামরীন একাডেমি
+                আত-তামরীন একাডেমি
               </h3>
               <span className="text-xs font-bold text-[#0b705c] dark:text-emerald-400 block mt-0.5">
                 ভার্সন v2.4.0 (NTRCA & BCS প্রস্তুতি)
@@ -2192,7 +2181,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed text-justify">
-              'চর্চা' হলো NTRCA শিক্ষক নিবন্ধন, মাদরাসা প্রভাষক, সহকারী শিক্ষক ও বিসিএস ইসলামিক স্টাডিজ পরীক্ষার্থীদের জন্য একটি সম্পূর্ণ ডিজিটাল মডেল টেস্ট ও অনুশীলনী প্ল্যাটফর্ম।
+              'আত-তামরীন' হলো NTRCA শিক্ষক নিবন্ধন, মাদরাসা প্রভাষক, সহকারী শিক্ষক ও বিসিএস ইসলামিক স্টাডিজ পরীক্ষার্থীদের জন্য একটি সম্পূর্ণ ডিজিটাল মডেল টেস্ট ও অনুশীলনী প্ল্যাটফর্ম।
             </p>
 
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl text-xs text-left space-y-1 text-slate-700 dark:text-slate-300">
@@ -2231,7 +2220,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
 
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2 max-h-60 overflow-y-auto pr-1 leading-relaxed">
-              <p>১. চর্চা অ্যাপটি শুধুমাত্র শিক্ষা ও পরীক্ষার প্রস্তুতির উদ্দেশ্যে ব্যবহারের জন্য তৈরি।</p>
+              <p>১. তামরীন অ্যাপটি শুধুমাত্র শিক্ষা ও পরীক্ষার প্রস্তুতির উদ্দেশ্যে ব্যবহারের জন্য তৈরি।</p>
               <p>২. অ্যাপের প্রশ্নব্যাংক, লেকচার শিট এবং কনটেন্ট কপি বা অননুমোদিতভাবে অন্যত্র প্রচার সম্পূর্ণ নিষিদ্ধ।</p>
               <p>৩. প্রিমিয়াম সদস্যপদ শুধুমাত্র নির্দিষ্ট ১টি ডিভাইসে ব্যবহারের জন্য প্রযোজ্য।</p>
               <p>৪. প্রতিটি শিক্ষার্থী নিজের রোল নম্বর অনুযায়ী সঠিক ডেটা ও রেজাল্ট হিস্ট্রি সংরক্ষণ করতে পারবেন।</p>

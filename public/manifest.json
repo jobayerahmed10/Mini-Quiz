@@ -1,0 +1,21 @@
+{
+  "short_name": "চর্চা",
+  "name": "চর্চা - শিক্ষক নিবন্ধন প্রস্তুতি",
+  "icons": [
+    {
+      "src": "pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0D172A",
+  "theme_color": "#0b705c",
+  "display": "standalone",
+  "orientation": "portrait"
+}
