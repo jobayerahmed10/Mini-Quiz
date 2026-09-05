@@ -31,14 +31,16 @@ import {
   Plus,
   Radio,
   Star,
-  Shield
+  Shield,
+  Lock
 } from 'lucide-react';
 import { Question, TabRoute, BlogPost } from '../types';
-import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds } from '../lib/utils';
+import { toBengaliNumeral, getUserProfile, UserProfile, isExamCompleted, getCompletedExamIds, isUserPremium } from '../lib/utils';
 import { ExamItem, fetchExamsFromSupabase, getDistinctExamParticipantCounts, fetchBlogPosts, getCachedBlogs, toggleBlogBookmark, getLocalBookmarkedBlogIds, getTamreenLeaderboard, TamreenLeaderboardUser } from '../lib/supabase';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { BlogDetailView } from './BlogDetailView';
 import { LeaderboardView } from './LeaderboardView';
+import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
 interface HomePageProps {
   questions?: Question[];
@@ -78,6 +80,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const [completedRevision, setCompletedRevision] = useState(0);
   const [showRegModal, setShowRegModal] = useState(false);
+  const [isPremium, setIsPremium] = useState<boolean>(() => isUserPremium());
+  const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
   const [pendingExamOpts, setPendingExamOpts] = useState<{
     examId?: string;
     subject: string;
@@ -85,6 +89,22 @@ export const HomePage: React.FC<HomePageProps> = ({
     timeMinutes: number;
     examType: string;
   } | null>(null);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setIsPremium(isUserPremium());
+    };
+    window.addEventListener('tamreen_premium_updated', handleSync);
+    window.addEventListener('tamreen_premium_status_changed', handleSync);
+    window.addEventListener('tamreen_unlocked_posts_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('tamreen_premium_updated', handleSync);
+      window.removeEventListener('tamreen_premium_status_changed', handleSync);
+      window.removeEventListener('tamreen_unlocked_posts_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Listen for exam completed events
   useEffect(() => {
@@ -331,8 +351,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* 1. আর্কাইভ */}
             <button
               onClick={() => onTabNavigate && onTabNavigate('circulars')}
-              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
+              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group relative"
             >
+              {!isPremium && (
+                <span className="absolute top-1.5 right-1.5 p-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  <Lock className="w-3 h-3" />
+                </span>
+              )}
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Archive className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
@@ -344,8 +369,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* 2. দ্রুত প্র্যাকটিস */}
             <button
               onClick={() => onTabNavigate && onTabNavigate('subjects', 'quick')}
-              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
+              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-amber-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group relative"
             >
+              {!isPremium && (
+                <span className="absolute top-1.5 right-1.5 p-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  <Lock className="w-3 h-3" />
+                </span>
+              )}
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-yellow-100/70 dark:bg-yellow-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Zap className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
               </div>
@@ -357,8 +387,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* 3. মক পরীক্ষা */}
             <button
               onClick={() => onTabNavigate && onTabNavigate('subjects', 'mock')}
-              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-rose-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group"
+              className="bg-white dark:bg-slate-800/90 rounded-2xl p-2.5 sm:p-3.5 flex flex-col items-center justify-center text-center space-y-1.5 border border-slate-200/80 dark:border-slate-700/80 hover:border-rose-400/80 hover:shadow-sm active:scale-95 transition-all cursor-pointer group relative"
             >
+              {!isPremium && (
+                <span className="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                  <Lock className="w-3 h-3" />
+                </span>
+              )}
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-rose-100/70 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Pencil className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
@@ -579,6 +614,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                 setPendingExamOpts(null);
               }
             }}
+          />
+          {/* Premium Enrollment Modal */}
+          <PremiumEnrollmentModal
+            isOpen={showPremiumModal}
+            onClose={() => setShowPremiumModal(false)}
           />
         </>
       )}

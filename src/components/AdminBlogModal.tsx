@@ -14,15 +14,25 @@ import {
   BookOpen, 
   Sparkles,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Check,
+  XCircle,
+  MessageSquare,
+  Flag,
+  ShieldCheck,
+  Filter
 } from 'lucide-react';
-import { BlogPost, BlogCategory } from '../types';
+import { BlogPost, BlogCategory, QuestionCommunityExplanation } from '../types';
 import { BLOG_TAXONOMY } from '../data/blogData';
 import { 
   saveBlogPost, 
   deleteBlogPost, 
   uploadBlogThumbnail, 
-  fetchBlogPosts 
+  fetchBlogPosts,
+  fetchAllExplanationsForAdmin,
+  approveExplanationInSupabase,
+  rejectExplanationInSupabase,
+  fetchAllQuestionReportsForAdmin
 } from '../lib/supabase';
 
 import { RichTextEditor } from './RichTextEditor';
@@ -109,12 +119,18 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
   onClose,
   onPostSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'list' | 'explanations' | 'reports'>('create');
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Moderation state
+  const [adminExplanations, setAdminExplanations] = useState<QuestionCommunityExplanation[]>([]);
+  const [adminReports, setAdminReports] = useState<any[]>([]);
+  const [explanationFilter, setExplanationFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [isLoadingModeration, setIsLoadingModeration] = useState<boolean>(false);
 
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -177,11 +193,60 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
     }
   };
 
+  const loadModerationData = async () => {
+    setIsLoadingModeration(true);
+    try {
+      const [expls, reps] = await Promise.all([
+        fetchAllExplanationsForAdmin(),
+        fetchAllQuestionReportsForAdmin(),
+      ]);
+      setAdminExplanations(expls || []);
+      setAdminReports(reps || []);
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setIsLoadingModeration(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadBlogs();
+      loadModerationData();
     }
   }, [isOpen]);
+
+  const handleApproveExplanation = async (id: string) => {
+    try {
+      const ok = await approveExplanationInSupabase(id);
+      if (ok) {
+        setAdminExplanations((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, status: 'approved' } : e))
+        );
+        showToast('ব্যাখ্যাটি সফলভাবে অনুমোদন করা হয়েছে!');
+      } else {
+        showToast('অনুমোদন করতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err: any) {
+      showToast('ত্রুটি: ' + (err?.message || 'Error'));
+    }
+  };
+
+  const handleRejectExplanation = async (id: string) => {
+    try {
+      const ok = await rejectExplanationInSupabase(id);
+      if (ok) {
+        setAdminExplanations((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, status: 'rejected' } : e))
+        );
+        showToast('ব্যাখ্যাটি বাতিল করা হয়েছে।');
+      } else {
+        showToast('বাতিল করতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err: any) {
+      showToast('ত্রুটি: ' + (err?.message || 'Error'));
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -321,10 +386,10 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
         </div>
 
         {/* Tab Toggle */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6 pt-3 gap-3 bg-white dark:bg-slate-900">
+        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6 pt-3 gap-2 sm:gap-3 bg-white dark:bg-slate-900 overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveTab('create')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+            className={`pb-3 px-2 sm:px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'create'
                 ? 'border-[#046A38] text-[#046A38] dark:text-emerald-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -335,14 +400,45 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('list')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+            className={`pb-3 px-2 sm:px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'list'
                 ? 'border-[#046A38] text-[#046A38] dark:text-emerald-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>সকল পোস্টের তালিকা ({blogs.length})</span>
+            <span>সকল পোস্ট ({blogs.length})</span>
+          </button>
+
+          {/* Explanations Moderation Tab */}
+          <button
+            onClick={() => setActiveTab('explanations')}
+            className={`pb-3 px-2 sm:px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'explanations'
+                ? 'border-[#046A38] text-[#046A38] dark:text-emerald-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>ব্যাখ্যা অনুমোদন</span>
+            {adminExplanations.filter((e) => e.status === 'pending').length > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-black bg-amber-500 text-white rounded-full">
+                {adminExplanations.filter((e) => e.status === 'pending').length}
+              </span>
+            )}
+          </button>
+
+          {/* Question Reports Tab */}
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`pb-3 px-2 sm:px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'reports'
+                ? 'border-[#046A38] text-[#046A38] dark:text-emerald-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Flag className="w-4 h-4" />
+            <span>রিপোর্ট ({adminReports.length})</span>
           </button>
         </div>
 
@@ -582,7 +678,7 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                 </button>
               </div>
             </form>
-          ) : (
+          ) : activeTab === 'list' ? (
             /* Post List Table */
             <div className="space-y-3">
               {isLoading ? (
@@ -666,6 +762,182 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'explanations' ? (
+            /* Explanations Moderation Panel */
+            <div className="space-y-4">
+              {/* Filter Row */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">ফিল্টার:</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {(['pending', 'approved', 'rejected', 'all'] as const).map((filterKey) => {
+                    const count =
+                      filterKey === 'all'
+                        ? adminExplanations.length
+                        : adminExplanations.filter((e) => e.status === filterKey).length;
+                    const labels = {
+                      pending: 'অপেক্ষমাণ',
+                      approved: 'অনুমোদিত',
+                      rejected: 'বাতিলকৃত',
+                      all: 'সকল',
+                    };
+                    return (
+                      <button
+                        key={filterKey}
+                        onClick={() => setExplanationFilter(filterKey)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          explanationFilter === filterKey
+                            ? 'bg-[#046A38] text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {labels[filterKey]} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Explanations List */}
+              {isLoadingModeration ? (
+                <div className="py-12 text-center text-slate-500">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-[#046A38]" />
+                  <p className="text-xs font-semibold">ব্যাখ্যা লোড হচ্ছে...</p>
+                </div>
+              ) : adminExplanations.filter((e) =>
+                  explanationFilter === 'all' ? true : e.status === explanationFilter
+                ).length === 0 ? (
+                <div className="py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  <MessageSquare className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                  <p className="text-xs font-semibold">এই ক্যাটাগরিতে কোনো ব্যাখ্যা পাওয়া যায়নি।</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adminExplanations
+                    .filter((e) => (explanationFilter === 'all' ? true : e.status === explanationFilter))
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm hover:shadow-md transition-all space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-700/60 pb-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black text-xs flex items-center justify-center shrink-0">
+                              {item.author_name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                                  {item.author_name}
+                                </h4>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  QID: {item.question_id}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">
+                                {item.created_at ? new Date(item.created_at).toLocaleString('bn-BD') : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                              item.status === 'approved'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : item.status === 'rejected'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 animate-pulse'
+                            }`}
+                          >
+                            {item.status === 'approved'
+                              ? '✓ অনুমোদিত'
+                              : item.status === 'rejected'
+                              ? '✕ বাতিলকৃত'
+                              : '⏳ অপেক্ষমাণ'}
+                          </span>
+                        </div>
+
+                        {/* Explanation Text */}
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
+                          {item.explanation}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          {item.status !== 'approved' && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveExplanation(item.id)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer active:scale-95"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>অনুমোদন করুন</span>
+                            </button>
+                          )}
+                          {item.status !== 'rejected' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRejectExplanation(item.id)}
+                              className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>বাতিল করুন</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Question Reports Panel */
+            <div className="space-y-4">
+              {isLoadingModeration ? (
+                <div className="py-12 text-center text-slate-500">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-[#046A38]" />
+                  <p className="text-xs font-semibold">রিপোর্ট লোড হচ্ছে...</p>
+                </div>
+              ) : adminReports.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  <Flag className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                  <p className="text-xs font-semibold">কোনো রিপোর্ট পাওয়া যায়নি।</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adminReports.map((rep) => (
+                    <div
+                      key={rep.id}
+                      className="p-4 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-bold text-[10px]">
+                            {rep.reason}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500">
+                            QID: {rep.question_id}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {rep.created_at ? new Date(rep.created_at).toLocaleString('bn-BD') : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                        {rep.details || 'কোনো বিবরণ দেওয়া হয়নি।'}
+                      </p>
+                      <div className="text-[10px] text-slate-400 pt-1">
+                        রিপোর্টকারী: <span className="font-bold">{rep.user_name || 'অজানা'}</span>{' '}
+                        {rep.phone && `(${rep.phone})`} {rep.email && `[${rep.email}]`}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

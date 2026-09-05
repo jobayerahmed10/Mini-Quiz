@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   X, 
@@ -19,11 +19,13 @@ import {
   Award,
   Layers,
   Zap,
-  Filter
+  Filter,
+  Lock
 } from 'lucide-react';
 import { JobCircular } from '../types';
 import { JOB_CIRCULARS_DATA } from '../data/jobCircularsData';
-import { toBengaliNumeral } from '../lib/utils';
+import { toBengaliNumeral, isUserPremium } from '../lib/utils';
+import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
 interface JobCircularsPageProps {
   onStartModelTestForCategory?: (categoryName: string) => void;
@@ -55,6 +57,24 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
   const [activeJobModal, setActiveJobModal] = useState<JobCircular | null>(null);
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
   const [selectedCategoryCard, setSelectedCategoryCard] = useState<ArchiveCardData | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(() => isUserPremium());
+  const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setIsPremium(isUserPremium());
+    };
+    window.addEventListener('tamreen_premium_updated', handleSync);
+    window.addEventListener('tamreen_premium_status_changed', handleSync);
+    window.addEventListener('tamreen_unlocked_posts_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('tamreen_premium_updated', handleSync);
+      window.removeEventListener('tamreen_premium_status_changed', handleSync);
+      window.removeEventListener('tamreen_unlocked_posts_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Category filter tabs data
   const categoryFilters = [
@@ -249,6 +269,10 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
   };
 
   const handleCardClick = (card: ArchiveCardData) => {
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
     setSelectedCategoryCard(card);
     if (onStartModelTestForCategory) {
       onStartModelTestForCategory(card.title);
@@ -319,12 +343,17 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
                       onClick={() => handleCardClick(card)}
                       className={`relative min-h-[120px] sm:min-h-[140px] rounded-2xl bg-gradient-to-br ${card.bgGradient} p-3.5 sm:p-4 text-white shadow-md hover:shadow-lg transition-all transform active:scale-97 cursor-pointer flex flex-col justify-between overflow-hidden group`}
                     >
-                      {/* Top Check Badge if applicable */}
-                      {card.hasCheckBadge && (
+                      {/* Top Lock Badge or Check Badge */}
+                      {!isPremium ? (
+                        <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow-xs border border-amber-300">
+                          <Lock className="w-3 h-3 text-slate-950" />
+                          <span>লকড</span>
+                        </div>
+                      ) : card.hasCheckBadge ? (
                         <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/40">
                           <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Card Emblem / Logo Watermark */}
                       <div className="absolute -bottom-2 -right-2 opacity-20 group-hover:scale-110 transition-transform pointer-events-none">
@@ -485,6 +514,11 @@ export const JobCircularsPage: React.FC<JobCircularsPageProps> = ({
         </div>
       )}
 
+      {/* Premium Enrollment Modal */}
+      <PremiumEnrollmentModal
+        isOpen={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+      />
     </div>
   );
 };

@@ -1281,18 +1281,18 @@ export function setPendingPosts(postIds: string[]): void {
 
 export function isUserPremium(): boolean {
   try {
-    const unlocked = getUnlockedPostIds();
-    if (unlocked.length > 0) return true;
-
     const status = localStorage.getItem('tamreen_premium_status');
     if (status === 'approved') return true;
     if (status === 'pending' || status === 'rejected') return false;
 
+    const unlocked = getUnlockedPostIds();
+    if (unlocked.length > 0) return true;
+
     const data = localStorage.getItem(PREMIUM_STORAGE_KEY);
-    if (data === null) return true; // Default for preview
+    if (data === null) return false;
     return data === 'true';
   } catch {
-    return true;
+    return false;
   }
 }
 

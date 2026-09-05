@@ -1577,7 +1577,7 @@ app.post('/api/leaderboard/clear', (req, res) => {
 // Toggle or fetch question likes
 app.post('/api/questions/like', (req, res) => {
   try {
-    const { question_id, user_id, user_name } = req.body;
+    const { question_id, user_id, user_name, action } = req.body;
     if (!question_id || !user_id) {
       return res.status(400).json({ error: 'question_id and user_id are required' });
     }
@@ -1589,20 +1589,36 @@ app.post('/api/questions/like', (req, res) => {
     );
 
     let isLiked = false;
-    if (existingIndex >= 0) {
-      // Remove like (unlike)
-      serverQuestionLikesStore.splice(existingIndex, 1);
+    if (action === 'add') {
+      if (existingIndex < 0) {
+        serverQuestionLikesStore.push({
+          id: `like_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          question_id: qId,
+          user_id: uId,
+          user_name: user_name ? String(user_name).trim() : undefined,
+          created_at: new Date().toISOString(),
+        });
+      }
+      isLiked = true;
+    } else if (action === 'remove') {
+      if (existingIndex >= 0) {
+        serverQuestionLikesStore.splice(existingIndex, 1);
+      }
       isLiked = false;
     } else {
-      // Add like
-      serverQuestionLikesStore.push({
-        id: `like_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        question_id: qId,
-        user_id: uId,
-        user_name: user_name ? String(user_name).trim() : undefined,
-        created_at: new Date().toISOString(),
-      });
-      isLiked = true;
+      if (existingIndex >= 0) {
+        serverQuestionLikesStore.splice(existingIndex, 1);
+        isLiked = false;
+      } else {
+        serverQuestionLikesStore.push({
+          id: `like_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          question_id: qId,
+          user_id: uId,
+          user_name: user_name ? String(user_name).trim() : undefined,
+          created_at: new Date().toISOString(),
+        });
+        isLiked = true;
+      }
     }
 
     saveQuestionLikesStoreToDisk();
@@ -1640,7 +1656,7 @@ app.get('/api/questions/likes', (req, res) => {
 // Toggle or fetch question bookmarks
 app.post('/api/questions/bookmark', (req, res) => {
   try {
-    const { question_id, user_id } = req.body;
+    const { question_id, user_id, action } = req.body;
     if (!question_id || !user_id) {
       return res.status(400).json({ error: 'question_id and user_id are required' });
     }
@@ -1652,19 +1668,34 @@ app.post('/api/questions/bookmark', (req, res) => {
     );
 
     let isBookmarked = false;
-    if (existingIndex >= 0) {
-      // Remove bookmark
-      serverQuestionBookmarksStore.splice(existingIndex, 1);
+    if (action === 'add') {
+      if (existingIndex < 0) {
+        serverQuestionBookmarksStore.push({
+          id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          question_id: qId,
+          user_id: uId,
+          created_at: new Date().toISOString(),
+        });
+      }
+      isBookmarked = true;
+    } else if (action === 'remove') {
+      if (existingIndex >= 0) {
+        serverQuestionBookmarksStore.splice(existingIndex, 1);
+      }
       isBookmarked = false;
     } else {
-      // Add bookmark
-      serverQuestionBookmarksStore.push({
-        id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        question_id: qId,
-        user_id: uId,
-        created_at: new Date().toISOString(),
-      });
-      isBookmarked = true;
+      if (existingIndex >= 0) {
+        serverQuestionBookmarksStore.splice(existingIndex, 1);
+        isBookmarked = false;
+      } else {
+        serverQuestionBookmarksStore.push({
+          id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          question_id: qId,
+          user_id: uId,
+          created_at: new Date().toISOString(),
+        });
+        isBookmarked = true;
+      }
     }
 
     saveQuestionBookmarksStoreToDisk();
@@ -1726,17 +1757,18 @@ app.get('/api/questions/reports', (req, res) => {
   return res.json({ success: true, reports: serverQuestionReportsStore });
 });
 
-// Question explanations
+// Question explanations (Public: approved only; Admin: all)
 app.get('/api/questions/explanations', (req, res) => {
   try {
     const { question_id } = req.query;
     if (!question_id || typeof question_id !== 'string') {
-      return res.json({ success: true, explanations: serverQuestionExplanationsStore });
+      const approved = serverQuestionExplanationsStore.filter((item) => item.status === 'approved' || !item.status);
+      return res.json({ success: true, explanations: approved });
     }
 
     const qId = question_id.trim();
     const explanations = serverQuestionExplanationsStore.filter(
-      (item) => item.question_id === qId && item.status !== 'rejected'
+      (item) => item.question_id === qId && (item.status === 'approved' || !item.status)
     );
 
     return res.json({ success: true, explanations });
@@ -1747,7 +1779,7 @@ app.get('/api/questions/explanations', (req, res) => {
 
 app.post('/api/questions/explanations', (req, res) => {
   try {
-    const { question_id, user_id, author_name, author_avatar, explanation } = req.body;
+    const { question_id, user_id, author_name, author_avatar, explanation, status } = req.body;
     if (!question_id || !explanation || !author_name) {
       return res.status(400).json({ error: 'question_id, author_name, and explanation are required' });
     }
@@ -1760,7 +1792,7 @@ app.post('/api/questions/explanations', (req, res) => {
       author_avatar: author_avatar ? String(author_avatar).trim() : undefined,
       explanation: String(explanation).trim(),
       likes_count: 0,
-      status: 'approved',
+      status: status || 'pending',
       created_at: new Date().toISOString(),
     };
 
@@ -1770,6 +1802,41 @@ app.post('/api/questions/explanations', (req, res) => {
     return res.json({ success: true, item: newExpl });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Error adding explanation' });
+  }
+});
+
+// Admin Moderation API Endpoints for Explanations
+app.get('/api/admin/explanations', (req, res) => {
+  return res.json({ success: true, explanations: serverQuestionExplanationsStore });
+});
+
+app.post('/api/admin/explanations/approve', (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'Explanation ID required' });
+    const item = serverQuestionExplanationsStore.find((e) => e.id === id);
+    if (item) {
+      item.status = 'approved';
+      saveQuestionExplanationsStoreToDisk();
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error approving explanation' });
+  }
+});
+
+app.post('/api/admin/explanations/reject', (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'Explanation ID required' });
+    const idx = serverQuestionExplanationsStore.findIndex((e) => e.id === id);
+    if (idx >= 0) {
+      serverQuestionExplanationsStore[idx].status = 'rejected';
+      saveQuestionExplanationsStoreToDisk();
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error rejecting explanation' });
   }
 });
 

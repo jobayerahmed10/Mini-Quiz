@@ -188,7 +188,7 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
 
     // Sync to Supabase & Server
     try {
-      const res = await toggleQuestionLikeInSupabase(qId, userId, user?.name);
+      const res = await toggleQuestionLikeInSupabase(qId, userId, user?.name, nextLiked);
       if (typeof res.newCount === 'number') {
         setLikeCount(res.newCount);
         setLocalQuestionLikeCount(qId, res.newCount);
@@ -207,7 +207,7 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
 
     // Sync to Supabase & Server
     try {
-      const res = await toggleQuestionBookmarkInSupabase(qId, userId);
+      const res = await toggleQuestionBookmarkInSupabase(qId, userId, nextBm);
       setIsBookmarked(res.isBookmarked);
     } catch (err) {
       console.warn('Bookmark sync background error:', err);
@@ -248,7 +248,7 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
     }
   };
 
-  // 4. Handle Add Explanation Submit
+  // 4. Handle Add Explanation Submit (Requires Admin Approval)
   const handleExplanationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!handleAuthCheck()) return;
@@ -266,15 +266,13 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
         explanation: newExplanationText.trim(),
       });
 
-      if (res.success && res.newExplanation) {
-        setExplanations([res.newExplanation, ...explanations]);
-        setShowExplanation(true);
-        setExplanationSuccessMsg('আপনার ব্যাখ্যাটি সফলভাবে প্রকাশিত হয়েছে!');
+      if (res.success) {
+        setExplanationSuccessMsg('আপনার ব্যাখ্যাটি জমা হয়েছে! এডমিন অনুমোদনের পর এটি প্রকাশিত হবে।');
         setTimeout(() => {
           setShowAddExplanationModal(false);
           setExplanationSuccessMsg(null);
           setNewExplanationText('');
-        }, 1800);
+        }, 2200);
       } else {
         alert(res.error || 'ব্যাখ্যা যোগ করতে সমস্যা হয়েছে।');
       }

@@ -5311,7 +5311,8 @@ export async function fetchUserLikedQuestionIds(userId?: string): Promise<string
 export async function toggleQuestionLikeInSupabase(
   questionId: string | number,
   userId?: string,
-  userName?: string
+  userName?: string,
+  targetLikedState?: boolean
 ): Promise<{ isLiked: boolean; newCount: number }> {
   const qId = String(questionId).trim();
   const uId = await getEffectiveAuthUserId(userId);
@@ -5319,29 +5320,28 @@ export async function toggleQuestionLikeInSupabase(
 
   // 1. Update local cache optimistically
   const currentLiked = getLikedIds();
-  const isCurrentlyLiked = currentLiked.includes(qId);
-  const nextLiked = isCurrentlyLiked
-    ? currentLiked.filter((id) => id !== qId)
-    : [...currentLiked, qId];
+  const isCurrentlyLiked = targetLikedState !== undefined ? !targetLikedState : currentLiked.includes(qId);
+  const shouldBeLiked = targetLikedState !== undefined ? targetLikedState : !isCurrentlyLiked;
+  const nextLiked = shouldBeLiked
+    ? Array.from(new Set([...currentLiked, qId]))
+    : currentLiked.filter((id) => id !== qId);
 
   try {
     localStorage.setItem('tamreen_user_liked_question_ids', JSON.stringify(nextLiked));
     localStorage.setItem(`tamreen_liked_ids_${uId}`, JSON.stringify(nextLiked));
   } catch {}
 
-  let finalIsLiked = !isCurrentlyLiked;
+  let finalIsLiked = shouldBeLiked;
   let finalCount = getLocalQuestionLikeCount(qId);
-  finalCount = isCurrentlyLiked ? Math.max(0, finalCount - 1) : finalCount + 1;
-  setLocalQuestionLikeCount(qId, finalCount);
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked } }));
+    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked, questionId: qId } }));
   }
 
   // 2. Sync to Supabase
   if (supabaseInstance) {
     try {
-      if (isCurrentlyLiked) {
+      if (!shouldBeLiked) {
         // Delete like
         await supabaseInstance
           .from('question_likes')
@@ -5380,12 +5380,12 @@ export async function toggleQuestionLikeInSupabase(
     const res = await fetch('/api/questions/like', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question_id: qId, user_id: uId, user_name: clientName }),
+      body: JSON.stringify({ question_id: qId, user_id: uId, user_name: clientName, action: shouldBeLiked ? 'add' : 'remove' }),
     });
     if (res.ok) {
       const json = await res.json();
       if (json.success) {
-        finalIsLiked = json.isLiked;
+        if (typeof json.isLiked === 'boolean') finalIsLiked = json.isLiked;
         if (typeof json.likeCount === 'number') {
           finalCount = json.likeCount;
           setLocalQuestionLikeCount(qId, finalCount);
@@ -5462,16 +5462,18 @@ export async function fetchUserBookmarkedQuestionIds(userId?: string): Promise<s
  */
 export async function toggleQuestionBookmarkInSupabase(
   questionId: string | number,
-  userId?: string
+  userId?: string,
+  targetBookmarkedState?: boolean
 ): Promise<{ isBookmarked: boolean }> {
   const qId = String(questionId).trim();
   const uId = await getEffectiveAuthUserId(userId);
 
   const currentBookmarked = getBookmarkedIds();
-  const isCurrentlyBookmarked = currentBookmarked.includes(qId);
-  const nextBookmarked = isCurrentlyBookmarked
-    ? currentBookmarked.filter((id) => id !== qId)
-    : [...currentBookmarked, qId];
+  const isCurrentlyBookmarked = targetBookmarkedState !== undefined ? !targetBookmarkedState : currentBookmarked.includes(qId);
+  const shouldBeBookmarked = targetBookmarkedState !== undefined ? targetBookmarkedState : !isCurrentlyBookmarked;
+  const nextBookmarked = shouldBeBookmarked
+    ? Array.from(new Set([...currentBookmarked, qId]))
+    : currentBookmarked.filter((id) => id !== qId);
 
   try {
     localStorage.setItem('tamreen_bookmarked_ids', JSON.stringify(nextBookmarked));
@@ -5481,11 +5483,11 @@ export async function toggleQuestionBookmarkInSupabase(
     window.dispatchEvent(new CustomEvent('tamreen_bookmarks_updated', { detail: { ids: nextBookmarked } }));
   }
 
-  let finalIsBookmarked = !isCurrentlyBookmarked;
+  let finalIsBookmarked = shouldBeBookmarked;
 
   if (supabaseInstance) {
     try {
-      if (isCurrentlyBookmarked) {
+      if (!shouldBeBookmarked) {
         await supabaseInstance
           .from('question_bookmarks')
           .delete()
@@ -5511,7 +5513,7 @@ export async function toggleQuestionBookmarkInSupabase(
     const res = await fetch('/api/questions/bookmark', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question_id: qId, user_id: uId }),
+      body: JSON.stringify({ question_id: qId, user_id: uId, action: shouldBeBookmarked ? 'add' : 'remove' }),
     });
     if (res.ok) {
       const json = await res.json();
@@ -5584,7 +5586,7 @@ export async function submitQuestionReportToSupabase(report: {
 }
 
 /**
- * Fetch community explanations for a question from Supabase & Server
+ * Fetch community explanations for a question from Supabase & Server (Public view: ONLY approved)
  */
 export async function fetchQuestionCommunityExplanations(
   questionId: string | number
@@ -5597,6 +5599,7 @@ export async function fetchQuestionCommunityExplanations(
         .from('question_explanations')
         .select('*')
         .eq('question_id', qId)
+        .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
@@ -5608,7 +5611,7 @@ export async function fetchQuestionCommunityExplanations(
           author_avatar: item.author_avatar ? String(item.author_avatar) : undefined,
           explanation: String(item.explanation || ''),
           likes_count: Number(item.likes_count || 0),
-          status: (item.status || 'approved') as any,
+          status: 'approved',
           created_at: String(item.created_at || new Date().toISOString()),
         }));
       }
@@ -5623,7 +5626,7 @@ export async function fetchQuestionCommunityExplanations(
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.explanations)) {
-        return json.explanations;
+        return json.explanations.filter((item: any) => item.status === 'approved' || !item.status);
       }
     }
   } catch {}
@@ -5632,7 +5635,7 @@ export async function fetchQuestionCommunityExplanations(
 }
 
 /**
- * Submit a community explanation to Supabase & Server
+ * Submit a community explanation to Supabase & Server (Submitted as status: pending)
  */
 export async function submitQuestionCommunityExplanation(explanation: {
   question_id: string | number;
@@ -5640,7 +5643,7 @@ export async function submitQuestionCommunityExplanation(explanation: {
   author_name: string;
   author_avatar?: string;
   explanation: string;
-}): Promise<{ success: boolean; newExplanation?: QuestionCommunityExplanation; error?: string }> {
+}): Promise<{ success: boolean; pending?: boolean; newExplanation?: QuestionCommunityExplanation; error?: string }> {
   const payload = {
     question_id: String(explanation.question_id).trim(),
     user_id: explanation.user_id ? String(explanation.user_id).trim() : null,
@@ -5648,7 +5651,7 @@ export async function submitQuestionCommunityExplanation(explanation: {
     author_avatar: explanation.author_avatar || null,
     explanation: explanation.explanation.trim(),
     likes_count: 0,
-    status: 'approved',
+    status: 'pending',
     created_at: new Date().toISOString(),
   };
 
@@ -5671,7 +5674,7 @@ export async function submitQuestionCommunityExplanation(explanation: {
           author_avatar: item.author_avatar ? String(item.author_avatar) : undefined,
           explanation: String(item.explanation),
           likes_count: Number(item.likes_count || 0),
-          status: item.status || 'approved',
+          status: 'pending',
           created_at: String(item.created_at),
         };
       }
@@ -5691,7 +5694,7 @@ export async function submitQuestionCommunityExplanation(explanation: {
       const json = await res.json();
       if (json.success && json.item) {
         if (!savedItem) savedItem = json.item;
-        return { success: true, newExplanation: savedItem };
+        return { success: true, pending: true, newExplanation: savedItem };
       }
     }
   } catch (err: any) {
@@ -5701,7 +5704,7 @@ export async function submitQuestionCommunityExplanation(explanation: {
   }
 
   if (savedItem) {
-    return { success: true, newExplanation: savedItem };
+    return { success: true, pending: true, newExplanation: savedItem };
   }
 
   // Construct local fallback object if network saved
@@ -5713,11 +5716,142 @@ export async function submitQuestionCommunityExplanation(explanation: {
     author_avatar: explanation.author_avatar,
     explanation: explanation.explanation,
     likes_count: 0,
-    status: 'approved',
+    status: 'pending',
     created_at: new Date().toISOString(),
   };
 
-  return { success: true, newExplanation: fallbackItem };
+  return { success: true, pending: true, newExplanation: fallbackItem };
+}
+
+/**
+ * Fetch ALL explanations for Admin Moderation (Pending, Approved, Rejected)
+ */
+export async function fetchAllExplanationsForAdmin(): Promise<QuestionCommunityExplanation[]> {
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_explanations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        return data.map((item: any) => ({
+          id: String(item.id),
+          question_id: String(item.question_id),
+          user_id: item.user_id ? String(item.user_id) : undefined,
+          author_name: String(item.author_name || 'শিক্ষার্থী'),
+          author_avatar: item.author_avatar ? String(item.author_avatar) : undefined,
+          explanation: String(item.explanation || ''),
+          likes_count: Number(item.likes_count || 0),
+          status: (item.status || 'pending') as any,
+          created_at: String(item.created_at || new Date().toISOString()),
+        }));
+      }
+    } catch (err) {
+      console.warn('Supabase fetchAllExplanationsForAdmin error:', err);
+    }
+  }
+
+  // Fallback to server
+  try {
+    const res = await fetch('/api/admin/explanations');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.explanations)) {
+        return json.explanations;
+      }
+    }
+  } catch {}
+
+  return [];
+}
+
+/**
+ * Approve a user-submitted explanation
+ */
+export async function approveExplanationInSupabase(explanationId: string): Promise<boolean> {
+  if (supabaseInstance) {
+    try {
+      const { error } = await supabaseInstance
+        .from('question_explanations')
+        .update({ status: 'approved' })
+        .eq('id', explanationId);
+      if (error) console.warn('Supabase approve error:', error);
+    } catch (err) {
+      console.warn('Supabase approve exception:', err);
+    }
+  }
+
+  try {
+    const res = await fetch('/api/admin/explanations/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: explanationId }),
+    });
+    return res.ok;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Reject / Delete a user-submitted explanation
+ */
+export async function rejectExplanationInSupabase(explanationId: string): Promise<boolean> {
+  if (supabaseInstance) {
+    try {
+      const { error } = await supabaseInstance
+        .from('question_explanations')
+        .update({ status: 'rejected' })
+        .eq('id', explanationId);
+      if (error) console.warn('Supabase reject error:', error);
+    } catch (err) {
+      console.warn('Supabase reject exception:', err);
+    }
+  }
+
+  try {
+    const res = await fetch('/api/admin/explanations/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: explanationId }),
+    });
+    return res.ok;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Fetch Question Reports for Admin
+ */
+export async function fetchAllQuestionReportsForAdmin(): Promise<any[]> {
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('question_reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('Supabase fetchAllQuestionReportsForAdmin error:', err);
+    }
+  }
+
+  try {
+    const res = await fetch('/api/questions/reports');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.reports)) {
+        return json.reports;
+      }
+    }
+  } catch {}
+
+  return [];
 }
 
 export async function customPhoneLoginOrRegister(

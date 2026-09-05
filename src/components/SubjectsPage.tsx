@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   Globe2, 
   Sprout, 
   Scale, 
   Monitor, 
-  BookMarked 
+  BookMarked,
+  Lock
 } from 'lucide-react';
+import { isUserPremium } from '../lib/utils';
+import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
 interface SubjectsPageProps {
   onSelectSubject: (options: { subject: string; topic?: string; questionCount?: number; timeMinutes?: number } | string) => void;
@@ -150,14 +153,36 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
   initialSubTab = 'mock' 
 }) => {
   const [activeTab, setActiveTab] = useState<'mock' | 'quick'>(initialSubTab);
+  const [isPremium, setIsPremium] = useState<boolean>(() => isUserPremium());
+  const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialSubTab) {
       setActiveTab(initialSubTab);
     }
   }, [initialSubTab]);
 
+  useEffect(() => {
+    const handleSync = () => {
+      setIsPremium(isUserPremium());
+    };
+    window.addEventListener('tamreen_premium_updated', handleSync);
+    window.addEventListener('tamreen_premium_status_changed', handleSync);
+    window.addEventListener('tamreen_unlocked_posts_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('tamreen_premium_updated', handleSync);
+      window.removeEventListener('tamreen_premium_status_changed', handleSync);
+      window.removeEventListener('tamreen_unlocked_posts_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const handleCardClick = (subjectName: string) => {
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
     onSelectSubject({
       subject: subjectName,
       questionCount: 25,
@@ -214,12 +239,19 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
               <div
                 key={item.id}
                 onClick={() => handleCardClick(item.name)}
-                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3 sm:gap-3.5 group"
+                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between gap-2 sm:gap-3 group relative overflow-hidden"
               >
-                <SubjectIcon type={item.iconType} />
-                <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 font-hind leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors">
-                  {item.name}
-                </span>
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <SubjectIcon type={item.iconType} />
+                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 font-hind leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
+                    {item.name}
+                  </span>
+                </div>
+                {!isPremium && (
+                  <div className="shrink-0 p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 border border-amber-300/60 dark:border-amber-700/60">
+                    <Lock className="w-3.5 h-3.5" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -234,17 +266,31 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
               <div
                 key={item.id}
                 onClick={() => handleCardClick(item.name)}
-                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.005] active:scale-[0.99] transition-all cursor-pointer flex items-center gap-4 group"
+                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.005] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between gap-4 group"
               >
-                <SubjectIcon type={item.iconType} />
-                <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 font-hind group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors">
-                  {item.name}
-                </span>
+                <div className="flex items-center gap-4 min-w-0">
+                  <SubjectIcon type={item.iconType} />
+                  <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 font-hind group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
+                    {item.name}
+                  </span>
+                </div>
+                {!isPremium && (
+                  <div className="shrink-0 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center gap-1.5 border border-amber-300/60 dark:border-amber-700/60 text-xs font-bold">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>লকড</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Premium Enrollment Modal */}
+      <PremiumEnrollmentModal
+        isOpen={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+      />
     </div>
   );
 };
