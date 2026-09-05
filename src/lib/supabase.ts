@@ -5215,6 +5215,10 @@ export async function getEffectiveAuthUserId(fallbackUserId?: string): Promise<s
  */
 export async function fetchQuestionLikesCount(questionId: string | number): Promise<number> {
   const qId = String(questionId).trim();
+  const isUserLiked = getLikedIds().includes(qId);
+  const localCount = getLocalQuestionLikeCount(qId);
+  let resolvedCount = isUserLiked ? Math.max(localCount, 1) : localCount;
+
   if (supabaseInstance) {
     try {
       const { count, error } = await supabaseInstance
@@ -5222,8 +5226,9 @@ export async function fetchQuestionLikesCount(questionId: string | number): Prom
         .select('*', { count: 'exact', head: true })
         .eq('question_id', qId);
       if (!error && typeof count === 'number') {
-        setLocalQuestionLikeCount(qId, count);
-        return count;
+        resolvedCount = isUserLiked ? Math.max(count, 1) : Math.max(count, localCount);
+        setLocalQuestionLikeCount(qId, resolvedCount);
+        return resolvedCount;
       }
     } catch {}
   }
@@ -5234,13 +5239,15 @@ export async function fetchQuestionLikesCount(questionId: string | number): Prom
     if (res.ok) {
       const json = await res.json();
       if (json.success && typeof json.likeCount === 'number') {
-        setLocalQuestionLikeCount(qId, json.likeCount);
-        return json.likeCount;
+        resolvedCount = isUserLiked ? Math.max(json.likeCount, 1) : Math.max(json.likeCount, localCount);
+        setLocalQuestionLikeCount(qId, resolvedCount);
+        return resolvedCount;
       }
     }
   } catch {}
 
-  return getLocalQuestionLikeCount(qId);
+  setLocalQuestionLikeCount(qId, resolvedCount);
+  return resolvedCount;
 }
 
 /**
@@ -5332,10 +5339,12 @@ export async function toggleQuestionLikeInSupabase(
   } catch {}
 
   let finalIsLiked = shouldBeLiked;
-  let finalCount = getLocalQuestionLikeCount(qId);
+  let prevLocalCount = getLocalQuestionLikeCount(qId);
+  let finalCount = shouldBeLiked ? Math.max(prevLocalCount, 1) : Math.max(0, prevLocalCount - 1);
+  setLocalQuestionLikeCount(qId, finalCount);
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked, questionId: qId } }));
+    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked, questionId: qId, count: finalCount } }));
   }
 
   // 2. Sync to Supabase
@@ -5349,15 +5358,18 @@ export async function toggleQuestionLikeInSupabase(
           .match({ question_id: qId, user_id: uId });
         finalIsLiked = false;
       } else {
-        // Insert like
-        await supabaseInstance.from('question_likes').insert([
-          {
-            question_id: qId,
-            user_id: uId,
-            user_name: clientName,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+        // Upsert like
+        await supabaseInstance.from('question_likes').upsert(
+          [
+            {
+              question_id: qId,
+              user_id: uId,
+              user_name: clientName,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          { onConflict: 'question_id,user_id' }
+        );
         finalIsLiked = true;
       }
 
@@ -5367,11 +5379,11 @@ export async function toggleQuestionLikeInSupabase(
         .select('*', { count: 'exact', head: true })
         .eq('question_id', qId);
       if (typeof count === 'number') {
-        finalCount = count;
+        finalCount = shouldBeLiked ? Math.max(count, 1) : count;
         setLocalQuestionLikeCount(qId, finalCount);
       }
     } catch (sbErr) {
-      console.warn('Supabase toggle like error, using server fallback:', sbErr);
+      console.warn('Supabase toggle like notice:', sbErr);
     }
   }
 
@@ -5387,12 +5399,21 @@ export async function toggleQuestionLikeInSupabase(
       if (json.success) {
         if (typeof json.isLiked === 'boolean') finalIsLiked = json.isLiked;
         if (typeof json.likeCount === 'number') {
-          finalCount = json.likeCount;
+          finalCount = shouldBeLiked ? Math.max(json.likeCount, 1) : json.likeCount;
           setLocalQuestionLikeCount(qId, finalCount);
         }
       }
     }
   } catch {}
+
+  if (shouldBeLiked && finalCount < 1) {
+    finalCount = 1;
+    setLocalQuestionLikeCount(qId, 1);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tamreen_likes_updated', { detail: { ids: nextLiked, questionId: qId, count: finalCount } }));
+  }
 
   return { isLiked: finalIsLiked, newCount: finalCount };
 }

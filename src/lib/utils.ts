@@ -942,7 +942,7 @@ export function toggleLikedId(id: string, questionObj?: Question): { isLiked: bo
   } else {
     list.push(id);
     isLiked = true;
-    currentCount = currentCount + 1;
+    currentCount = Math.max(1, currentCount + 1);
     if (questionObj) {
       saveLikedQuestion(questionObj);
     }

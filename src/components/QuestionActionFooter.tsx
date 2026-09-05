@@ -64,8 +64,12 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
   const isRegistered = isUserRegistered();
 
   // Instant synchronous initial states
-  const [likeCount, setLikeCount] = useState<number>(() => getLocalQuestionLikeCount(qId));
-  const [isLiked, setIsLiked] = useState<boolean>(() => getLikedIds().includes(qId));
+  const initialUserLiked = getLikedIds().includes(qId);
+  const initialCount = getLocalQuestionLikeCount(qId);
+  const initialEffectiveCount = initialUserLiked ? Math.max(initialCount, 1) : initialCount;
+
+  const [likeCount, setLikeCount] = useState<number>(initialEffectiveCount);
+  const [isLiked, setIsLiked] = useState<boolean>(initialUserLiked);
   const [isBookmarked, setIsBookmarked] = useState<boolean>(() => getBookmarkedIds().includes(qId));
   const [showExplanation, setShowExplanation] = useState<boolean>(defaultExpanded || showOfficialExplanation);
   
@@ -103,10 +107,16 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
 
   // Listen to global sync events across tabs / cards
   useEffect(() => {
-    const handleLikesUpdated = () => {
+    const handleLikesUpdated = (e?: any) => {
       const likedList = getLikedIds();
-      setIsLiked(likedList.includes(qId));
-      setLikeCount(getLocalQuestionLikeCount(qId));
+      const userLiked = likedList.includes(qId);
+      setIsLiked(userLiked);
+
+      const localCount = e?.detail?.questionId === qId && typeof e?.detail?.count === 'number'
+        ? e.detail.count
+        : getLocalQuestionLikeCount(qId);
+      const finalCnt = userLiked ? Math.max(localCount, 1) : localCount;
+      setLikeCount(finalCnt);
     };
 
     const handleBookmarksUpdated = () => {
@@ -128,15 +138,20 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
     let isMounted = true;
 
     // Synchronize local states immediately on id change
-    setIsLiked(getLikedIds().includes(qId));
+    const userLiked = getLikedIds().includes(qId);
+    setIsLiked(userLiked);
     setIsBookmarked(getBookmarkedIds().includes(qId));
-    setLikeCount(getLocalQuestionLikeCount(qId));
+
+    const localCnt = getLocalQuestionLikeCount(qId);
+    setLikeCount(userLiked ? Math.max(localCnt, 1) : localCnt);
 
     // Check likes count from backend
     fetchQuestionLikesCount(qId).then((cnt) => {
       if (isMounted && typeof cnt === 'number') {
-        setLikeCount(cnt);
-        setLocalQuestionLikeCount(qId, cnt);
+        const currentUserLiked = getLikedIds().includes(qId);
+        const finalCnt = currentUserLiked ? Math.max(cnt, 1) : cnt;
+        setLikeCount(finalCnt);
+        setLocalQuestionLikeCount(qId, finalCnt);
       }
     });
 
@@ -146,6 +161,7 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
         if (likedIds.includes(qId)) {
           setIsLiked(true);
           saveLikedQuestion(question);
+          setLikeCount((prev) => Math.max(prev, 1));
         }
       }
     });
