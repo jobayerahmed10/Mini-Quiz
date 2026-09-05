@@ -1863,21 +1863,19 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         const targetRows = matchingRows.length > 0 ? matchingRows : data;
 
         // Fetch profiles separately as a backup to map names, avatars, and roll numbers
-        const userIds = Array.from(new Set(targetRows.map((r: any) => r.user_id).filter(Boolean)));
-        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
-        if (userIds.length > 0) {
-          try {
-            const { data: profs } = await supabaseInstance
-              .from('profiles')
-              .select('id, full_name, avatar_url, roll_number, student_id')
-              .in('id', userIds);
-            if (profs && Array.isArray(profs)) {
-              profs.forEach((p: any) => {
-                if (p.id) profilesMap.set(p.id, p);
-              });
-            }
-          } catch {}
-        }
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string; phone?: string }>();
+        try {
+          const { data: profs } = await supabaseInstance
+            .from('profiles')
+            .select('id, full_name, avatar_url, roll_number, student_id, phone');
+          if (profs && Array.isArray(profs)) {
+            profs.forEach((p: any) => {
+              if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
+              if (p.phone) profilesMap.set(`phone_${String(p.phone).trim()}`, p);
+              if (p.roll_number) profilesMap.set(`roll_${String(p.roll_number).trim()}`, p);
+            });
+          }
+        } catch {}
 
         // Deduplicate best result per distinct participant
         const bestMap = new Map<string, any>();
@@ -1945,7 +1943,11 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         return sortedRows.map((row: any, idx: number) => {
           const uId = row.user_id ? String(row.user_id).trim() : null;
           const isRegistered = Boolean(row.is_guest === false || (uId && !uId.startsWith('guest_') && !uId.startsWith('anon_')));
-          const profFromMap = (isRegistered && uId) ? profilesMap.get(uId) : null;
+          const profFromMap = isRegistered ? (
+            (uId ? profilesMap.get(uId.toLowerCase()) : null) ||
+            (row.phone ? profilesMap.get(`phone_${String(row.phone).trim()}`) : null) ||
+            ((row.roll_number || row.student_id) ? profilesMap.get(`roll_${String(row.roll_number || row.student_id).trim()}`) : null)
+          ) : null;
           const isGuest = !isRegistered;
 
           // Strict Name Priority: profiles.full_name ?? exam_results.user_name ?? exam_results.full_name ?? exam_results.guest_name ?? 'পরীক্ষার্থী'
@@ -1956,7 +1958,7 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
           const rawRollOrId = profFromMap?.roll_number || profFromMap?.student_id || row.roll_number || row.roll_no || row.student_id || row.guest_id;
           const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
-          const avatarUrl = isRegistered ? (profFromMap?.avatar_url || row.avatar_url) : row.avatar_url;
+          const avatarUrl = isRegistered ? (profFromMap?.avatar_url || row.avatar_url || row.user_avatar) : (row.avatar_url || row.user_avatar);
           const correctAnswers = Number(row.correct_answers ?? row.correct_count ?? row.score ?? 0);
           const calculatedPoints = Number(row.points && row.points > 0 ? row.points : correctAnswers);
           const score = Number(row.obtained_marks ?? row.score ?? calculatedPoints);
@@ -2117,21 +2119,19 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
 
         if (filtered.length > 0) {
           // Fetch profiles
-          const userIds = Array.from(new Set(filtered.map((r: any) => r.user_id).filter(Boolean)));
-          let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
-          if (userIds.length > 0) {
-            try {
-              const { data: profs } = await supabaseInstance
-                .from('profiles')
-                .select('id, full_name, avatar_url, roll_number, student_id')
-                .in('id', userIds);
-              if (profs && Array.isArray(profs)) {
-                profs.forEach((p: any) => {
-                  if (p.id) profilesMap.set(p.id, p);
-                });
-              }
-            } catch {}
-          }
+          let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string; phone?: string }>();
+          try {
+            const { data: profs } = await supabaseInstance
+              .from('profiles')
+              .select('id, full_name, avatar_url, roll_number, student_id, phone');
+            if (profs && Array.isArray(profs)) {
+              profs.forEach((p: any) => {
+                if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
+                if (p.phone) profilesMap.set(`phone_${String(p.phone).trim()}`, p);
+                if (p.roll_number) profilesMap.set(`roll_${String(p.roll_number).trim()}`, p);
+              });
+            }
+          } catch {}
 
           // Group by user_id for registered users, or guest_id / guest_name for guests
           const userAggMap = new Map<string, {
@@ -2149,7 +2149,11 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
           for (const r of filtered) {
             const uId = r.user_id ? String(r.user_id).trim() : null;
             const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
-            const prof = isRegistered ? profilesMap.get(uId) : null;
+            const prof = isRegistered ? (
+              (uId ? profilesMap.get(uId.toLowerCase()) : null) ||
+              (r.phone ? profilesMap.get(`phone_${String(r.phone).trim()}`) : null) ||
+              ((r.roll_number || r.student_id) ? profilesMap.get(`roll_${String(r.roll_number || r.student_id).trim()}`) : null)
+            ) : null;
             const isGuest = !isRegistered;
 
             // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
@@ -2159,7 +2163,7 @@ export async function getFreeOverallLeaderboard(period: string = 'all'): Promise
             const rawRollOrId = prof?.roll_number || prof?.student_id || r.guest_id || r.roll_number || r.student_id;
             const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
-            const avatar = isRegistered ? (prof?.avatar_url || r.avatar_url) : r.avatar_url;
+            const avatar = isRegistered ? (prof?.avatar_url || r.avatar_url || r.user_avatar) : (r.avatar_url || r.user_avatar);
             const points = Number(r.correct_answers ?? r.score ?? 0);
             const totalQ = Number(r.total_marks ?? (Number(r.correct_answers || 0) + Number(r.wrong_answers || 0)) ?? 0);
             const percentage = totalQ > 0 ? (points / totalQ) * 100 : 100;
@@ -2462,19 +2466,19 @@ export async function getTamreenLeaderboard(params: {
 
       if (!qErr && Array.isArray(rawResults) && rawResults.length > 0) {
         // Fetch profiles for avatars and full names
-        const userIds = Array.from(new Set(rawResults.map((r) => r.user_id).filter(Boolean)));
         const profilesMap = new Map<string, any>();
-        if (userIds.length > 0) {
-          try {
-            const { data: profs } = await supabaseInstance
-              .from('profiles')
-              .select('id, full_name, avatar_url, roll_number, student_id')
-              .in('id', userIds);
-            if (profs && Array.isArray(profs)) {
-              profs.forEach((p) => profilesMap.set(p.id, p));
-            }
-          } catch {}
-        }
+        try {
+          const { data: profs } = await supabaseInstance
+            .from('profiles')
+            .select('id, full_name, avatar_url, roll_number, student_id, phone');
+          if (profs && Array.isArray(profs)) {
+            profs.forEach((p) => {
+              if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
+              if (p.phone) profilesMap.set(`phone_${String(p.phone).trim()}`, p);
+              if (p.roll_number) profilesMap.set(`roll_${String(p.roll_number).trim()}`, p);
+            });
+          }
+        } catch {}
 
         // Group by (user_identifier, exam_id) and retain ONLY 1st completed attempt
         const userExamGroups = new Map<string, any[]>();
@@ -2547,11 +2551,15 @@ export async function getTamreenLeaderboard(params: {
         for (const att of periodFiltered) {
           const uKey = att._uKey || String(att.user_id || att.id).trim().toLowerCase();
           const isReg = Boolean(att._isReg);
-          const prof = isReg ? profilesMap.get(att.user_id) : null;
+          const prof = isReg ? (
+            (att.user_id ? profilesMap.get(String(att.user_id).toLowerCase()) : null) ||
+            (att.phone ? profilesMap.get(`phone_${String(att.phone).trim()}`) : null) ||
+            ((att.roll_number || att.student_id) ? profilesMap.get(`roll_${String(att.roll_number || att.student_id).trim()}`) : null)
+          ) : null;
 
           const userName = prof?.full_name || att.full_name || att.user_name || att.guest_name || (isReg ? 'পরীক্ষার্থী' : 'গেস্ট পরীক্ষার্থী');
           const rollNo = prof?.roll_number || prof?.student_id || att.roll_number || att.roll_no || att.student_id;
-          const avatarUrl = isReg ? (prof?.avatar_url || att.avatar_url) : att.avatar_url;
+          const avatarUrl = isReg ? (prof?.avatar_url || att.avatar_url || att.user_avatar) : (att.avatar_url || att.user_avatar);
 
           // Points source MUST be exam_results.points (fallback to correct_answers)
           const correct = Number(att.correct_answers ?? att.correct_count ?? att.score ?? 0);
@@ -2581,8 +2589,8 @@ export async function getTamreenLeaderboard(params: {
             if (time > existing.lastPointTime) {
               existing.lastPointTime = time;
             }
-            if (avatarUrl && !existing.avatarUrl) existing.avatarUrl = avatarUrl;
-            if (rollNo && !existing.rollNo) existing.rollNo = String(rollNo);
+            if (avatarUrl) existing.avatarUrl = String(avatarUrl);
+            if (rollNo) existing.rollNo = String(rollNo);
           }
         }
 
@@ -2942,26 +2950,28 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
       if (data && !error && Array.isArray(data) && data.length > 0) {
         // Fetch profiles
-        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
-        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string }>();
-        if (userIds.length > 0) {
-          try {
-            const { data: profs } = await supabaseInstance
-              .from('profiles')
-              .select('id, full_name, avatar_url, roll_number, student_id')
-              .in('id', userIds);
-            if (profs && Array.isArray(profs)) {
-              profs.forEach((p: any) => {
-                if (p.id) profilesMap.set(p.id, p);
-              });
-            }
-          } catch {}
-        }
+        let profilesMap = new Map<string, { full_name?: string; avatar_url?: string; roll_number?: string; student_id?: string; phone?: string }>();
+        try {
+          const { data: profs } = await supabaseInstance
+            .from('profiles')
+            .select('id, full_name, avatar_url, roll_number, student_id, phone');
+          if (profs && Array.isArray(profs)) {
+            profs.forEach((p: any) => {
+              if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
+              if (p.phone) profilesMap.set(`phone_${String(p.phone).trim()}`, p);
+              if (p.roll_number) profilesMap.set(`roll_${String(p.roll_number).trim()}`, p);
+            });
+          }
+        } catch {}
 
         dbEntries = data.map((item: any) => {
           const uId = item.user_id ? String(item.user_id).trim() : null;
           const isRegistered = Boolean(uId && !uId.startsWith('guest_') && !uId.startsWith('anon_'));
-          const prof = isRegistered ? profilesMap.get(uId) : null;
+          const prof = isRegistered ? (
+            (uId ? profilesMap.get(uId.toLowerCase()) : null) ||
+            (item.phone ? profilesMap.get(`phone_${String(item.phone).trim()}`) : null) ||
+            ((item.roll_number || item.student_id) ? profilesMap.get(`roll_${String(item.roll_number || item.student_id).trim()}`) : null)
+          ) : null;
           const isGuest = !isRegistered;
 
           // Name fallback: profiles.full_name ?? exam_results.user_name ?? exam_results.guest_name ?? 'Anonymous'
@@ -2971,7 +2981,7 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
           const rawRollOrId = prof?.roll_number || prof?.student_id || item.guest_id || item.roll_number || item.student_id;
           const rollNumber = rawRollOrId ? String(rawRollOrId) : 'N/A';
 
-          const avatar = isRegistered ? (prof?.avatar_url || item.avatar_url) : item.avatar_url;
+          const avatar = isRegistered ? (prof?.avatar_url || item.avatar_url || item.user_avatar) : (item.avatar_url || item.user_avatar);
           const score = Number(item.score ?? item.correct_answers ?? item.correct_count ?? 0);
           const totalQuestions = Number(item.total_marks ?? (Number(item.correct_answers ?? item.correct_count ?? 0) + Number(item.wrong_answers ?? item.wrong_count ?? 0)) ?? 0);
           const correctCount = Number(item.correct_answers ?? item.correct_count ?? item.score ?? 0);
@@ -4919,6 +4929,44 @@ export async function supabaseUpdateUserProfile(updates: {
           success = true;
         }
       }
+
+      // Sync avatar and name to past exam_results in Supabase
+      try {
+        const erPayload: any = {};
+        if (updates.fullName) {
+          erPayload.full_name = updates.fullName;
+          erPayload.user_name = updates.fullName;
+        }
+        if (updates.avatarUrl !== undefined) {
+          erPayload.avatar_url = updates.avatarUrl;
+          erPayload.user_avatar = updates.avatarUrl;
+        }
+        if (Object.keys(erPayload).length > 0) {
+          if (targetUserId) {
+            await supabaseInstance.from('exam_results').update(erPayload).eq('user_id', targetUserId);
+          }
+          if (targetPhone) {
+            await supabaseInstance.from('exam_results').update(erPayload).eq('phone', targetPhone);
+          }
+        }
+      } catch {}
+
+      // Sync avatar and name to leaderboard_entries in Supabase
+      try {
+        const lbPayload: any = {};
+        if (updates.fullName) {
+          lbPayload.full_name = updates.fullName;
+          lbPayload.user_name = updates.fullName;
+        }
+        if (updates.avatarUrl !== undefined) {
+          lbPayload.user_avatar = updates.avatarUrl;
+        }
+        if (Object.keys(lbPayload).length > 0) {
+          if (targetUserId) {
+            await supabaseInstance.from('leaderboard_entries').update(lbPayload).eq('user_id', targetUserId);
+          }
+        }
+      } catch {}
     } catch (dbErr) {
       console.warn('Supabase public.profiles update notice:', dbErr);
     }
@@ -4945,6 +4993,7 @@ export async function supabaseUpdateUserProfile(updates: {
   // Dispatch profile update event so other components refresh immediately
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('tamreen_profile_updated'));
+    window.dispatchEvent(new Event('tamreen_data_changed'));
   }
 
   return success;

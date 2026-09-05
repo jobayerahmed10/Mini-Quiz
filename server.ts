@@ -1503,36 +1503,50 @@ app.post('/api/leaderboard', (req, res) => {
 
 app.post('/api/leaderboard/update-profile', (req, res) => {
   try {
-    const { userId, newName, newAvatar } = req.body;
-    if (!userId || !newName) {
+    const { userId, newName, newAvatar, phone, rollNumber, email } = req.body;
+    if (!newName) {
       return res.json({ success: true, updatedCount: 0 });
     }
 
     const cleanNew = String(newName).trim();
     const cleanAvatar = newAvatar ? String(newAvatar) : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
+    const cleanRoll = rollNumber ? String(rollNumber).trim() : '';
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
 
     let updatedCount = 0;
-    // Only update entries with matching registered userId (NEVER overwrite guests)
-    if (!userId.startsWith('guest_') && !userId.startsWith('anon_')) {
-      serverLeaderboardStore.forEach((e) => {
-        if (e.user_id === userId && !e.is_guest) {
-          e.user_name = cleanNew;
-          e.full_name = cleanNew;
-          if (cleanAvatar) e.user_avatar = cleanAvatar;
-          updatedCount++;
-        }
-      });
-      serverExamResultsStore.forEach((er) => {
-        if (er.user_id === userId && !er.is_guest) {
-          er.full_name = cleanNew;
-          if (cleanAvatar) er.avatar_url = cleanAvatar;
-        }
-      });
+    serverLeaderboardStore.forEach((e: any) => {
+      if (e.is_guest) return;
+      const matchId = Boolean(userId && e.user_id && e.user_id === userId);
+      const matchPhone = Boolean(cleanPhone && e.phone && e.phone === cleanPhone);
+      const matchRoll = Boolean(cleanRoll && ((e.roll_number && e.roll_number === cleanRoll) || (e.student_id && e.student_id === cleanRoll)));
+      const matchEmail = Boolean(cleanEmail && e.email && e.email.toLowerCase() === cleanEmail);
 
-      if (updatedCount > 0) {
-        saveLeaderboardStoreToDisk();
-        saveExamResultsStoreToDisk();
+      if (matchId || matchPhone || matchRoll || matchEmail) {
+        e.user_name = cleanNew;
+        e.full_name = cleanNew;
+        if (cleanAvatar) e.user_avatar = cleanAvatar;
+        updatedCount++;
       }
+    });
+
+    serverExamResultsStore.forEach((er: any) => {
+      if (er.is_guest) return;
+      const matchId = Boolean(userId && er.user_id && er.user_id === userId);
+      const matchPhone = Boolean(cleanPhone && er.phone && er.phone === cleanPhone);
+      const matchRoll = Boolean(cleanRoll && ((er.roll_number && er.roll_number === cleanRoll) || (er.student_id && er.student_id === cleanRoll)));
+      const matchEmail = Boolean(cleanEmail && er.email && er.email.toLowerCase() === cleanEmail);
+
+      if (matchId || matchPhone || matchRoll || matchEmail) {
+        er.full_name = cleanNew;
+        er.user_name = cleanNew;
+        if (cleanAvatar) er.avatar_url = cleanAvatar;
+      }
+    });
+
+    if (updatedCount > 0) {
+      saveLeaderboardStoreToDisk();
+      saveExamResultsStoreToDisk();
     }
 
     return res.json({ success: true, updatedCount });

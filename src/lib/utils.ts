@@ -455,7 +455,10 @@ export function saveUserProfile(
         body: JSON.stringify({
           userId: currentUId,
           newName: name.trim(),
-          newAvatar: avatar || '',
+          newAvatar: finalAvatar,
+          phone: phone ? phone.trim() : (previousProfile?.phone || ''),
+          email: email !== undefined ? email : (previousProfile?.email || ''),
+          rollNumber: finalRoll,
         }),
       }).catch(() => {});
     }
@@ -469,10 +472,10 @@ export function saveUserProfile(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: uId,
-        phone: phone ? phone.trim() : '',
-        email: email ? email.trim() : '',
+        phone: phone ? phone.trim() : (previousProfile?.phone || ''),
+        email: email ? email.trim() : (previousProfile?.email || ''),
         fullName: name.trim(),
-        avatarUrl: avatar || '',
+        avatarUrl: finalAvatar,
       }),
     }).catch(() => {});
   } catch {}
