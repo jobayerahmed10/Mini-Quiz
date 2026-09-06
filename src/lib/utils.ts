@@ -441,6 +441,60 @@ export function saveUserProfile(
     if (isRegistered) {
       localStorage.setItem('tamreen_user_auth_status', 'registered');
     }
+
+    // 1. Immediately propagate new avatar and name to local leaderboard cache
+    const rawLocalLd = localStorage.getItem('tamreen_local_leaderboard');
+    if (rawLocalLd) {
+      try {
+        const localLd = JSON.parse(rawLocalLd);
+        if (Array.isArray(localLd)) {
+          const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+          const currentUId = getUserUniqueId();
+          const cleanName = name.trim();
+          let modified = false;
+
+          const updatedLocalLd = localLd.map((e: any) => {
+            const eUserId = e.user_id ? String(e.user_id).trim().toLowerCase() : '';
+            const eRoll = String(e.roll_number || e.student_id || '').trim().toLowerCase();
+            const ePhone = e.phone ? String(e.phone).replace(/\D/g, '') : '';
+            const matchId = Boolean(finalId && eUserId && eUserId === finalId.toLowerCase()) || Boolean(currentUId && eUserId && eUserId === currentUId.toLowerCase());
+            const matchRoll = Boolean(finalRoll && eRoll && eRoll === finalRoll.toLowerCase());
+            const matchPhone = Boolean(cleanPhone && ePhone && ePhone === cleanPhone);
+
+            if (matchId || matchRoll || matchPhone) {
+              modified = true;
+              return {
+                ...e,
+                user_avatar: finalAvatar,
+                user_name: cleanName || e.user_name,
+                full_name: cleanName || e.full_name,
+              };
+            }
+            return e;
+          });
+
+          if (modified) {
+            localStorage.setItem('tamreen_local_leaderboard', JSON.stringify(updatedLocalLd));
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Immediately update local exam history with new avatar & name
+    const rawHistory = localStorage.getItem('tamreen_exam_history');
+    if (rawHistory) {
+      try {
+        const historyList = JSON.parse(rawHistory);
+        if (Array.isArray(historyList)) {
+          const updatedHistory = historyList.map((h: any) => ({
+            ...h,
+            avatar_url: finalAvatar,
+            user_name: name.trim() || h.user_name,
+          }));
+          localStorage.setItem('tamreen_exam_history', JSON.stringify(updatedHistory));
+        }
+      } catch {}
+    }
   } catch {
     // ignore localstorage errors
   }
@@ -448,20 +502,18 @@ export function saveUserProfile(
   // Update registered user's avatar or profile on shared server leaderboard
   try {
     const currentUId = getUserUniqueId();
-    if (isRegistered && currentUId && !currentUId.startsWith('guest_') && !currentUId.startsWith('anon_')) {
-      fetch('/api/leaderboard/update-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUId,
-          newName: name.trim(),
-          newAvatar: finalAvatar,
-          phone: phone ? phone.trim() : (previousProfile?.phone || ''),
-          email: email !== undefined ? email : (previousProfile?.email || ''),
-          rollNumber: finalRoll,
-        }),
-      }).catch(() => {});
-    }
+    fetch('/api/leaderboard/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: finalId || currentUId,
+        newName: name.trim(),
+        newAvatar: finalAvatar,
+        phone: phone ? phone.trim() : (previousProfile?.phone || ''),
+        email: email !== undefined ? email : (previousProfile?.email || ''),
+        rollNumber: finalRoll,
+      }),
+    }).catch(() => {});
   } catch {}
 
   // Sync profile to cloud server progress store

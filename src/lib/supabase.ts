@@ -6327,27 +6327,26 @@ export function toggleBlogBookmark(blogId: string): boolean {
 }
 
 export function getCachedBlogs(): BlogPost[] {
-  if (typeof window === 'undefined') return INITIAL_BLOG_POSTS;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(BLOGS_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Filter out old demo blogs if any exist
-        const nonDemo = parsed.filter((b: BlogPost) => !b.id.startsWith('blog-'));
-        if (nonDemo.length > 0) {
-          return nonDemo;
-        }
+        // Filter out old demo/init placeholder blogs if any exist
+        const nonDemo = parsed.filter((b: BlogPost) => b && b.id && !b.id.startsWith('blog-') && !b.id.startsWith('init_blog_'));
+        return nonDemo;
       }
     }
   } catch {}
-  return INITIAL_BLOG_POSTS;
+  return [];
 }
 
 export function setCachedBlogs(blogs: BlogPost[]) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(BLOGS_CACHE_KEY, JSON.stringify(blogs));
+    const validBlogs = (blogs || []).filter((b: BlogPost) => b && b.id && !b.id.startsWith('blog-') && !b.id.startsWith('init_blog_'));
+    localStorage.setItem(BLOGS_CACHE_KEY, JSON.stringify(validBlogs));
   } catch {}
 }
 
@@ -6364,6 +6363,7 @@ export function generateSlug(title: string): string {
 export async function fetchBlogPosts(filterOptions?: { category?: string; sub_category?: string; subject?: string }): Promise<BlogPost[]> {
   let blogs: BlogPost[] = getCachedBlogs();
 
+  // 1. Try Supabase
   if (supabaseInstance) {
     try {
       let query = supabaseInstance
@@ -6386,36 +6386,52 @@ export async function fetchBlogPosts(filterOptions?: { category?: string; sub_ca
       const { data, error } = await fetchWithTimeout(Promise.resolve(query), 3500, timeoutFallback as any);
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const mapped: BlogPost[] = data.map((item: any) => ({
-          id: String(item.id),
-          slug: item.slug || generateSlug(item.title || 'blog'),
-          title: item.title || '',
-          thumbnail: item.thumbnail || item.thumbnail_url || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
-          excerpt: item.excerpt || item.description || '',
-          content: item.content || item.full_content || '',
-          category: (item.category || 'নিবন্ধন প্রস্তুতি') as BlogCategory,
-          sub_category: item.sub_category || item.subCategory || undefined,
-          subject: item.subject || item.topic || undefined,
-          author: item.author || 'আত-তামরীন একাডেমি',
-          published_date: item.published_date || '৩১ আগস্ট ২০২৬',
-          reading_time_minutes: Number(item.reading_time_minutes || item.reading_time || 5),
-          status: item.status === 'draft' ? 'draft' : 'published',
-          created_at: item.created_at || new Date().toISOString(),
-          updated_at: item.updated_at,
-          views_count: Number(item.views_count || 0),
-          is_featured: Boolean(item.is_featured),
-        }));
+        const mapped: BlogPost[] = data
+          .filter((item: any) => item && item.id && !String(item.id).startsWith('blog-') && !String(item.id).startsWith('init_blog_'))
+          .map((item: any) => ({
+            id: String(item.id),
+            slug: item.slug || generateSlug(item.title || 'blog'),
+            title: item.title || '',
+            thumbnail: item.thumbnail || item.thumbnail_url || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80',
+            excerpt: item.excerpt || item.description || '',
+            content: item.content || item.full_content || '',
+            category: (item.category || 'নিবন্ধন প্রস্তুতি') as BlogCategory,
+            sub_category: item.sub_category || item.subCategory || undefined,
+            subject: item.subject || item.topic || undefined,
+            author: item.author || 'আত-তামরীন একাডেমি',
+            published_date: item.published_date || '০৬ সেপ্টেম্বর ২০২৬',
+            reading_time_minutes: Number(item.reading_time_minutes || item.reading_time || 5),
+            status: item.status === 'draft' ? 'draft' : 'published',
+            created_at: item.created_at || new Date().toISOString(),
+            updated_at: item.updated_at,
+            views_count: Number(item.views_count || 0),
+            is_featured: Boolean(item.is_featured),
+          }));
 
         if (!filterOptions || (!filterOptions.category && !filterOptions.sub_category && !filterOptions.subject)) {
           setCachedBlogs(mapped);
         }
-        blogs = mapped;
-        return blogs;
+        return mapped;
       }
     } catch (err) {
       console.warn('Supabase blogs fetch notice:', err);
     }
   }
+
+  // 2. Try Node Express /api/blogs server fallback
+  try {
+    const srvRes = await fetchWithTimeout(fetch('/api/blogs'), 3000, null as any);
+    if (srvRes && srvRes.ok) {
+      const json = await srvRes.json();
+      if (json && Array.isArray(json.blogs)) {
+        const mapped: BlogPost[] = json.blogs.filter((item: any) => item && item.id && !String(item.id).startsWith('blog-') && !String(item.id).startsWith('init_blog_'));
+        if (!filterOptions || (!filterOptions.category && !filterOptions.sub_category && !filterOptions.subject)) {
+          setCachedBlogs(mapped);
+        }
+        blogs = mapped;
+      }
+    }
+  } catch {}
 
   // If cached or fallback, apply filtering locally
   if (filterOptions) {
@@ -6468,6 +6484,15 @@ export async function saveBlogPost(postData: Partial<BlogPost> & { title: string
     }
     setCachedBlogs(updatedList);
 
+    // Save to server fallback store
+    try {
+      fetch('/api/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPost),
+      }).catch(() => {});
+    } catch {}
+
     // Save to Supabase if available
     if (supabaseInstance) {
       try {
@@ -6517,6 +6542,10 @@ export async function deleteBlogPost(id: string): Promise<boolean> {
     const currentBlogs = getCachedBlogs();
     const updated = currentBlogs.filter(b => b.id !== id);
     setCachedBlogs(updated);
+
+    try {
+      fetch(`/api/blogs/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+    } catch {}
 
     if (supabaseInstance) {
       try {

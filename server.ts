@@ -26,6 +26,7 @@ const QUESTION_LIKES_FILE_PATH = path.join(process.cwd(), 'question_likes_store.
 const QUESTION_BOOKMARKS_FILE_PATH = path.join(process.cwd(), 'question_bookmarks_store.json');
 const QUESTION_REPORTS_FILE_PATH = path.join(process.cwd(), 'question_reports_store.json');
 const QUESTION_EXPLANATIONS_FILE_PATH = path.join(process.cwd(), 'question_explanations_store.json');
+const BLOGS_FILE_PATH = path.join(process.cwd(), 'blogs_store.json');
 
 export interface ServerQuestionLike {
   id: string;
@@ -156,6 +157,7 @@ let serverQuestionLikesStore: ServerQuestionLike[] = [];
 let serverQuestionBookmarksStore: ServerQuestionBookmark[] = [];
 let serverQuestionReportsStore: ServerQuestionReport[] = [];
 let serverQuestionExplanationsStore: ServerQuestionExplanation[] = [];
+let serverBlogsStore: any[] = [];
 
 // Load existing stores from disk on startup
 try {
@@ -236,6 +238,27 @@ try {
   }
 } catch (err) {
   console.warn('Could not load question_explanations_store.json:', err);
+}
+
+try {
+  if (fs.existsSync(BLOGS_FILE_PATH)) {
+    const raw = fs.readFileSync(BLOGS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      // Filter out demo/init placeholder blogs
+      serverBlogsStore = parsed.filter((b: any) => b && b.id && !String(b.id).startsWith('blog-') && !String(b.id).startsWith('init_blog_'));
+    }
+  }
+} catch (err) {
+  console.warn('Could not load blogs_store.json:', err);
+}
+
+function saveBlogsStoreToDisk() {
+  try {
+    fs.writeFileSync(BLOGS_FILE_PATH, JSON.stringify(serverBlogsStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write blogs_store.json:', err);
+  }
 }
 
 function saveRegisteredUsersStoreToDisk() {
@@ -1610,8 +1633,9 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     const cleanNew = newName ? String(newName).trim() : '';
     const cleanAvatar = newAvatar !== undefined ? String(newAvatar) : '';
     const cleanPhone = phone ? normalizePhoneNumber(String(phone)) : '';
-    const cleanRoll = rollNumber ? String(rollNumber).trim() : '';
+    const cleanRoll = rollNumber ? String(rollNumber).trim().toLowerCase() : '';
     const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanUserId = userId ? String(userId).trim().toLowerCase() : '';
 
     let updatedCount = 0;
 
@@ -1619,9 +1643,9 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     serverRegisteredUsersStore.forEach((u) => {
       const uPhone = u.phone ? normalizePhoneNumber(u.phone) : '';
       const uRoll = String(u.roll_number || u.student_id || '').toLowerCase();
-      const matchId = Boolean(userId && u.id && u.id === userId);
+      const matchId = Boolean(cleanUserId && u.id && u.id.toLowerCase() === cleanUserId);
       const matchPhone = Boolean(cleanPhone && uPhone && uPhone === cleanPhone);
-      const matchRoll = Boolean(cleanRoll && uRoll && uRoll === cleanRoll.toLowerCase());
+      const matchRoll = Boolean(cleanRoll && uRoll && uRoll === cleanRoll);
       const matchEmail = Boolean(cleanEmail && u.email && u.email.toLowerCase() === cleanEmail);
 
       if (matchId || matchPhone || matchRoll || matchEmail) {
@@ -1633,11 +1657,12 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
 
     // 2. Update serverLeaderboardStore
     serverLeaderboardStore.forEach((e: any) => {
-      if (e.is_guest) return;
       const ePhone = e.phone ? normalizePhoneNumber(String(e.phone)) : '';
-      const matchId = Boolean(userId && e.user_id && e.user_id === userId);
+      const eUserId = e.user_id ? String(e.user_id).trim().toLowerCase() : '';
+      const eRoll = String(e.roll_number || e.student_id || '').trim().toLowerCase();
+      const matchId = Boolean(cleanUserId && eUserId && eUserId === cleanUserId);
       const matchPhone = Boolean(cleanPhone && ePhone && ePhone === cleanPhone);
-      const matchRoll = Boolean(cleanRoll && ((e.roll_number && e.roll_number === cleanRoll) || (e.student_id && e.student_id === cleanRoll)));
+      const matchRoll = Boolean(cleanRoll && eRoll && eRoll === cleanRoll);
       const matchEmail = Boolean(cleanEmail && e.email && e.email.toLowerCase() === cleanEmail);
 
       if (matchId || matchPhone || matchRoll || matchEmail) {
@@ -1652,11 +1677,12 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
 
     // 3. Update serverExamResultsStore
     serverExamResultsStore.forEach((er: any) => {
-      if (er.is_guest) return;
       const erPhone = er.phone ? normalizePhoneNumber(String(er.phone)) : '';
-      const matchId = Boolean(userId && er.user_id && er.user_id === userId);
+      const erUserId = er.user_id ? String(er.user_id).trim().toLowerCase() : '';
+      const erRoll = String(er.roll_number || er.student_id || '').trim().toLowerCase();
+      const matchId = Boolean(cleanUserId && erUserId && erUserId === cleanUserId);
       const matchPhone = Boolean(cleanPhone && erPhone && erPhone === cleanPhone);
-      const matchRoll = Boolean(cleanRoll && ((er.roll_number && er.roll_number === cleanRoll) || (er.student_id && er.student_id === cleanRoll)));
+      const matchRoll = Boolean(cleanRoll && erRoll && erRoll === cleanRoll);
       const matchEmail = Boolean(cleanEmail && er.email && er.email.toLowerCase() === cleanEmail);
 
       if (matchId || matchPhone || matchRoll || matchEmail) {
@@ -1672,7 +1698,8 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     // 4. Update serverUserProgressStore
     serverUserProgressStore.forEach((p) => {
       const pPhone = p.phone ? normalizePhoneNumber(p.phone) : '';
-      const matchId = Boolean(userId && p.userId && p.userId === userId);
+      const pUserId = p.userId ? String(p.userId).trim().toLowerCase() : '';
+      const matchId = Boolean(cleanUserId && pUserId && pUserId === cleanUserId);
       const matchPhone = Boolean(cleanPhone && pPhone && pPhone === cleanPhone);
 
       if (matchId || matchPhone) {
@@ -1684,10 +1711,70 @@ app.post('/api/leaderboard/update-profile', (req, res) => {
     saveLeaderboardStoreToDisk();
     saveExamResultsStoreToDisk();
     saveRegisteredUsersStoreToDisk();
+    saveUserProgressStoreToDisk();
 
     return res.json({ success: true, updatedCount });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Server error updating profile' });
+  }
+});
+
+// Blog Posts API Endpoints
+app.get('/api/blogs', (req, res) => {
+  try {
+    const { category, sub_category, subject } = req.query;
+    let filtered = serverBlogsStore;
+    if (category && typeof category === 'string' && category !== 'সবগুলো') {
+      filtered = filtered.filter(b => b.category === category);
+    }
+    if (sub_category && typeof sub_category === 'string') {
+      filtered = filtered.filter(b => b.sub_category === sub_category);
+    }
+    if (subject && typeof subject === 'string') {
+      filtered = filtered.filter(b => b.subject === subject);
+    }
+    return res.json({ success: true, blogs: filtered });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error fetching blogs' });
+  }
+});
+
+app.post('/api/blogs', (req, res) => {
+  try {
+    const post = req.body;
+    if (!post || !post.title) {
+      return res.status(400).json({ error: 'Blog title is required' });
+    }
+    const id = post.id || `blog_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newPost = {
+      ...post,
+      id,
+      updated_at: new Date().toISOString(),
+      created_at: post.created_at || new Date().toISOString(),
+    };
+
+    const existingIdx = serverBlogsStore.findIndex(b => b.id === id);
+    if (existingIdx >= 0) {
+      serverBlogsStore[existingIdx] = newPost;
+    } else {
+      serverBlogsStore.unshift(newPost);
+    }
+
+    saveBlogsStoreToDisk();
+    return res.json({ success: true, post: newPost });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error saving blog post' });
+  }
+});
+
+app.delete('/api/blogs/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    serverBlogsStore = serverBlogsStore.filter(b => b.id !== id);
+    saveBlogsStoreToDisk();
+    return res.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Server error deleting blog post' });
   }
 });
 

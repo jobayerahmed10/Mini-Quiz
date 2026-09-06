@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Trophy, Sparkles, User, RefreshCw, Filter, ChevronDown, X, BookOpen } from 'lucide-react';
 import { toBengaliNumeral, getUserProfile, getUserUniqueId, isUserRegistered } from '../lib/utils';
 import { 
@@ -468,6 +468,17 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const currentExamObj = examList.find((e) => e.id === selectedExamId);
   const selectedExamTitle = currentExamObj ? currentExamObj.title : (selectedExamId === 'all' ? 'সকল বিষয় / মডেল টেস্ট' : selectedExamId);
 
+  const localFallbackList = useMemo(() => {
+    let localEntries: LeaderboardEntry[] = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('tamreen_local_leaderboard');
+        if (raw) localEntries = JSON.parse(raw);
+      } catch {}
+    }
+    return computeLeaderboard(localEntries, currentFilter, selectedExamId, userName, userAvatar, examList);
+  }, [currentFilter, selectedExamId, userName, userAvatar, examList]);
+
   // Fetch Leaderboard entries via secure database RPCs / fallback
   const loadLeaderboardData = useCallback(async () => {
     setIsLoading(true);
@@ -673,8 +684,35 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     };
   }, [loadLeaderboardData]);
 
-  // Ranked list directly from authoritative API response
-  const rankedList = rpcRankedList || [];
+  // Ranked list directly from authoritative API response with live profile sync
+  const liveProf = getUserProfile();
+  const liveAvatar = liveProf?.avatar || userAvatar;
+  const liveName = liveProf?.name?.trim() || userName;
+  const liveRoll = liveProf?.roll_number || liveProf?.student_id;
+  const authUserId = liveProf?.id || (typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : '');
+
+  const baseRankedList = (rpcRankedList && rpcRankedList.length > 0) ? rpcRankedList : (localFallbackList || []);
+
+  const rankedList = baseRankedList.map((item, idx) => {
+    const itemUserId = ((item as any).user_id || item.id || '').toLowerCase();
+    const itemRoll = String(item.rollNumber || '').trim().toLowerCase();
+    const isCurrent = Boolean(
+      item.isCurrentUser ||
+      (currentUserId && itemUserId && itemUserId === currentUserId.toLowerCase()) ||
+      (authUserId && itemUserId && itemUserId === authUserId.toLowerCase()) ||
+      (liveRoll && itemRoll && itemRoll === String(liveRoll).trim().toLowerCase()) ||
+      (currentUserId && item.id.includes(currentUserId))
+    );
+
+    return {
+      ...item,
+      rank: item.rank || (idx + 1),
+      userName: isCurrent && liveName && liveName !== 'আপনি (পরীক্ষার্থী)' ? liveName : item.userName,
+      userAvatar: isCurrent ? (liveAvatar || item.userAvatar) : item.userAvatar,
+      isCurrentUser: isCurrent,
+      rollNumber: isCurrent && liveRoll ? liveRoll : item.rollNumber,
+    };
+  });
 
   const currentUserRankItem = rankedList.find((item) => item.isCurrentUser);
   const topOneItem = rankedList.length > 0 ? rankedList[0] : null;
