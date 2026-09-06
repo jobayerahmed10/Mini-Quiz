@@ -237,8 +237,10 @@ export const QuestionActionFooter: React.FC<QuestionActionFooterProps> = ({
 
     setIsSubmittingReport(true);
     try {
+      const qTitle = question.question || (question.subject ? `${question.subject} - প্রশ্ন #${qId}` : `প্রশ্ন #${qId}`);
       const res = await submitQuestionReportToSupabase({
         question_id: qId,
+        question_title: qTitle,
         user_id: userId,
         user_name: user?.name || customAuthorName || 'শিক্ষার্থী',
         phone: user?.phone,

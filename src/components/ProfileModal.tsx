@@ -19,6 +19,7 @@ import {
 } from '../lib/supabase';
 import { AuthModal } from './AuthModal';
 import { AdminBlogModal } from './AdminBlogModal';
+import { ISLAMIC_PRESET_AVATARS, PRESET_AVATAR_URLS } from '../lib/avatarPresets';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -28,14 +29,7 @@ interface ProfileModalProps {
   onOpenFontSettings?: () => void;
 }
 
-// Preset avatars for quick selection
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250',
-];
+const PRESET_AVATARS = PRESET_AVATAR_URLS;
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,

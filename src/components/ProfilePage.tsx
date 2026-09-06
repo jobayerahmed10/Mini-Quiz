@@ -15,7 +15,8 @@ import {
   compressAndResizeAvatar, getCompletedExamIds, getExamResult,
   getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
   removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId,
-  getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions, getTotalExamsCount
+  getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions, getTotalExamsCount,
+  UserReportedQuestion, getUserReportedQuestions
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -24,8 +25,10 @@ import {
   supabaseOnAuthStateChange,
   supabaseUpdateUserProfile,
   fetchUserLikedQuestionIds,
-  fetchUserBookmarkedQuestionIds
+  fetchUserBookmarkedQuestionIds,
+  fetchUserQuestionReportsFromSupabase
 } from '../lib/supabase';
+import { ISLAMIC_PRESET_AVATARS, PRESET_AVATAR_URLS } from '../lib/avatarPresets';
 import { CourseEnrollmentRecord, Question } from '../types';
 import { AuthModal } from './AuthModal';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
@@ -49,13 +52,7 @@ interface ProfilePageProps {
   onChangeShowHarakat?: (show: boolean) => void;
 }
 
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250',
-];
+const PRESET_AVATARS = PRESET_AVATAR_URLS;
 
 const TARGET_EXAM_PRESETS = [
   '১৮তম শিক্ষক নিবন্ধন প্রিলি (সাধারণ)',
@@ -126,6 +123,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   // Dynamic Likes & Bookmarks State (Synchronous local state first)
   const [dbLikedIds, setDbLikedIds] = useState<string[]>(() => getLikedIds());
   const [dbBookmarkedIds, setDbBookmarkedIds] = useState<string[]>(() => getBookmarkedIds());
+
+  // Real User Reported Questions (only shows when user reported, no defaults)
+  const [reportedQuestions, setReportedQuestions] = useState<UserReportedQuestion[]>(() => getUserReportedQuestions());
+  const [avatarGenderFilter, setAvatarGenderFilter] = useState<'all' | 'boy' | 'girl'>('all');
 
   // Supabase Auth State
   const [authSession, setAuthSession] = useState<any>(null);
@@ -280,11 +281,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     window.addEventListener('tamreen_likes_updated', handleLikesSync);
     window.addEventListener('tamreen_bookmarks_updated', handleBookmarksSync);
 
+    const handleReportsSync = () => {
+      setReportedQuestions(getUserReportedQuestions());
+    };
+    window.addEventListener('tamreen_reports_updated', handleReportsSync);
+    window.addEventListener('tamreen_data_changed', handleReportsSync);
+
     return () => {
       window.removeEventListener('tamreen_likes_updated', handleLikesSync);
       window.removeEventListener('tamreen_bookmarks_updated', handleBookmarksSync);
+      window.removeEventListener('tamreen_reports_updated', handleReportsSync);
+      window.removeEventListener('tamreen_data_changed', handleReportsSync);
     };
   }, []);
+
+  // Sync user reported questions from Supabase / Server
+  useEffect(() => {
+    fetchUserQuestionReportsFromSupabase(userId, userProfile?.phone).then((reports) => {
+      if (Array.isArray(reports)) {
+        setReportedQuestions(reports);
+      }
+    });
+  }, [userId, userProfile?.phone, showReportedQuestionsModal]);
 
   // Sync likes and bookmarks from Supabase/Server
   useEffect(() => {
@@ -767,9 +785,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-xs shadow-xs">
-                  {toBengaliNumeral(7)}
-                </span>
+                {reportedQuestions.length > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-xs shadow-xs">
+                    {toBengaliNumeral(reportedQuestions.length)}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                    {toBengaliNumeral(0)}
+                  </span>
+                )}
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>
@@ -1019,22 +1043,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 />
               </div>
 
-              {/* Preset Avatars */}
-              <div className="space-y-1 pt-1">
+              {/* Islamic Preset Avatars */}
+              <div className="space-y-1.5 pt-1 text-center">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
-                  অথবা প্রিসেট ছবি বেছে নিন:
+                  অথবা ইসলামিক অ্যাভাটার বেছে নিন (ছেলে/মেয়ে):
                 </span>
-                <div className="flex items-center justify-center gap-2 overflow-x-auto py-1">
-                  {PRESET_AVATARS.map((url, idx) => (
+                <div className="grid grid-cols-4 gap-2 py-1 max-h-36 overflow-y-auto pr-1">
+                  {ISLAMIC_PRESET_AVATARS.map((av) => (
                     <button
-                      key={idx}
+                      key={av.id}
                       type="button"
-                      onClick={() => setAvatar(url)}
-                      className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                        avatar === url ? 'border-[#0b705c] scale-110 ring-2 ring-[#0b705c]/40' : 'border-transparent hover:scale-105'
+                      onClick={() => setAvatar(av.url)}
+                      title={av.name}
+                      className={`relative p-1 rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex flex-col items-center gap-0.5 bg-slate-50 dark:bg-slate-800 ${
+                        avatar === av.url
+                          ? 'border-[#0b705c] scale-105 ring-2 ring-[#0b705c]/40 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <img src={url} alt={`Preset ${idx}`} className="w-full h-full object-cover" />
+                      <img src={av.url} alt={av.name} className="w-9 h-9 rounded-lg object-cover" />
+                      <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300 truncate w-full text-center">
+                        {av.gender === 'boy' ? 'ছেলে' : 'মেয়ে'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1938,25 +1968,73 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </label>
               </div>
 
-              {/* Preset Avatars List */}
-              <div className="space-y-2 pt-2">
-                <span className="text-xs font-bold text-slate-500 block">অথবা রেডিমেড অ্যাভাটার সিলেক্ট করুন:</span>
-                <div className="grid grid-cols-4 gap-3">
-                  {PRESET_AVATARS.map((url, idx) => (
+              {/* Islamic Preset Avatars List */}
+              <div className="space-y-3 pt-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    ইসলামিক অ্যাভাটার নির্বাচন করুন:
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
                     <button
-                      key={idx}
-                      onClick={async () => {
-                        setAvatar(url);
-                        saveUserProfile(name, phone, url, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
-                        await supabaseUpdateUserProfile({ fullName: name, avatarUrl: url, phone });
-                      }}
-                      className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
-                        avatar === url ? 'border-[#0b705c] scale-105 shadow-md' : 'border-slate-200 opacity-70 hover:opacity-100'
+                      type="button"
+                      onClick={() => setAvatarGenderFilter('all')}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        avatarGenderFilter === 'all'
+                          ? 'bg-[#0b705c] text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                       }`}
                     >
-                      <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
+                      সব ({toBengaliNumeral(ISLAMIC_PRESET_AVATARS.length)})
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setAvatarGenderFilter('boy')}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        avatarGenderFilter === 'boy'
+                          ? 'bg-[#0b705c] text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      ছেলে
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarGenderFilter('girl')}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        avatarGenderFilter === 'girl'
+                          ? 'bg-[#0b705c] text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      মেয়ে
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                  {ISLAMIC_PRESET_AVATARS
+                    .filter((av) => avatarGenderFilter === 'all' || av.gender === avatarGenderFilter)
+                    .map((av) => (
+                      <button
+                        key={av.id}
+                        type="button"
+                        onClick={async () => {
+                          setAvatar(av.url);
+                          saveUserProfile(name, phone, av.url, isRegistered, userProfile?.email, userProfile?.roll_number || userProfile?.student_id, userProfile?.id);
+                          await supabaseUpdateUserProfile({ fullName: name, avatarUrl: av.url, phone });
+                        }}
+                        className={`p-1 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer flex flex-col items-center gap-1 bg-slate-50 dark:bg-slate-800/80 ${
+                          avatar === av.url
+                            ? 'border-[#0b705c] scale-105 shadow-md ring-2 ring-[#0b705c]/30'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 opacity-80 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={av.url} alt={av.name} className="w-12 h-12 rounded-xl object-cover" />
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate w-full text-center">
+                          {av.name}
+                        </span>
+                      </button>
+                    ))}
                 </div>
               </div>
 
@@ -2131,44 +2209,98 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
                   <Flag className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white">
-                  রিপোর্টেড প্রশ্নসমূহ
-                </h3>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    রিপোর্টেড প্রশ্নসমূহ
+                  </h3>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                    মোট {toBengaliNumeral(reportedQuestions.length)}টি রিপোর্ট জমা হয়েছে
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setShowReportedQuestionsModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-              {[
-                { title: 'NTRCA ১৮তম শিক্ষক নিবন্ধন - আরবি প্রশ্ন #২৪', date: '০২ মার্চ ২০২৬', status: 'সংশোধিত' },
-                { title: 'BCS বিষয়ভিত্তিক কুইজ - ইসলামিক স্টাডিজ #১২', date: '২৮ ফেব্রুয়ারি ২০২৬', status: 'পর্যালোচনায়' },
-                { title: 'মাদরাসা শিক্ষক নিবন্ধন - আকাঈদ প্রশ্ন #০৫', date: '২৫ ফেব্রুয়ারি ২০২৬', status: 'সংশোধিত' },
-              ].map((item, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex items-center justify-between">
-                  <div>
-                    <h5 className="text-xs font-black text-slate-900 dark:text-white">{item.title}</h5>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">{item.date}</span>
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {reportedQuestions.length === 0 ? (
+                <div className="py-8 text-center space-y-2.5">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 mx-auto flex items-center justify-center">
+                    <Flag className="w-5 h-5" />
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    item.status === 'সংশোধিত' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {item.status}
-                  </span>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                    কোনো রিপোর্ট পাওয়া যায়নি
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                    আপনি এখনও কোনো প্রশ্নে ভুল বা অসঙ্গতি রিপোর্ট করেননি। অনুশীলনের সময় কোনো প্রশ্নে সমস্যা মনে হলে প্রশ্নপত্রের নিচে 'রিপোর্ট' অপশন থেকে জানাতে পারেন।
+                  </p>
                 </div>
-              ))}
+              ) : (
+                reportedQuestions.map((item, idx) => {
+                  const statusLabel =
+                    item.status === 'resolved' || item.status === 'সংশোধিত'
+                      ? 'সংশোধিত'
+                      : item.status === 'reviewed' || item.status === 'পর্যালোচিত'
+                      ? 'পর্যালোচিত'
+                      : 'পর্যালোচনায়';
+
+                  const badgeClass =
+                    statusLabel === 'সংশোধিত'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                      : statusLabel === 'পর্যালোচিত'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+
+                  let formattedDate = 'তারিখ অপ্রাপ্য';
+                  try {
+                    const d = new Date(item.created_at);
+                    if (!isNaN(d.getTime())) {
+                      formattedDate = d.toLocaleDateString('bn-BD', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      });
+                    }
+                  } catch {}
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700/50 space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h5 className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                          {item.question_title || `প্রশ্ন #${item.question_id}`}
+                        </h5>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${badgeClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">কারণ: </span>
+                        {item.reason}
+                        {item.details ? <span className="text-slate-500 dark:text-slate-400"> ({item.details})</span> : ''}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                        <span>প্রশ্ন আইডি: #{toBengaliNumeral(item.question_id)}</span>
+                        <span>{formattedDate}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <button
               onClick={() => setShowReportedQuestionsModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-[#0b705c] text-white text-xs font-black hover:bg-[#085a4a] cursor-pointer transition-colors"
             >
               বন্ধ করুন
             </button>

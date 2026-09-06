@@ -25,7 +25,11 @@ import {
   getBookmarkedIds,
   getLocalQuestionLikeCount,
   setLocalQuestionLikeCount,
-  generateUUID
+  generateUUID,
+  UserReportedQuestion,
+  getUserReportedQuestions,
+  saveUserReportedQuestions,
+  addUserReportedQuestion
 } from './utils';
 
 /**
@@ -5604,6 +5608,7 @@ export async function toggleQuestionBookmarkInSupabase(
  */
 export async function submitQuestionReportToSupabase(report: {
   question_id: string | number;
+  question_title?: string;
   user_id?: string;
   user_name?: string;
   phone?: string;
@@ -5611,8 +5616,27 @@ export async function submitQuestionReportToSupabase(report: {
   reason: string;
   details?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  const qId = String(report.question_id).trim();
+  const reportId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const nowIso = new Date().toISOString();
+
+  const localReport: UserReportedQuestion = {
+    id: reportId,
+    question_id: qId,
+    question_title: report.question_title || `প্রশ্ন #${qId}`,
+    reason: report.reason,
+    details: report.details,
+    status: 'pending',
+    created_at: nowIso,
+  };
+
+  // 1. Immediately cache locally
+  addUserReportedQuestion(localReport);
+
   const payload = {
-    question_id: String(report.question_id).trim(),
+    id: reportId,
+    question_id: qId,
+    question_title: report.question_title || `প্রশ্ন #${qId}`,
     user_id: report.user_id ? String(report.user_id).trim() : null,
     user_name: report.user_name || 'শিক্ষার্থী',
     phone: report.phone || null,
@@ -5620,7 +5644,7 @@ export async function submitQuestionReportToSupabase(report: {
     reason: report.reason,
     details: report.details || null,
     status: 'pending',
-    created_at: new Date().toISOString(),
+    created_at: nowIso,
   };
 
   if (supabaseInstance) {
@@ -5657,6 +5681,95 @@ export async function submitQuestionReportToSupabase(report: {
 
   return { success: true };
 }
+
+/**
+ * Fetch User's Reported Questions from Supabase & Server
+ */
+export async function fetchUserQuestionReportsFromSupabase(
+  userId?: string,
+  phone?: string
+): Promise<UserReportedQuestion[]> {
+  const currentUserId = userId || (typeof window !== 'undefined' ? localStorage.getItem('tamreen_user_id') : undefined);
+  const currentPhone = phone || getUserProfile()?.phone;
+
+  let remoteReports: UserReportedQuestion[] = [];
+
+  if (supabaseInstance && currentUserId) {
+    try {
+      let query = supabaseInstance
+        .from('question_reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (currentUserId) {
+        query = query.eq('user_id', currentUserId);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        remoteReports = data.map((r: any) => ({
+          id: String(r.id || `rep_${r.question_id}`),
+          question_id: String(r.question_id),
+          question_title: r.question_title || `প্রশ্ন #${r.question_id}`,
+          reason: String(r.reason || ''),
+          details: r.details || undefined,
+          status: r.status || 'pending',
+          created_at: String(r.created_at || new Date().toISOString()),
+        }));
+      }
+    } catch (err) {
+      console.warn('Supabase fetchUserQuestionReports error:', err);
+    }
+  }
+
+  // Also check server API
+  try {
+    const params = new URLSearchParams();
+    if (currentUserId) params.set('userId', currentUserId);
+    if (currentPhone) params.set('phone', currentPhone);
+    const res = await fetch(`/api/questions/reports?${params.toString()}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.reports)) {
+        const srvReports: UserReportedQuestion[] = json.reports.map((r: any) => ({
+          id: String(r.id || `rep_${r.question_id}`),
+          question_id: String(r.question_id),
+          question_title: r.question_title || `প্রশ্ন #${r.question_id}`,
+          reason: String(r.reason || ''),
+          details: r.details || undefined,
+          status: r.status || 'pending',
+          created_at: String(r.created_at || new Date().toISOString()),
+        }));
+
+        // Merge without duplicates
+        const existingIds = new Set(remoteReports.map((r) => r.id));
+        srvReports.forEach((sr) => {
+          if (!existingIds.has(sr.id)) {
+            remoteReports.push(sr);
+            existingIds.add(sr.id);
+          }
+        });
+      }
+    }
+  } catch {}
+
+  if (remoteReports.length > 0) {
+    const local = getUserReportedQuestions();
+    const map = new Map<string, UserReportedQuestion>();
+    remoteReports.forEach((r) => map.set(r.id, r));
+    local.forEach((r) => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+    const combined = Array.from(map.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    saveUserReportedQuestions(combined);
+    return combined;
+  }
+
+  return getUserReportedQuestions();
+}
+
 
 /**
  * Fetch community explanations for a question from Supabase & Server (Public view: ONLY approved)

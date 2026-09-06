@@ -45,6 +45,7 @@ export interface ServerQuestionBookmark {
 export interface ServerQuestionReport {
   id: string;
   question_id: string;
+  question_title?: string;
   user_id?: string;
   user_name?: string;
   phone?: string;
@@ -1861,7 +1862,7 @@ app.get('/api/questions/bookmarks', (req, res) => {
 // Question reports
 app.post('/api/questions/report', (req, res) => {
   try {
-    const { question_id, user_id, user_name, phone, email, reason, details } = req.body;
+    const { question_id, question_title, user_id, user_name, phone, email, reason, details } = req.body;
     if (!question_id || !reason) {
       return res.status(400).json({ error: 'question_id and reason are required' });
     }
@@ -1869,6 +1870,7 @@ app.post('/api/questions/report', (req, res) => {
     const report: ServerQuestionReport = {
       id: `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       question_id: String(question_id).trim(),
+      question_title: question_title ? String(question_title).trim() : `প্রশ্ন #${question_id}`,
       user_id: user_id ? String(user_id).trim() : undefined,
       user_name: user_name ? String(user_name).trim() : undefined,
       phone: phone ? String(phone).trim() : undefined,
@@ -1889,7 +1891,22 @@ app.post('/api/questions/report', (req, res) => {
 });
 
 app.get('/api/questions/reports', (req, res) => {
-  return res.json({ success: true, reports: serverQuestionReportsStore });
+  try {
+    const { userId, phone } = req.query;
+    if (userId || phone) {
+      const uId = String(userId || '').trim();
+      const ph = phone ? normalizePhoneNumber(String(phone)) : '';
+      const filtered = serverQuestionReportsStore.filter((r) => {
+        const matchId = Boolean(uId && r.user_id && r.user_id === uId);
+        const matchPhone = Boolean(ph && r.phone && normalizePhoneNumber(r.phone) === ph);
+        return matchId || matchPhone;
+      });
+      return res.json({ success: true, reports: filtered });
+    }
+    return res.json({ success: true, reports: serverQuestionReportsStore });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Error fetching question reports' });
+  }
 });
 
 // Question explanations (Public: approved only; Admin: all)

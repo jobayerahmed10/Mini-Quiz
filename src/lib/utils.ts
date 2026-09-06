@@ -1130,6 +1130,48 @@ export function removeSavedWrongQuestion(questionId: string | number): void {
   }
 }
 
+const REPORTED_QUESTIONS_KEY = 'tamreen_user_reported_questions';
+
+export interface UserReportedQuestion {
+  id: string;
+  question_id: string;
+  question_title?: string;
+  reason: string;
+  details?: string;
+  status: 'pending' | 'reviewed' | 'resolved' | string;
+  created_at: string;
+}
+
+export function getUserReportedQuestions(): UserReportedQuestion[] {
+  try {
+    const raw = localStorage.getItem(REPORTED_QUESTIONS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveUserReportedQuestions(reports: UserReportedQuestion[]): void {
+  try {
+    localStorage.setItem(REPORTED_QUESTIONS_KEY, JSON.stringify(reports));
+    window.dispatchEvent(new CustomEvent('tamreen_reports_updated', { detail: reports }));
+    window.dispatchEvent(new Event('tamreen_data_changed'));
+  } catch {}
+}
+
+export function addUserReportedQuestion(report: UserReportedQuestion): void {
+  try {
+    const current = getUserReportedQuestions();
+    const exists = current.some((r) => r.id === report.id || (r.question_id === report.question_id && r.created_at === report.created_at));
+    if (!exists) {
+      const updated = [report, ...current];
+      saveUserReportedQuestions(updated);
+    }
+  } catch {}
+}
+
 /**
  * Overall Accuracy and Best Exam Metrics
  */
