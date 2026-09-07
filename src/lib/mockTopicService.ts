@@ -6,6 +6,18 @@ import { AUTHENTIC_TOPIC_QUESTIONS } from '../data/charyapadaQuestions';
 const ATTEMPTED_QUESTIONS_STORAGE_KEY = 'miniquiz_attempted_question_ids';
 
 /**
+ * Normalizes title strings for strict deduplication
+ */
+export function normalizeTitle(title: string | undefined | null): string {
+  if (!title) return '';
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_–—,;:।.'"/\\()（）[\]{}]+/g, ' ')
+    .trim();
+}
+
+/**
  * Get the set of question IDs attempted by the current user from localStorage
  */
 export function getAttemptedQuestionIds(): Set<string> {
@@ -40,49 +52,132 @@ export function recordAttemptedQuestionIds(questionIds: string[]): void {
 }
 
 /**
- * Query Supabase for subject topics & subtopics
+ * Retrieve questions from all sources (Supabase questions table + LocalStorage Admin cache)
+ */
+export async function getAllAvailableAdminQuestions(): Promise<any[]> {
+  const allQuestionsMap = new Map<string, any>();
+
+  // 1. Fetch from Supabase questions table
+  try {
+    if (supabase) {
+      const { data: supaQ, error } = await supabase
+        .from('questions')
+        .select('*')
+        .limit(15000);
+
+      if (!error && supaQ && Array.isArray(supaQ)) {
+        supaQ.forEach((q) => {
+          if (q && q.id) {
+            allQuestionsMap.set(String(q.id), q);
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching Supabase questions:', err);
+  }
+
+  // 2. Read from localStorage admin question bank / question cache
+  if (typeof window !== 'undefined') {
+    try {
+      const rawCache = localStorage.getItem('miniquiz_questions_cache');
+      if (rawCache) {
+        const parsed = JSON.parse(rawCache);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((q: any) => {
+            if (q && q.id) {
+              const qId = String(q.id);
+              if (!allQuestionsMap.has(qId)) {
+                allQuestionsMap.set(qId, q);
+              }
+            }
+          });
+        }
+      }
+    } catch {}
+
+    try {
+      const rawAdminQ = localStorage.getItem('miniquiz_admin_questions');
+      if (rawAdminQ) {
+        const parsed = JSON.parse(rawAdminQ);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((q: any) => {
+            if (q && q.id) {
+              const qId = String(q.id);
+              if (!allQuestionsMap.has(qId)) {
+                allQuestionsMap.set(qId, q);
+              }
+            }
+          });
+        }
+      }
+    } catch {}
+  }
+
+  return Array.from(allQuestionsMap.values());
+}
+
+/**
+ * Query Supabase for subject topics & subtopics with deduplication
  */
 export async function getSubjectTopicsAndSubtopics(subjectId: string) {
   try {
-    const { data, error } = await supabase
+    if (!supabase) return [];
+    const { data: flatTopics, error: flatErr } = await supabase
       .from('topics')
-      .select(`
-        id,
-        title,
-        subject_id,
-        parent_id,
-        sub_topics:topics!parent_id (
-          id,
-          title,
-          subject_id,
-          parent_id
-        )
-      `)
+      .select('id, title, subject_id, parent_id')
       .eq('subject_id', subjectId)
-      .is('parent_id', null);
+      .order('id', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching topics:', error);
-      const { data: flatTopics, error: flatErr } = await supabase
-        .from('topics')
-        .select('id, title, subject_id, parent_id')
-        .eq('subject_id', subjectId)
-        .order('id', { ascending: true });
+    if (!flatErr && flatTopics && flatTopics.length > 0) {
+      // Deduplicate main topics
+      const mainMap = new Map<string, any>();
+      flatTopics.forEach((t: any) => {
+        if (!t.parent_id) {
+          const normKey = normalizeTitle(t.title);
+          if (!mainMap.has(normKey)) {
+            mainMap.set(normKey, {
+              id: t.id,
+              title: t.title,
+              subject_id: t.subject_id,
+              parent_id: null,
+              sub_topics: [],
+              aliasIds: [String(t.id)],
+            });
+          } else {
+            mainMap.get(normKey).aliasIds.push(String(t.id));
+          }
+        }
+      });
 
-      if (!flatErr && flatTopics && flatTopics.length > 0) {
-        const main = flatTopics.filter((t: any) => !t.parent_id);
-        return main.map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          subject_id: m.subject_id,
-          parent_id: m.parent_id,
-          sub_topics: flatTopics.filter((st: any) => String(st.parent_id) === String(m.id)),
-        }));
-      }
-      return [];
+      // Attach and deduplicate subtopics
+      flatTopics.forEach((st: any) => {
+        if (st.parent_id) {
+          // Find matching main topic either by parent_id or alias
+          for (const main of mainMap.values()) {
+            if (main.aliasIds.includes(String(st.parent_id))) {
+              const normSubKey = normalizeTitle(st.title);
+              const exists = main.sub_topics.find((s: any) => normalizeTitle(s.title) === normSubKey);
+              if (!exists) {
+                main.sub_topics.push({
+                  id: st.id,
+                  title: st.title,
+                  subject_id: st.subject_id,
+                  parent_id: main.id,
+                  aliasIds: [String(st.id)],
+                });
+              } else {
+                exists.aliasIds.push(String(st.id));
+              }
+              break;
+            }
+          }
+        }
+      });
+
+      return Array.from(mainMap.values());
     }
-
-    return data || [];
+    return [];
   } catch (err) {
     console.error('Exception in getSubjectTopicsAndSubtopics:', err);
     return [];
@@ -94,91 +189,175 @@ export async function getTopicsWithSubtopics(subjectId: string) {
 }
 
 /**
- * Fetch hierarchical curriculum from Supabase with dynamic question counts per subtopic and topic.
- * - Subtopic totalQuestions is fetched from Supabase questions table.
+ * Extended subtopic with alias IDs for query matching
+ */
+export interface ExtendedCurriculumSubtopic extends CurriculumSubtopic {
+  aliasIds?: string[];
+}
+
+export interface ExtendedCurriculumTopic extends CurriculumTopic {
+  aliasIds?: string[];
+  subtopics: ExtendedCurriculumSubtopic[];
+}
+
+/**
+ * Fetch hierarchical curriculum from Supabase & Admin Question Bank:
+ * - DEDUPLICATES topics and subtopics so each unique title appears strictly ONCE.
+ * - Dynamic question counts per subtopic from Supabase & Admin Question Bank.
  * - Main topic totalQuestions is the exact sum of all its subtopics.
- * - Subtopic & Topic solvedQuestions are computed from user's attempted question history.
- * - Default count is 0 if no questions exist in DB (no hardcoded numbers).
+ * - If a topic/subtopic has no questions in DB, display 0 (no hardcoding).
  */
 export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubject[]> {
   const attemptedIds = getAttemptedQuestionIds();
+  const allAdminQuestions = await getAllAvailableAdminQuestions();
+
+  // Index questions by sub_topic_id, topic_id, and normalized topic/subtopic title
+  const qBySubTopicId = new Map<string, string[]>();
+  const qByTopicId = new Map<string, string[]>();
+  const qByNormalizedTitle = new Map<string, string[]>();
+
+  allAdminQuestions.forEach((q) => {
+    const qId = String(q.id);
+
+    if (q.sub_topic_id) {
+      const key = String(q.sub_topic_id).trim();
+      const list = qBySubTopicId.get(key) || [];
+      list.push(qId);
+      qBySubTopicId.set(key, list);
+    }
+    if (q.topic_id) {
+      const key = String(q.topic_id).trim();
+      const list = qByTopicId.get(key) || [];
+      list.push(qId);
+      qByTopicId.set(key, list);
+    }
+    if (q.topic) {
+      const norm = normalizeTitle(q.topic);
+      if (norm) {
+        const list = qByNormalizedTitle.get(norm) || [];
+        list.push(qId);
+        qByNormalizedTitle.set(norm, list);
+      }
+    }
+    if (q.sub_topic) {
+      const norm = normalizeTitle(q.sub_topic);
+      if (norm) {
+        const list = qByNormalizedTitle.get(norm) || [];
+        list.push(qId);
+        qByNormalizedTitle.set(norm, list);
+      }
+    }
+  });
 
   try {
     // 1. Fetch subjects from Supabase
-    const { data: supaSubjects, error: sErr } = await supabase
-      .from('subjects')
-      .select('id, name, created_at')
-      .order('id', { ascending: true });
+    let supaSubjects: any[] = [];
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('id, name, created_at')
+        .order('id', { ascending: true });
+      if (!error && data) {
+        supaSubjects = data;
+      }
+    }
 
     // 2. Fetch all topics & subtopics from Supabase
-    const { data: supaTopics, error: tErr } = await supabase
-      .from('topics')
-      .select('id, title, subject_id, parent_id, created_at')
-      .order('id', { ascending: true });
-
-    // 3. Fetch questions metadata to calculate dynamic per-subtopic & per-topic counts
-    let questionsData: any[] = [];
-    try {
-      const { data: qRows, error: qErr } = await supabase
-        .from('questions')
-        .select('id, subject_id, topic_id, sub_topic_id, topic, subject')
-        .limit(10000);
-      if (!qErr && qRows) {
-        questionsData = qRows;
+    let supaTopics: any[] = [];
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('topics')
+        .select('id, title, subject_id, parent_id, created_at')
+        .order('id', { ascending: true });
+      if (!error && data) {
+        supaTopics = data;
       }
-    } catch {}
-
-    // Map questions by sub_topic_id, topic_id, and topic title for fast O(1) lookup
-    const qBySubTopicId = new Map<string, string[]>();
-    const qByTopicId = new Map<string, string[]>();
-    const qByTopicTitle = new Map<string, string[]>();
-
-    questionsData.forEach((q) => {
-      const qId = String(q.id);
-      if (q.sub_topic_id) {
-        const key = String(q.sub_topic_id).trim();
-        const list = qBySubTopicId.get(key) || [];
-        list.push(qId);
-        qBySubTopicId.set(key, list);
-      }
-      if (q.topic_id) {
-        const key = String(q.topic_id).trim();
-        const list = qByTopicId.get(key) || [];
-        list.push(qId);
-        qByTopicId.set(key, list);
-      }
-      if (q.topic) {
-        const key = String(q.topic).trim().toLowerCase();
-        const list = qByTopicTitle.get(key) || [];
-        list.push(qId);
-        qByTopicTitle.set(key, list);
-      }
-    });
+    }
 
     // If Supabase returned subjects
-    if (!sErr && supaSubjects && supaSubjects.length > 0) {
-      const topicRows = (!tErr && supaTopics) ? supaTopics : [];
+    if (supaSubjects && supaSubjects.length > 0) {
+      // Deduplicate subjects by normalized name
+      const uniqueSubjectsMap = new Map<string, any>();
+      supaSubjects.forEach((s) => {
+        const normName = normalizeTitle(s.name);
+        if (!uniqueSubjectsMap.has(normName)) {
+          uniqueSubjectsMap.set(normName, { ...s, aliasIds: [String(s.id)] });
+        } else {
+          uniqueSubjectsMap.get(normName).aliasIds.push(String(s.id));
+        }
+      });
 
-      const builtSubjects: CurriculumSubject[] = supaSubjects.map((s) => {
-        // Find main topics for this subject (parent_id is null)
-        const mainTopics = topicRows.filter(
-          (t) => String(t.subject_id) === String(s.id) && !t.parent_id
+      const builtSubjects: CurriculumSubject[] = Array.from(uniqueSubjectsMap.values()).map((s) => {
+        // Collect topic rows belonging to this subject (checking all alias subject IDs)
+        const subjectTopicRows = supaTopics.filter((t) =>
+          s.aliasIds.includes(String(t.subject_id))
         );
 
-        const structuredTopics: CurriculumTopic[] = mainTopics.map((mt) => {
-          // Find subtopics for this main topic (parent_id === mt.id)
-          const subRows = topicRows.filter((t) => String(t.parent_id) === String(mt.id));
+        // Group & DEDUPLICATE main topics (parent_id is null)
+        const mainTopicMap = new Map<string, { id: string; title: string; aliasIds: string[]; childSubRows: any[] }>();
 
-          const subtopics: CurriculumSubtopic[] = subRows.map((st) => {
-            const stId = String(st.id);
-            const stTitle = (st.title || '').trim().toLowerCase();
+        subjectTopicRows.forEach((t) => {
+          if (!t.parent_id) {
+            const normTopic = normalizeTitle(t.title);
+            if (!normTopic) return;
+            if (!mainTopicMap.has(normTopic)) {
+              mainTopicMap.set(normTopic, {
+                id: String(t.id),
+                title: t.title,
+                aliasIds: [String(t.id)],
+                childSubRows: [],
+              });
+            } else {
+              mainTopicMap.get(normTopic)!.aliasIds.push(String(t.id));
+            }
+          }
+        });
 
-            // Collect all question IDs for this subtopic
-            const subQIdsSet = new Set<string>([
-              ...(qBySubTopicId.get(stId) || []),
-              ...(qByTopicId.get(stId) || []),
-              ...(qByTopicTitle.get(stTitle) || []),
-            ]);
+        // Collect child subtopics for each main topic
+        subjectTopicRows.forEach((st) => {
+          if (st.parent_id) {
+            // Find which main topic owns this subtopic
+            for (const main of mainTopicMap.values()) {
+              if (main.aliasIds.includes(String(st.parent_id))) {
+                main.childSubRows.push(st);
+                break;
+              }
+            }
+          }
+        });
+
+        // Build structured topics with DEDUPLICATED subtopics
+        const structuredTopics: ExtendedCurriculumTopic[] = Array.from(mainTopicMap.values()).map((main) => {
+          // Deduplicate subtopics by normalized title
+          const subMap = new Map<string, { id: string; title: string; aliasIds: string[] }>();
+
+          main.childSubRows.forEach((subRow) => {
+            const normSub = normalizeTitle(subRow.title);
+            if (!normSub) return;
+            if (!subMap.has(normSub)) {
+              subMap.set(normSub, {
+                id: String(subRow.id),
+                title: subRow.title,
+                aliasIds: [String(subRow.id)],
+              });
+            } else {
+              subMap.get(normSub)!.aliasIds.push(String(subRow.id));
+            }
+          });
+
+          // Compute questions count for each unique subtopic
+          const subtopics: ExtendedCurriculumSubtopic[] = Array.from(subMap.values()).map((subItem) => {
+            const subQIdsSet = new Set<string>();
+
+            // Match by subtopic IDs (including all duplicates/aliases)
+            subItem.aliasIds.forEach((subId) => {
+              (qBySubTopicId.get(subId) || []).forEach((qid) => subQIdsSet.add(qid));
+              (qByTopicId.get(subId) || []).forEach((qid) => subQIdsSet.add(qid));
+            });
+
+            // Match by normalized title
+            const normSub = normalizeTitle(subItem.title);
+            (qByNormalizedTitle.get(normSub) || []).forEach((qid) => subQIdsSet.add(qid));
 
             const totalQ = subQIdsSet.size;
             let solvedQ = 0;
@@ -187,14 +366,15 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
             });
 
             return {
-              id: stId,
-              title: st.title || 'উপ-টপিক',
+              id: subItem.id,
+              aliasIds: subItem.aliasIds,
+              title: subItem.title,
               totalQuestions: totalQ,
               solvedQuestions: solvedQ,
             };
           });
 
-          // Main topic totals are strictly the sum of its child subtopics
+          // Main topic totals = sum of subtopics (or direct questions if no subtopics)
           let topicTotalQuestions = 0;
           let topicSolvedQuestions = 0;
 
@@ -202,29 +382,30 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
             topicTotalQuestions = subtopics.reduce((acc, sub) => acc + sub.totalQuestions, 0);
             topicSolvedQuestions = subtopics.reduce((acc, sub) => acc + sub.solvedQuestions, 0);
           } else {
-            // If main topic has no subtopics, check direct question associations
-            const mtId = String(mt.id);
-            const mtTitle = (mt.title || '').trim().toLowerCase();
-            const directQIds = new Set<string>([
-              ...(qByTopicId.get(mtId) || []),
-              ...(qByTopicTitle.get(mtTitle) || []),
-            ]);
-            topicTotalQuestions = directQIds.size;
-            directQIds.forEach((qId) => {
+            const topicQIdsSet = new Set<string>();
+            main.aliasIds.forEach((tId) => {
+              (qByTopicId.get(tId) || []).forEach((qid) => topicQIdsSet.add(qid));
+            });
+            const normTopic = normalizeTitle(main.title);
+            (qByNormalizedTitle.get(normTopic) || []).forEach((qid) => topicQIdsSet.add(qid));
+
+            topicTotalQuestions = topicQIdsSet.size;
+            topicQIdsSet.forEach((qId) => {
               if (attemptedIds.has(qId)) topicSolvedQuestions++;
             });
           }
 
           return {
-            id: String(mt.id),
-            title: mt.title || 'টপিক',
+            id: main.id,
+            aliasIds: main.aliasIds,
+            title: main.title,
             totalQuestions: topicTotalQuestions,
             solvedQuestions: topicSolvedQuestions,
             subtopics,
           };
         });
 
-        // Icon lookup based on subject name
+        // Subject Icon lookup
         let iconType = 'bangla';
         const nameLower = (s.name || '').toLowerCase();
         if (nameLower.includes('ইংরেজি') || nameLower.includes('english')) iconType = 'english';
@@ -248,25 +429,31 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
         };
       });
 
-      // If supaSubjects were present but had no topics, fallback default topics
-      const mergedSubjects = builtSubjects.map((bs) => {
+      // If a subject had 0 topics from Supabase, merge clean default curriculum without duplicates
+      const finalSubjects = builtSubjects.map((bs) => {
         if (bs.topics.length === 0) {
           const matchDefault = DEFAULT_MOCK_CURRICULUM.find(
-            (d) => d.name.includes(bs.name) || bs.name.includes(d.name)
+            (d) => normalizeTitle(d.name) === normalizeTitle(bs.name)
           );
           if (matchDefault) {
-            const mappedDefaultTopics = matchDefault.topics.map((dt) => ({
-              ...dt,
-              totalQuestions: dt.subtopics.length > 0 
-                ? dt.subtopics.reduce((acc, st) => acc + (qByTopicTitle.get(st.title.toLowerCase())?.length || 0), 0)
-                : (qByTopicTitle.get(dt.title.toLowerCase())?.length || 0),
-              solvedQuestions: 0,
-              subtopics: dt.subtopics.map((st) => ({
-                ...st,
-                totalQuestions: qByTopicTitle.get(st.title.toLowerCase())?.length || 0,
+            const mappedDefaultTopics = matchDefault.topics.map((dt) => {
+              const subtopics = dt.subtopics.map((st) => {
+                const normSt = normalizeTitle(st.title);
+                const qIds = qByNormalizedTitle.get(normSt) || [];
+                return {
+                  ...st,
+                  totalQuestions: qIds.length,
+                  solvedQuestions: 0,
+                };
+              });
+              const topicQ = subtopics.reduce((acc, st) => acc + st.totalQuestions, 0);
+              return {
+                ...dt,
+                totalQuestions: topicQ,
                 solvedQuestions: 0,
-              })),
-            }));
+                subtopics,
+              };
+            });
 
             return {
               ...bs,
@@ -278,33 +465,43 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
         return bs;
       });
 
-      return mergedSubjects;
+      return finalSubjects;
     }
   } catch (err) {
     console.error('Error fetching curriculum from Supabase:', err);
   }
 
-  // Fallback if Supabase was completely unreachable
+  // Fallback if Supabase was completely unreachable: return deduplicated default curriculum
   return DEFAULT_MOCK_CURRICULUM.map((s) => ({
     ...s,
-    totalQuestions: s.topics.reduce((acc, t) => acc + t.subtopics.length * 20, 0),
     topics: s.topics.map((t) => ({
       ...t,
-      totalQuestions: t.subtopics.length * 20,
-      solvedQuestions: 0,
-      subtopics: t.subtopics.map((sub) => ({
-        ...sub,
-        totalQuestions: 20,
-        solvedQuestions: 0,
-      })),
+      subtopics: t.subtopics.map((sub) => {
+        const normSub = normalizeTitle(sub.title);
+        const qList = qByNormalizedTitle.get(normSub) || [];
+        return {
+          ...sub,
+          totalQuestions: qList.length,
+          solvedQuestions: 0,
+        };
+      }),
+    })),
+  })).map((s) => ({
+    ...s,
+    totalQuestions: s.topics.reduce((acc, t) => acc + t.subtopics.reduce((sa, st) => sa + st.totalQuestions, 0), 0),
+    topics: s.topics.map((t) => ({
+      ...t,
+      totalQuestions: t.subtopics.reduce((sa, st) => sa + st.totalQuestions, 0),
     })),
   }));
 }
 
 /**
- * Fetch questions matching ANY of the selected sub_topic_ids from Supabase.
- * - Combines and shuffles all retrieved questions.
- * - Slices up to targetCount for the examination session.
+ * Fetch questions matching ANY of the selected sub_topic_ids or titles from:
+ * 1. Supabase database questions table
+ * 2. Admin Question Bank / cache
+ * 3. Authentic topic questions pool
+ * Combines and shuffles all retrieved questions.
  */
 export async function fetchQuestionsForSelectedSubtopics(
   selectedSubtopicIds: string[],
@@ -316,55 +513,77 @@ export async function fetchQuestionsForSelectedSubtopics(
   }
 
   try {
-    let rawQuestions: any[] = [];
+    const rawQuestionsMap = new Map<string, any>();
 
-    // 1. Primary: Query Supabase by sub_topic_id in selectedSubtopicIds
-    const { data: subTopicQuestions, error: stErr } = await supabase
-      .from('questions')
-      .select('*')
-      .in('sub_topic_id', selectedSubtopicIds);
+    // 1. Fetch from Supabase by sub_topic_id or topic_id
+    if (supabase) {
+      try {
+        const { data: subTopicQuestions } = await supabase
+          .from('questions')
+          .select('*')
+          .in('sub_topic_id', selectedSubtopicIds);
 
-    if (!stErr && subTopicQuestions && subTopicQuestions.length > 0) {
-      rawQuestions.push(...subTopicQuestions);
-    }
+        if (subTopicQuestions && Array.isArray(subTopicQuestions)) {
+          subTopicQuestions.forEach((q) => {
+            if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+          });
+        }
 
-    // 2. Also check topic_id for matching IDs
-    const { data: topicIdQuestions, error: tiErr } = await supabase
-      .from('questions')
-      .select('*')
-      .in('topic_id', selectedSubtopicIds);
+        const { data: topicIdQuestions } = await supabase
+          .from('questions')
+          .select('*')
+          .in('topic_id', selectedSubtopicIds);
 
-    if (!tiErr && topicIdQuestions && topicIdQuestions.length > 0) {
-      rawQuestions.push(...topicIdQuestions);
-    }
+        if (topicIdQuestions && Array.isArray(topicIdQuestions)) {
+          topicIdQuestions.forEach((q) => {
+            if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+          });
+        }
 
-    // 3. Also check topic name matching if titles are provided
-    if (selectedSubtopicTitles.length > 0) {
-      const { data: titleQuestions } = await supabase
-        .from('questions')
-        .select('*')
-        .in('topic', selectedSubtopicTitles);
+        if (selectedSubtopicTitles.length > 0) {
+          const { data: titleQuestions } = await supabase
+            .from('questions')
+            .select('*')
+            .in('topic', selectedSubtopicTitles);
 
-      if (titleQuestions && titleQuestions.length > 0) {
-        rawQuestions.push(...titleQuestions);
+          if (titleQuestions && Array.isArray(titleQuestions)) {
+            titleQuestions.forEach((q) => {
+              if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying Supabase for exam questions:', err);
       }
     }
 
-    // 4. Deduplicate raw questions by ID
-    const seenIds = new Set<string>();
-    const uniqueRaw: any[] = [];
-    rawQuestions.forEach((item) => {
-      if (item && item.id) {
-        const idStr = String(item.id);
-        if (!seenIds.has(idStr)) {
-          seenIds.add(idStr);
-          uniqueRaw.push(item);
-        }
+    // 2. Fetch from Admin Question Bank / localStorage cache
+    const allAdminQuestions = await getAllAvailableAdminQuestions();
+    const selectedIdSet = new Set(selectedSubtopicIds.map((id) => String(id).trim()));
+    const selectedNormTitles = new Set(selectedSubtopicTitles.map((t) => normalizeTitle(t)));
+
+    allAdminQuestions.forEach((q) => {
+      if (!q || !q.id) return;
+      const qId = String(q.id);
+      if (rawQuestionsMap.has(qId)) return;
+
+      const qSubId = q.sub_topic_id ? String(q.sub_topic_id).trim() : '';
+      const qTopicId = q.topic_id ? String(q.topic_id).trim() : '';
+      const qTopicNorm = normalizeTitle(q.topic);
+      const qSubTopicNorm = normalizeTitle(q.sub_topic);
+
+      if (
+        (qSubId && selectedIdSet.has(qSubId)) ||
+        (qTopicId && selectedIdSet.has(qTopicId)) ||
+        (qTopicNorm && selectedNormTitles.has(qTopicNorm)) ||
+        (qSubTopicNorm && selectedNormTitles.has(qSubTopicNorm))
+      ) {
+        rawQuestionsMap.set(qId, q);
       }
     });
 
-    // 5. Convert to standard Question objects
-    let formatted: Question[] = uniqueRaw
+    // 3. Convert to standardized Question format
+    let formatted: Question[] = Array.from(rawQuestionsMap.values())
       .filter((item) => item.status !== 'draft')
       .map((item) => ({
         id: String(item.id),
@@ -382,19 +601,18 @@ export async function fetchQuestionsForSelectedSubtopics(
       }))
       .filter((q) => q.question && q.option_a && q.option_b);
 
-    // If database returned fewer questions than required or 0, fallback to authentic topic questions pool
+    // 4. Fallback to Authentic Topic Questions pool if database count is small
     if (formatted.length < targetCount) {
-      const subTitleSet = new Set(selectedSubtopicTitles.map((t) => t.toLowerCase().trim()));
       AUTHENTIC_TOPIC_QUESTIONS.forEach((q) => {
-        const qTopic = (q.topic || '').toLowerCase().trim();
-        if (subTitleSet.has(qTopic) && !seenIds.has(String(q.id))) {
-          seenIds.add(String(q.id));
+        const qNorm = normalizeTitle(q.topic);
+        if (selectedNormTitles.has(qNorm) && !rawQuestionsMap.has(String(q.id))) {
+          rawQuestionsMap.set(String(q.id), q);
           formatted.push(q);
         }
       });
     }
 
-    // 6. Thoroughly shuffle questions (Fisher-Yates Shuffle)
+    // 5. Fisher-Yates Shuffle
     const shuffled = [...formatted];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));

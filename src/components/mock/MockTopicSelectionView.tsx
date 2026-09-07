@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { CurriculumSubject, CurriculumTopic } from '../../data/mockCurriculum';
+import { normalizeTitle } from '../../lib/mockTopicService';
 
 interface MockTopicSelectionViewProps {
   selectedSubject: CurriculumSubject;
@@ -29,16 +30,37 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
   onProceed,
   onBack,
 }) => {
-  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(() => {
-    // Default expand topics for clear hierarchy visibility
-    const initial: Record<string, boolean> = {};
-    selectedSubject.topics.forEach((t) => {
-      initial[t.id] = true;
-    });
-    return initial;
-  });
+  // Requirement: Subtopics are HIDDEN (collapsed) by default. Clicking on topic expands them.
+  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({});
 
   const [showSubjectDrawer, setShowSubjectDrawer] = useState(false);
+
+  // Deduplicate topics within the selected subject as an extra safety guarantee
+  const uniqueTopics = useMemo(() => {
+    if (!selectedSubject || !selectedSubject.topics) return [];
+    const seen = new Map<string, CurriculumTopic>();
+
+    selectedSubject.topics.forEach((top) => {
+      const key = normalizeTitle(top.title);
+      if (!seen.has(key)) {
+        // Also deduplicate subtopics inside this topic
+        const seenSub = new Map<string, any>();
+        (top.subtopics || []).forEach((st) => {
+          const subKey = normalizeTitle(st.title);
+          if (!seenSub.has(subKey)) {
+            seenSub.set(subKey, st);
+          }
+        });
+
+        seen.set(key, {
+          ...top,
+          subtopics: Array.from(seenSub.values()),
+        });
+      }
+    });
+
+    return Array.from(seen.values());
+  }, [selectedSubject]);
 
   const toggleExpand = (topicId: string) => {
     setExpandedTopics((prev) => ({
@@ -97,9 +119,9 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
         </button>
       </div>
 
-      {/* 2. Hierarchical Topics and Subtopics List */}
+      {/* 2. Hierarchical Topics and Subtopics List (Single unique instance of each topic) */}
       <main className="max-w-2xl mx-auto w-full px-4 pt-2 space-y-3 sm:space-y-4">
-        {selectedSubject.topics.map((topic) => {
+        {uniqueTopics.map((topic) => {
           // Check how many child subtopics are currently selected
           const topicSubCount = topic.subtopics.length > 0
             ? topic.subtopics.filter((s) => selectedSubtopicIds.has(s.id)).length
@@ -110,20 +132,28 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
             : selectedSubtopicIds.has(topic.id);
 
           const isPartiallySelected = topic.subtopics.length > 0 && topicSubCount > 0 && !isAllSelected;
-          const isExpanded = expandedTopics[topic.id] ?? true;
+          
+          // By default isExpanded is false (subtopics hidden until topic is clicked)
+          const isExpanded = Boolean(expandedTopics[topic.id]);
 
           return (
             <div
               key={topic.id}
               className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xs overflow-hidden transition-all"
             >
-              {/* Main Topic Header */}
-              <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+              {/* Main Topic Header: Click anywhere on header (except checkbox) to expand/collapse subtopics */}
+              <div 
+                onClick={() => toggleExpand(topic.id)}
+                className="p-3.5 sm:p-4 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {/* Topic Checkbox */}
                   <button
                     type="button"
-                    onClick={() => onSelectAllInTopic(topic, !isAllSelected)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectAllInTopic(topic, !isAllSelected);
+                    }}
                     className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all shrink-0 cursor-pointer ${
                       isAllSelected
                         ? 'bg-[#046A38] border-[#046A38] text-white shadow-xs'
@@ -138,10 +168,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                   </button>
 
                   {/* Topic Title */}
-                  <div
-                    onClick={() => toggleExpand(topic.id)}
-                    className="flex items-center gap-2 cursor-pointer flex-1 min-w-0 select-none"
-                  >
+                  <div className="flex items-center gap-2 flex-1 min-w-0 select-none">
                     <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
                       {topic.title}
                     </span>
@@ -161,32 +188,30 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                     {topic.solvedQuestions}/{topic.totalQuestions} টি প্রশ্ন
                   </span>
                   {topic.subtopics.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(topic.id)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                      aria-label="টপিক টগল করুন"
-                    >
+                    <div className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
+                        <ChevronUp className="w-4 h-4 text-[#046A38] dark:text-emerald-400" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Indented Child Subtopics List */}
+              {/* Indented Child Subtopics List (Hidden by default, shown when topic is clicked) */}
               {isExpanded && topic.subtopics.length > 0 && (
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/40 bg-slate-50/50 dark:bg-slate-900/40">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/40 bg-slate-50/50 dark:bg-slate-900/40 animate-fade-in">
                   {topic.subtopics.map((sub) => {
                     const isSubChecked = selectedSubtopicIds.has(sub.id);
 
                     return (
                       <div
                         key={sub.id}
-                        onClick={() => onToggleSubtopic(topic.id, sub.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleSubtopic(topic.id, sub.id);
+                        }}
                         className="py-2.5 px-4 sm:px-6 pl-10 sm:pl-12 flex items-center justify-between gap-3 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-3 min-w-0">
