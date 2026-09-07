@@ -10,6 +10,7 @@ import { UstadAiPage } from './components/UstadAiPage';
 import { BlogPage } from './components/BlogPage';
 import { JobCircularsPage } from './components/JobCircularsPage';
 import { SubjectsPage } from './components/SubjectsPage';
+import { MockExamFlow } from './components/mock/MockExamFlow';
 import { ProfileModal } from './components/ProfileModal';
 import { ProfilePage } from './components/ProfilePage';
 import { BottomNav } from './components/BottomNav';
@@ -108,6 +109,7 @@ export default function App() {
 
   // Direct Exam Deep-linking & Auth Modal State
   const [showDirectRegModal, setShowDirectRegModal] = useState<boolean>(false);
+  const [mockFlowSubject, setMockFlowSubject] = useState<string | null>(null);
   const [pendingDirectExamOpts, setPendingDirectExamOpts] = useState<{
     examId?: string;
     subject: string;
@@ -636,6 +638,11 @@ export default function App() {
     // Unique Attempt Isolation: Completely reset quiz result state on clicking/starting any exam
     setQuizResult(null);
 
+    if (typeof subjectOrOpts === 'object' && (subjectOrOpts as any).isMockFlow) {
+      setMockFlowSubject(subjectOrOpts.subject);
+      return;
+    }
+
     if (typeof subjectOrOpts === 'string') {
       setSelectedSubject(subjectOrOpts);
       setSelectedTopic(undefined);
@@ -890,6 +897,7 @@ export default function App() {
               <SubjectsPage
                 initialSubTab={practiceSubTab}
                 onSelectSubject={(subj) => handleStartPractice(subj)}
+                onStartMockFlow={(subj) => setMockFlowSubject(subj)}
                 onOpenCourses={() => handleTabChange('courses')}
               />
             )}
@@ -994,8 +1002,26 @@ export default function App() {
         }}
       />
 
+      {/* 3-Step Mock Exam Flow Overlay (Step 1 -> Step 2 -> Step 3) */}
+      {mockFlowSubject && (
+        <div className="fixed inset-0 z-50 bg-[#F8FAFC] dark:bg-[#090E1A] overflow-y-auto">
+          <MockExamFlow
+            initialSubjectName={mockFlowSubject}
+            allQuestions={questions}
+            onFinishQuiz={(result) => {
+              setMockFlowSubject(null);
+              handleFinishQuiz(result.userAnswers, result.timeTakenSeconds || 0);
+              setQuizResult(result);
+              setResultViewMode('explanation');
+              navigateWithHistory('result');
+            }}
+            onClose={() => setMockFlowSubject(null)}
+          />
+        </div>
+      )}
+
       {/* Bottom Neumorphic Sticky Nav Bar */}
-      {currentPage !== 'practice' && !showAuthModal && !showDirectRegModal && !showRegPromptModal && !sharedExamData && (
+      {currentPage !== 'practice' && !mockFlowSubject && !showAuthModal && !showDirectRegModal && !showRegPromptModal && !sharedExamData && (
         <BottomNav
           activeTab={activeTab}
           onTabChange={handleTabChange}

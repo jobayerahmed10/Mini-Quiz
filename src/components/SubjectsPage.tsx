@@ -5,16 +5,16 @@ import {
   Sprout, 
   Scale, 
   Monitor, 
-  BookMarked,
-  Lock
+  BookMarked
 } from 'lucide-react';
 import { isUserPremium } from '../lib/utils';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
 interface SubjectsPageProps {
-  onSelectSubject: (options: { subject: string; topic?: string; questionCount?: number; timeMinutes?: number } | string) => void;
+  onSelectSubject: (options: { subject: string; topic?: string; questionCount?: number; timeMinutes?: number; isMockFlow?: boolean } | string) => void;
   onOpenCourses?: () => void;
   initialSubTab?: 'mock' | 'quick';
+  onStartMockFlow?: (subjectName: string) => void;
 }
 
 interface SubjectItem {
@@ -150,7 +150,9 @@ const SubjectIcon: React.FC<{ type: string }> = ({ type }) => {
 
 export const SubjectsPage: React.FC<SubjectsPageProps> = ({ 
   onSelectSubject, 
-  initialSubTab = 'mock' 
+  onOpenCourses,
+  initialSubTab = 'mock',
+  onStartMockFlow,
 }) => {
   const [activeTab, setActiveTab] = useState<'mock' | 'quick'>(initialSubTab);
   const [isPremium, setIsPremium] = useState<boolean>(() => isUserPremium());
@@ -179,14 +181,15 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
   }, []);
 
   const handleCardClick = (subjectName: string) => {
-    if (!isPremium) {
-      setShowPremiumModal(true);
+    if (activeTab === 'mock' && onStartMockFlow) {
+      onStartMockFlow(subjectName);
       return;
     }
     onSelectSubject({
       subject: subjectName,
       questionCount: 25,
       timeMinutes: activeTab === 'quick' ? 15 : 30,
+      isMockFlow: activeTab === 'mock',
     });
   };
 
@@ -247,11 +250,6 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
                     {item.name}
                   </span>
                 </div>
-                {!isPremium && (
-                  <div className="shrink-0 p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 border border-amber-300/60 dark:border-amber-700/60">
-                    <Lock className="w-3.5 h-3.5" />
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -274,12 +272,6 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
                     {item.name}
                   </span>
                 </div>
-                {!isPremium && (
-                  <div className="shrink-0 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center gap-1.5 border border-amber-300/60 dark:border-amber-700/60 text-xs font-bold">
-                    <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>লকড</span>
-                  </div>
-                )}
               </div>
             ))}
           </div>
