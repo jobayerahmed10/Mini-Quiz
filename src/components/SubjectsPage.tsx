@@ -5,8 +5,11 @@ import {
   Sprout, 
   Scale, 
   Monitor, 
-  BookMarked
+  BookMarked,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { isUserPremium } from '../lib/utils';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
@@ -18,44 +21,38 @@ interface SubjectsPageProps {
 }
 
 interface SubjectItem {
-  id: string;
+  id: string | number;
   name: string;
-  iconType: string;
+  iconType?: string;
+  code?: string;
 }
 
-const MOCK_EXAM_SUBJECTS: SubjectItem[] = [
+const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'ca', name: 'কারেন্ট অ্যাফেয়ার্স', iconType: 'news' },
   { id: 'bn', name: 'বাংলা', iconType: 'bn1' },
   { id: 'bn_grammar', name: 'বাংলা ভাষা ও ব্যাকরণ', iconType: 'bn2' },
   { id: 'eng_lit', name: 'English Literature', iconType: 'eng_lit' },
   { id: 'eng_lang', name: 'English Language', iconType: 'eng_lang' },
-  { id: 'math', name: 'গাণিতিক', iconType: 'math' },
-  { id: 'general_sci', name: 'সাধারণ', iconType: 'science' },
+  { id: 'math', name: 'গাণিতিক যুক্তি', iconType: 'math' },
+  { id: 'general_sci', name: 'সাধারণ বিজ্ঞান', iconType: 'science' },
   { id: 'bd_affairs', name: 'বাংলাদেশ বিষয়াবলি', iconType: 'bd' },
   { id: 'intl_affairs', name: 'আন্তর্জাতিক বিষয়াবলি', iconType: 'intl' },
   { id: 'geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', iconType: 'geo' },
   { id: 'ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', iconType: 'ethics' },
   { id: 'ict', name: 'কম্পিউটার ও তথ্যপ্রযুক্তি', iconType: 'ict' },
-  { id: 'mental', name: 'মানসিক', iconType: 'mental' },
+  { id: 'mental', name: 'মানসিক দক্ষতা', iconType: 'mental' },
 ];
 
-const QUICK_PRACTICE_SUBJECTS: SubjectItem[] = [
-  { id: 'ca', name: 'কারেন্ট অ্যাফেয়ার্স', iconType: 'news' },
-  { id: 'bn_lit', name: 'বাংলা সাহিত্য', iconType: 'bn1' },
-  { id: 'bn_grammar', name: 'বাংলা ভাষা ও ব্যাকরণ', iconType: 'bn2' },
-  { id: 'eng_lit', name: 'English Literature', iconType: 'eng_lit' },
-  { id: 'eng_lang', name: 'English Language', iconType: 'eng_lang' },
-  { id: 'math_logic', name: 'গাণিতিক যুক্তি', iconType: 'math' },
-  { id: 'gen_science', name: 'সাধারণ বিজ্ঞান', iconType: 'science' },
-  { id: 'bd_affairs', name: 'বাংলাদেশ বিষয়াবলি', iconType: 'bd' },
-  { id: 'intl_affairs', name: 'আন্তর্জাতিক বিষয়াবলি', iconType: 'intl' },
-  { id: 'geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', iconType: 'geo' },
-  { id: 'ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', iconType: 'ethics' },
-  { id: 'ict', name: 'কম্পিউটার ও তথ্যপ্রযুক্তি', iconType: 'ict' },
-  { id: 'mental_skill', name: 'মানসিক দক্ষতা', iconType: 'mental' },
-];
+const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) => {
+  if (!type) {
+    const firstChar = name?.trim()?.[0] || 'ব';
+    return (
+      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#046A38] text-white flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-2xs font-hind select-none">
+        {firstChar}
+      </div>
+    );
+  }
 
-const SubjectIcon: React.FC<{ type: string }> = ({ type }) => {
   switch (type) {
     case 'news':
       return (
@@ -141,8 +138,8 @@ const SubjectIcon: React.FC<{ type: string }> = ({ type }) => {
       );
     default:
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#046A38] text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Globe className="w-5.5 h-5.5" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#046A38] text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-base">
+          {name?.[0] || 'ব'}
         </div>
       );
   }
@@ -155,7 +152,8 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
   onStartMockFlow,
 }) => {
   const [activeTab, setActiveTab] = useState<'mock' | 'quick'>(initialSubTab);
-  const [isPremium, setIsPremium] = useState<boolean>(() => isUserPremium());
+  const [subjects, setSubjects] = useState<SubjectItem[]>(DEFAULT_SUBJECTS);
+  const [loading, setLoading] = useState(true);
   const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
 
   useEffect(() => {
@@ -164,29 +162,70 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
     }
   }, [initialSubTab]);
 
+  // Fetch subjects from Supabase 'subjects' table with fallback to default
   useEffect(() => {
-    const handleSync = () => {
-      setIsPremium(isUserPremium());
-    };
-    window.addEventListener('tamreen_premium_updated', handleSync);
-    window.addEventListener('tamreen_premium_status_changed', handleSync);
-    window.addEventListener('tamreen_unlocked_posts_updated', handleSync);
-    window.addEventListener('storage', handleSync);
+    let isMounted = true;
+
+    async function fetchSubjects() {
+      try {
+        const { data, error } = await supabase
+          .from('subjects')
+          .select('id, name, code, created_at')
+          .order('id', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          if (isMounted) {
+            // Map Supabase subjects with icon matching
+            const mappedSubjects: SubjectItem[] = data.map((s: any) => {
+              const nameLower = (s.name || '').toLowerCase();
+              let iconType = '';
+              if (nameLower.includes('কারেন্ট') || nameLower.includes('current')) iconType = 'news';
+              else if (nameLower.includes('বাংলা ভাষা') || nameLower.includes('ব্যাকরণ')) iconType = 'bn2';
+              else if (nameLower.includes('বাংলা') || nameLower.includes('bangla')) iconType = 'bn1';
+              else if (nameLower.includes('english lit') || nameLower.includes('ইংরেজি সাহিত্য')) iconType = 'eng_lit';
+              else if (nameLower.includes('english') || nameLower.includes('ইংরেজি')) iconType = 'eng_lang';
+              else if (nameLower.includes('গণিত') || nameLower.includes('math')) iconType = 'math';
+              else if (nameLower.includes('বিজ্ঞান') || nameLower.includes('science')) iconType = 'science';
+              else if (nameLower.includes('বাংলাদেশ')) iconType = 'bd';
+              else if (nameLower.includes('আন্তর্জাতিক')) iconType = 'intl';
+              else if (nameLower.includes('ভূগোল') || nameLower.includes('দুর্যোগ')) iconType = 'geo';
+              else if (nameLower.includes('নৈতিকতা') || nameLower.includes('সুশাসন')) iconType = 'ethics';
+              else if (nameLower.includes('কম্পিউটার') || nameLower.includes('তথ্যপ্রযুক্তি') || nameLower.includes('ict')) iconType = 'ict';
+              else if (nameLower.includes('মানসিক')) iconType = 'mental';
+
+              return {
+                id: s.id,
+                name: s.name,
+                iconType,
+                code: s.code,
+              };
+            });
+            setSubjects(mappedSubjects);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading subjects from Supabase:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchSubjects();
+
     return () => {
-      window.removeEventListener('tamreen_premium_updated', handleSync);
-      window.removeEventListener('tamreen_premium_status_changed', handleSync);
-      window.removeEventListener('tamreen_unlocked_posts_updated', handleSync);
-      window.removeEventListener('storage', handleSync);
+      isMounted = false;
     };
   }, []);
 
-  const handleCardClick = (subjectName: string) => {
+  const handleCardClick = (subject: SubjectItem) => {
     if (activeTab === 'mock' && onStartMockFlow) {
-      onStartMockFlow(subjectName);
+      onStartMockFlow(subject.name);
       return;
     }
     onSelectSubject({
-      subject: subjectName,
+      subject: subject.name,
       questionCount: 25,
       timeMinutes: activeTab === 'quick' ? 15 : 30,
       isMockFlow: activeTab === 'mock',
@@ -194,13 +233,13 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 mb-24 space-y-4">
+    <div className="max-w-3xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 mb-24 space-y-4 font-hind">
       {/* Top Navigation Tabs Switcher */}
       <div className="flex items-center justify-center gap-6 sm:gap-10 border-b border-slate-200/80 dark:border-slate-800 pb-1">
         <button
           type="button"
           onClick={() => setActiveTab('mock')}
-          className={`relative py-2.5 text-lg sm:text-xl font-black font-hind transition-colors cursor-pointer select-none ${
+          className={`relative py-2.5 text-lg sm:text-xl font-black transition-colors cursor-pointer select-none ${
             activeTab === 'mock'
               ? 'text-slate-900 dark:text-white'
               : 'text-slate-400 hover:text-slate-600 dark:text-slate-500'
@@ -215,7 +254,7 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('quick')}
-          className={`relative py-2.5 text-lg sm:text-xl font-black font-hind transition-colors cursor-pointer select-none ${
+          className={`relative py-2.5 text-lg sm:text-xl font-black transition-colors cursor-pointer select-none ${
             activeTab === 'quick'
               ? 'text-slate-900 dark:text-white'
               : 'text-slate-400 hover:text-slate-600 dark:text-slate-500'
@@ -228,54 +267,66 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
         </button>
       </div>
 
-      {/* TAB 1: MOCK EXAM VIEW (মক পরীক্ষা) */}
-      {activeTab === 'mock' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="text-center pt-1 pb-1">
-            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-hind tracking-tight">
-              বিষয় ভিত্তিক
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {MOCK_EXAM_SUBJECTS.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleCardClick(item.name)}
-                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between gap-2 sm:gap-3 group relative overflow-hidden"
-              >
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  <SubjectIcon type={item.iconType} />
-                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 font-hind leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
-                    {item.name}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Loading state */}
+      {loading ? (
+        <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+          <Loader2 className="w-8 h-8 text-[#046A38] animate-spin" />
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+            বিষয়গুলো লোড হচ্ছে...
+          </p>
         </div>
-      )}
-
-      {/* TAB 2: QUICK PRACTICE VIEW (দ্রুত প্র্যাকটিস) */}
-      {activeTab === 'quick' && (
-        <div className="space-y-3 animate-fade-in pt-1">
-          <div className="flex flex-col gap-3 sm:gap-3.5">
-            {QUICK_PRACTICE_SUBJECTS.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleCardClick(item.name)}
-                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.005] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between gap-4 group"
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <SubjectIcon type={item.iconType} />
-                  <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 font-hind group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
-                    {item.name}
-                  </span>
-                </div>
+      ) : (
+        <>
+          {/* TAB 1: MOCK EXAM VIEW (মক পরীক্ষা) */}
+          {activeTab === 'mock' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="text-center pt-1 pb-1">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                  বিষয় ভিত্তিক
+                </h2>
               </div>
-            ))}
-          </div>
-        </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {subjects.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleCardClick(item)}
+                    className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between gap-2 sm:gap-3 group relative overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <SubjectIcon type={item.iconType} name={item.name} />
+                      <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
+                        {item.name}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: QUICK PRACTICE VIEW (দ্রুত প্র্যাকটিস) */}
+          {activeTab === 'quick' && (
+            <div className="space-y-3 animate-fade-in pt-1">
+              <div className="flex flex-col gap-3 sm:gap-3.5">
+                {subjects.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleCardClick(item)}
+                    className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.005] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between gap-4 group"
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <SubjectIcon type={item.iconType} name={item.name} />
+                      <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
+                        {item.name}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Premium Enrollment Modal */}

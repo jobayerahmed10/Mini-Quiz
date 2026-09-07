@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { CurriculumSubject, CurriculumTopic } from '../../data/mockCurriculum';
 
@@ -20,10 +20,8 @@ interface MockTopicSelectionViewProps {
 export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
   selectedSubject,
   allSubjects,
-  selectedTopicIds,
   selectedSubtopicIds,
   questionCount,
-  onToggleTopic,
   onToggleSubtopic,
   onSelectAllInTopic,
   onChangeQuestionCount,
@@ -32,7 +30,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
   onBack,
 }) => {
   const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(() => {
-    // Default expand all topics for quick visibility
+    // Default expand topics for clear hierarchy visibility
     const initial: Record<string, boolean> = {};
     selectedSubject.topics.forEach((t) => {
       initial[t.id] = true;
@@ -52,15 +50,15 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
   const totalSelectedCount = selectedSubtopicIds.size;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090E1A] text-slate-900 dark:text-slate-100 flex flex-col font-hind pb-32">
-      {/* 1. Header (Screenshot 1 & 2) */}
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090E1A] text-slate-900 dark:text-slate-100 flex flex-col font-hind pb-36">
+      {/* 1. Header with Back Button and 1/2 Steps Indicator */}
       <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 py-3 sm:px-6 shadow-2xs">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="পিছনে যান"
             >
               <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
@@ -70,7 +68,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
             </h1>
           </div>
 
-          <div className="px-3 py-1 rounded-full bg-[#046A38] text-white text-xs sm:text-sm font-bold shadow-xs">
+          <div className="px-3 py-1 rounded-full bg-[#046A38] text-white text-xs sm:text-sm font-bold shadow-xs select-none">
             ১/২ স্টেপস
           </div>
         </div>
@@ -82,7 +80,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
         </div>
       </header>
 
-      {/* Active Subject Bar */}
+      {/* Active Subject Information Bar */}
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400">বর্তমান বিষয়:</span>
@@ -93,19 +91,25 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
         <button
           type="button"
           onClick={() => setShowSubjectDrawer(true)}
-          className="text-xs font-bold text-[#046A38] dark:text-emerald-400 hover:underline flex items-center gap-1"
+          className="text-xs font-bold text-[#046A38] dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
         >
           বিষয় পরিবর্তন করুন
         </button>
       </div>
 
-      {/* 2. Topics and Subtopics List */}
+      {/* 2. Hierarchical Topics and Subtopics List */}
       <main className="max-w-2xl mx-auto w-full px-4 pt-2 space-y-3 sm:space-y-4">
         {selectedSubject.topics.map((topic) => {
-          // Check how many subtopics are selected for this topic
-          const topicSubCount = topic.subtopics.filter((s) => selectedSubtopicIds.has(s.id)).length;
-          const isAllSelected = topic.subtopics.length > 0 && topicSubCount === topic.subtopics.length;
-          const isPartiallySelected = topicSubCount > 0 && !isAllSelected;
+          // Check how many child subtopics are currently selected
+          const topicSubCount = topic.subtopics.length > 0
+            ? topic.subtopics.filter((s) => selectedSubtopicIds.has(s.id)).length
+            : (selectedSubtopicIds.has(topic.id) ? 1 : 0);
+
+          const isAllSelected = topic.subtopics.length > 0
+            ? topicSubCount === topic.subtopics.length
+            : selectedSubtopicIds.has(topic.id);
+
+          const isPartiallySelected = topic.subtopics.length > 0 && topicSubCount > 0 && !isAllSelected;
           const isExpanded = expandedTopics[topic.id] ?? true;
 
           return (
@@ -127,6 +131,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                         ? 'bg-[#046A38]/20 border-[#046A38] text-[#046A38]'
                         : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-slate-400'
                     }`}
+                    aria-label={`Select all in ${topic.title}`}
                   >
                     {isAllSelected && <Check className="w-4 h-4 stroke-[3]" />}
                     {isPartiallySelected && <div className="w-2.5 h-2.5 bg-[#046A38] rounded-xs" />}
@@ -135,13 +140,13 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                   {/* Topic Title */}
                   <div
                     onClick={() => toggleExpand(topic.id)}
-                    className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                    className="flex items-center gap-2 cursor-pointer flex-1 min-w-0 select-none"
                   >
                     <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
                       {topic.title}
                     </span>
 
-                    {/* Subtopic selected count badge (Screenshot 2: [ 2 ]) */}
+                    {/* Subtopic selected count badge */}
                     {topicSubCount > 0 && (
                       <span className="px-2 py-0.5 rounded-full bg-[#046A38] text-white text-xs font-black shrink-0">
                         {topicSubCount}
@@ -150,26 +155,29 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                   </div>
                 </div>
 
-                {/* Right side: Questions count & toggle */}
+                {/* Right side: Dynamic Questions Count ({solved}/{total} টি প্রশ্ন) & Accordion toggle */}
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
                     {topic.solvedQuestions}/{topic.totalQuestions} টি প্রশ্ন
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(topic.id)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                  >
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
+                  {topic.subtopics.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(topic.id)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      aria-label="টপিক টগল করুন"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Indented Subtopics List */}
+              {/* Indented Child Subtopics List */}
               {isExpanded && topic.subtopics.length > 0 && (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/40 bg-slate-50/50 dark:bg-slate-900/40">
                   {topic.subtopics.map((sub) => {
@@ -179,14 +187,14 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                       <div
                         key={sub.id}
                         onClick={() => onToggleSubtopic(topic.id, sub.id)}
-                        className="py-2.5 px-4 sm:px-6 pl-10 sm:pl-12 flex items-center justify-between gap-3 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer"
+                        className="py-2.5 px-4 sm:px-6 pl-10 sm:pl-12 flex items-center justify-between gap-3 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           {/* Subtopic Checkbox */}
                           <div
                             className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
                               isSubChecked
-                                ? 'bg-[#046A38] border-[#046A38] text-white'
+                                ? 'bg-[#046A38] border-[#046A38] text-white shadow-2xs'
                                 : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
                             }`}
                           >
@@ -205,7 +213,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
                           </span>
                         </div>
 
-                        {/* Question count */}
+                        {/* Subtopic Question Count: {solved}/{total} */}
                         <span className="text-xs text-slate-400 dark:text-slate-500 font-medium shrink-0">
                           {sub.solvedQuestions}/{sub.totalQuestions}
                         </span>
@@ -219,10 +227,10 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
         })}
       </main>
 
-      {/* 3. Fixed Bottom Bar (Screenshot 1 & 2) */}
+      {/* 3. Fixed Sticky Bottom Bar */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0B132B]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <div className="max-w-2xl mx-auto space-y-3">
-          {/* Row 1: Question count */}
+          {/* Row 1: Question Count Selector */}
           <div className="flex items-center justify-between">
             <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-hind">
               প্রশ্নের সংখ্যা
@@ -242,12 +250,12 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Actions */}
+          {/* Row 2: Action Buttons (+ আরেকটি বিষয় & এগিয়ে যান) */}
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setShowSubjectDrawer(true)}
-              className="py-3 px-4 rounded-full border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/60 active:scale-98 transition-all"
+              className="py-3 px-4 rounded-full border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/60 active:scale-98 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>+ আরেকটি বিষয়</span>
@@ -257,15 +265,15 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
               type="button"
               onClick={onProceed}
               disabled={totalSelectedCount === 0}
-              className="py-3 px-6 rounded-full bg-[#046A38] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-1.5 shadow-md hover:bg-[#03542c] active:scale-98 disabled:opacity-50 disabled:pointer-events-none transition-all"
+              className="py-3 px-6 rounded-full bg-[#046A38] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-1.5 shadow-md hover:bg-[#03542c] active:scale-98 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
             >
-              <span>এগিয়ে যান</span>
+              <span>এগিয়ে যান ({totalSelectedCount})</span>
             </button>
           </div>
         </div>
       </footer>
 
-      {/* Subject Drawer / Modal */}
+      {/* Subject Switcher Drawer Modal */}
       {showSubjectDrawer && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
           <div className="bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
@@ -276,7 +284,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowSubjectDrawer(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold text-sm p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold text-sm p-1 cursor-pointer"
               >
                 ✕ বন্ধ
               </button>

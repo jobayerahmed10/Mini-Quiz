@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CurriculumSubject, CurriculumTopic } from '../../data/mockCurriculum';
-import { fetchMockCurriculumFromSupabase } from '../../lib/mockTopicService';
+import { fetchMockCurriculumFromSupabase, fetchQuestionsForSelectedSubtopics, recordAttemptedQuestionIds } from '../../lib/mockTopicService';
 import { MockTopicSelectionView } from './MockTopicSelectionView';
 import { MockConfirmationView } from './MockConfirmationView';
 import { MockExamInterface } from './MockExamInterface';
 import { Question, QuizResult } from '../../types';
-import { AUTHENTIC_TOPIC_QUESTIONS } from '../../data/charyapadaQuestions';
 
 interface MockExamFlowProps {
   initialSubjectName: string;
@@ -23,8 +22,19 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
   const [curriculum, setCurriculum] = useState<CurriculumSubject[]>([]);
   const [loadingCurriculum, setLoadingCurriculum] = useState(true);
   const [currentStep, setCurrentStep] = useState<'topic_select' | 'confirm' | 'exam'>('topic_select');
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
 
-  // Load subjects & topics from Supabase
+  // 1. Initial Selection State: strictly EMPTY by default (remove auto-select / pre-check behavior)
+  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState<Set<string>>(() => new Set<string>());
+
+  const [questionCount, setQuestionCount] = useState<number>(25);
+  const [timeMinutes, setTimeMinutes] = useState<number>(25);
+  const [negativeMarkingEnabled, setNegativeMarkingEnabled] = useState<boolean>(true);
+
+  const [loadingExamQuestions, setLoadingExamQuestions] = useState<boolean>(false);
+  const [examQuestions, setExamQuestions] = useState<Question[]>([]);
+
+  // Load subjects & topics with dynamic counts from Supabase
   useEffect(() => {
     let mounted = true;
     fetchMockCurriculumFromSupabase().then((data) => {
@@ -40,39 +50,20 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
   // Find the selected subject
   const selectedSubject = useMemo(() => {
     if (curriculum.length === 0) return null;
+    if (activeSubjectId) {
+      const foundById = curriculum.find((s) => s.id === activeSubjectId);
+      if (foundById) return foundById;
+    }
     const cleanInitial = initialSubjectName.trim().toLowerCase();
-    const found = curriculum.find(
+    const foundByName = curriculum.find(
       (s) =>
         s.name.toLowerCase().includes(cleanInitial) ||
         cleanInitial.includes(s.name.toLowerCase())
     );
-    return found || curriculum[0];
-  }, [curriculum, initialSubjectName]);
+    return foundByName || curriculum[0];
+  }, [curriculum, initialSubjectName, activeSubjectId]);
 
-  // Selected subtopics & topics state
-  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState<Set<string>>(() => {
-    const set = new Set<string>();
-    return set;
-  });
-
-  const [questionCount, setQuestionCount] = useState<number>(25);
-  const [timeMinutes, setTimeMinutes] = useState<number>(25);
-  const [negativeMarkingEnabled, setNegativeMarkingEnabled] = useState<boolean>(true);
-
-  // Initialize with the first topic's subtopics selected by default
-  useEffect(() => {
-    if (selectedSubject && selectedSubtopicIds.size === 0) {
-      const initialSet = new Set<string>();
-      if (selectedSubject.topics.length > 0) {
-        // Default select subtopics of the first topic (e.g. চর্যাপদ as in screenshot)
-        selectedSubject.topics[0].subtopics.forEach((sub) => {
-          initialSet.add(sub.id);
-        });
-      }
-      setSelectedSubtopicIds(initialSet);
-    }
-  }, [selectedSubject]);
-
+  // Subtopic toggle handler
   const handleToggleSubtopic = (topicId: string, subtopicId: string) => {
     setSelectedSubtopicIds((prev) => {
       const next = new Set(prev);
@@ -85,35 +76,55 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
     });
   };
 
+  // Select all or deselect all in a topic
   const handleSelectAllInTopic = (topic: CurriculumTopic, selectAll: boolean) => {
     setSelectedSubtopicIds((prev) => {
       const next = new Set(prev);
-      topic.subtopics.forEach((sub) => {
+      if (topic.subtopics.length > 0) {
+        topic.subtopics.forEach((sub) => {
+          if (selectAll) {
+            next.add(sub.id);
+          } else {
+            next.delete(sub.id);
+          }
+        });
+      } else {
         if (selectAll) {
-          next.add(sub.id);
+          next.add(topic.id);
         } else {
-          next.delete(sub.id);
+          next.delete(topic.id);
         }
-      });
+      }
       return next;
     });
   };
 
+  // Parent topic checkbox toggle
   const handleToggleTopic = (topic: CurriculumTopic) => {
-    const topicSubIds = topic.subtopics.map((s) => s.id);
-    const allSelected = topicSubIds.every((id) => selectedSubtopicIds.has(id));
-    handleSelectAllInTopic(topic, !allSelected);
-  };
-
-  const handleSwitchSubject = (newSubject: CurriculumSubject) => {
-    const newSet = new Set<string>();
-    if (newSubject.topics.length > 0) {
-      newSubject.topics[0].subtopics.forEach((sub) => newSet.add(sub.id));
+    if (topic.subtopics.length > 0) {
+      const topicSubIds = topic.subtopics.map((s) => s.id);
+      const allSelected = topicSubIds.every((id) => selectedSubtopicIds.has(id));
+      handleSelectAllInTopic(topic, !allSelected);
+    } else {
+      setSelectedSubtopicIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(topic.id)) {
+          next.delete(topic.id);
+        } else {
+          next.add(topic.id);
+        }
+        return next;
+      });
     }
-    setSelectedSubtopicIds(newSet);
   };
 
-  // Build resolved titles of selected items for display in step 2
+  // Subject switch handler (resets selection to empty)
+  const handleSwitchSubject = (newSubject: CurriculumSubject) => {
+    setActiveSubjectId(newSubject.id);
+    setSelectedSubtopicIds(new Set<string>()); // Empty selection on subject change
+  };
+
+  // Resolve titles of selected items for Step 2 confirmation
   const { selectedSubtopicTitles, selectedTopicTitles } = useMemo(() => {
     if (!selectedSubject) return { selectedSubtopicTitles: [], selectedTopicTitles: [] };
 
@@ -122,12 +133,18 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
 
     selectedSubject.topics.forEach((top) => {
       let topicHasSub = false;
-      top.subtopics.forEach((sub) => {
-        if (selectedSubtopicIds.has(sub.id)) {
-          subTitles.push(sub.title);
-          topicHasSub = true;
-        }
-      });
+      if (top.subtopics.length > 0) {
+        top.subtopics.forEach((sub) => {
+          if (selectedSubtopicIds.has(sub.id)) {
+            subTitles.push(sub.title);
+            topicHasSub = true;
+          }
+        });
+      } else if (selectedSubtopicIds.has(top.id)) {
+        subTitles.push(top.title);
+        topicHasSub = true;
+      }
+
       if (topicHasSub) {
         topTitles.push(top.title);
       }
@@ -136,55 +153,37 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
     return { selectedSubtopicTitles: subTitles, selectedTopicTitles: topTitles };
   }, [selectedSubject, selectedSubtopicIds]);
 
-  // Resolve questions for the exam
-  const examQuestions = useMemo(() => {
-    if (!selectedSubject) return [];
+  // Handle Start Examination: Queries Supabase for selected subtopics, shuffles, and starts exam
+  const handleStartExam = async () => {
+    setLoadingExamQuestions(true);
+    try {
+      const subtopicIdArray = Array.from(selectedSubtopicIds);
+      let loadedQuestions = await fetchQuestionsForSelectedSubtopics(
+        subtopicIdArray,
+        selectedSubtopicTitles,
+        questionCount
+      );
 
-    const searchPool = [...AUTHENTIC_TOPIC_QUESTIONS, ...allQuestions];
-    const subSet = new Set(selectedSubtopicTitles.map((t) => t.toLowerCase().trim()));
-    const topSet = new Set(selectedTopicTitles.map((t) => t.toLowerCase().trim()));
-    const subjName = selectedSubject.name.toLowerCase();
-
-    // 1. Exact match by subtopic or topic
-    const matched: Question[] = [];
-    const seen = new Set<string>();
-
-    searchPool.forEach((q) => {
-      const qKey = `${q.id}-${q.question}`;
-      if (seen.has(qKey)) return;
-
-      const qTopic = (q.topic || '').toLowerCase().trim();
-      const qSubj = (q.subject || '').toLowerCase().trim();
-
-      const matchesSubtopic = qTopic && subSet.has(qTopic);
-      const matchesTopic = qTopic && topSet.has(qTopic);
-      const matchesSubject = qSubj && (qSubj.includes(subjName) || subjName.includes(qSubj));
-
-      if (matchesSubtopic || matchesTopic || (matchesSubject && selectedSubtopicTitles.length === 0)) {
-        seen.add(qKey);
-        matched.push(q);
+      // If database has 0 or fewer questions, fallback to allQuestions matching subject
+      if (loadedQuestions.length === 0) {
+        const fallback = allQuestions.slice(0, questionCount);
+        loadedQuestions = fallback;
       }
-    });
 
-    // If matches are fewer than questionCount, pad with subject questions or pool
-    if (matched.length < questionCount) {
-      searchPool.forEach((q) => {
-        const qKey = `${q.id}-${q.question}`;
-        if (!seen.has(qKey)) {
-          seen.add(qKey);
-          matched.push(q);
-        }
-      });
+      setExamQuestions(loadedQuestions);
+      setCurrentStep('exam');
+    } catch (err) {
+      console.error('Error starting mock exam:', err);
+    } finally {
+      setLoadingExamQuestions(false);
     }
-
-    return matched.slice(0, questionCount);
-  }, [selectedSubject, selectedSubtopicTitles, selectedTopicTitles, allQuestions, questionCount]);
+  };
 
   if (loadingCurriculum || !selectedSubject) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090E1A] flex flex-col items-center justify-center p-6 text-center font-hind">
-        <div className="w-12 h-12 rounded-full border-4 border-emerald-600/30 border-t-emerald-600 animate-spin mb-4" />
-        <p className="text-slate-600 dark:text-slate-400 font-bold">
+        <div className="w-12 h-12 rounded-full border-4 border-[#046A38]/30 border-t-[#046A38] animate-spin mb-4" />
+        <p className="text-slate-700 dark:text-slate-300 font-bold text-base">
           সুপাবেজ থেকে টপিক ও সাব-টপিক লোড হচ্ছে...
         </p>
       </div>
@@ -222,7 +221,7 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
           negativeMarkingEnabled={negativeMarkingEnabled}
           onTimeChange={setTimeMinutes}
           onNegativeMarkingToggle={setNegativeMarkingEnabled}
-          onStartExam={() => setCurrentStep('exam')}
+          onStartExam={handleStartExam}
           onBack={() => setCurrentStep('topic_select')}
         />
       )}
@@ -235,10 +234,27 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
           timeMinutes={timeMinutes}
           negativeMarkingEnabled={negativeMarkingEnabled}
           onFinishExam={(result) => {
+            // Save answered question IDs to localStorage for tracking attempted stats
+            const answeredIds = result.userAnswers?.map((a) => String(a.questionId)) || [];
+            if (answeredIds.length > 0) {
+              recordAttemptedQuestionIds(answeredIds);
+            }
             onFinishQuiz(result);
           }}
           onExit={onClose}
         />
+      )}
+
+      {/* Loading Overlay when generating exam session */}
+      {loadingExamQuestions && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0F172A] p-6 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center gap-3">
+            <div className="w-10 h-10 rounded-full border-4 border-[#046A38]/30 border-t-[#046A38] animate-spin" />
+            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+              নির্বাচিত টপিকের প্রশ্নসমূহ লোড ও সাজানো হচ্ছে...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
