@@ -1373,9 +1373,75 @@ export function setPendingPosts(postIds: string[]): void {
   } catch {}
 }
 
+export interface PremiumDetails {
+  isPremium: boolean;
+  status: 'none' | 'pending' | 'approved' | 'rejected';
+  packageName: string;
+  planId: string;
+  activatedAt: string;
+  expiresAt: string;
+  totalDays: number;
+  remainingDays: number;
+  trxId?: string;
+  phoneNumber?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'premium_approved' | 'system' | 'exam' | 'premium_rejected';
+  date: string;
+  read: boolean;
+  phone?: string;
+}
+
+export function getUserNotifications(): AppNotification[] {
+  try {
+    const raw = localStorage.getItem('tamreen_user_notifications');
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function addUserNotification(notif: AppNotification): void {
+  try {
+    const list = getUserNotifications();
+    // Avoid duplicate notifications by id
+    const filtered = list.filter((n) => n.id !== notif.id);
+    filtered.unshift(notif);
+    localStorage.setItem('tamreen_user_notifications', JSON.stringify(filtered));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_notification_updated', { detail: filtered }));
+    }
+  } catch {}
+}
+
+export function markNotificationsAsRead(): void {
+  try {
+    const list = getUserNotifications().map((n) => ({ ...n, read: true }));
+    localStorage.setItem('tamreen_user_notifications', JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_notification_updated', { detail: list }));
+    }
+  } catch {}
+}
+
 export function isUserPremium(): boolean {
   try {
     const status = localStorage.getItem('tamreen_premium_status');
+    const expiresAt = localStorage.getItem('tamreen_premium_expires_at');
+    
+    if (expiresAt) {
+      const expTime = new Date(expiresAt).getTime();
+      if (!isNaN(expTime) && Date.now() > expTime) {
+        // Expired
+        return false;
+      }
+    }
+
     if (status === 'approved') return true;
     if (status === 'pending' || status === 'rejected') return false;
 
@@ -1387,6 +1453,123 @@ export function isUserPremium(): boolean {
     return data === 'true';
   } catch {
     return false;
+  }
+}
+
+export function getPremiumDetails(): PremiumDetails {
+  try {
+    const status = (localStorage.getItem('tamreen_premium_status') as any) || 'none';
+    const planId = localStorage.getItem('tamreen_premium_plan') || 'yearly';
+    const packageName = localStorage.getItem('tamreen_premium_package_name') || 'বাৎসরিক প্রিমিয়াম প্যাকেজ (১২ মাস)';
+    const activatedAt = localStorage.getItem('tamreen_premium_activated_at') || '';
+    const expiresAt = localStorage.getItem('tamreen_premium_expires_at') || '';
+    const trxId = localStorage.getItem('tamreen_premium_trx') || '';
+    const totalDays = Number(localStorage.getItem('tamreen_premium_total_days')) || 365;
+
+    let remainingDays = 0;
+    if (expiresAt) {
+      const expTime = new Date(expiresAt).getTime();
+      const diffMs = expTime - Date.now();
+      remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    } else if (status === 'approved') {
+      remainingDays = totalDays;
+    }
+
+    const active = isUserPremium() && (status === 'approved' || remainingDays > 0);
+
+    return {
+      isPremium: active,
+      status: active ? 'approved' : status,
+      packageName,
+      planId,
+      activatedAt,
+      expiresAt,
+      totalDays,
+      remainingDays,
+      trxId,
+    };
+  } catch {
+    return {
+      isPremium: isUserPremium(),
+      status: 'none',
+      packageName: 'বাৎসরিক প্রিমিয়াম প্যাকেজ',
+      planId: 'yearly',
+      activatedAt: '',
+      expiresAt: '',
+      totalDays: 365,
+      remainingDays: 0,
+    };
+  }
+}
+
+export function approveUserPremiumPackage(record: {
+  id?: string;
+  student_name?: string;
+  phone_number?: string;
+  course_id?: string;
+  course_title?: string;
+  transaction_id?: string;
+  amount?: string;
+}): void {
+  try {
+    const title = record.course_title || record.course_id || '';
+    let durationDays = 365;
+    let planId = 'yearly';
+    let packageName = 'বাৎসরিক প্রিমিয়াম প্যাকেজ (১২ মাস)';
+
+    if (title.includes('monthly') || title.includes('মাসিক')) {
+      durationDays = 30;
+      planId = 'monthly';
+      packageName = 'মাসিক প্রিমিয়াম প্যাকেজ (১ মাস)';
+    } else if (title.includes('quarterly') || title.includes('ত্রৈমাসিক') || title.includes('৩ মাস')) {
+      durationDays = 90;
+      planId = 'quarterly';
+      packageName = 'ত্রৈমাসিক প্রিমিয়াম প্যাকেজ (৩ মাস)';
+    } else if (title.includes('half_yearly') || title.includes('ষান্মাসিক') || title.includes('৬ মাস')) {
+      durationDays = 180;
+      planId = 'half_yearly';
+      packageName = 'ষান্মাসিক প্রিমিয়াম প্যাকেজ (৬ মাস)';
+    } else if (title.includes('yearly') || title.includes('বাৎসরিক') || title.includes('১২ মাস') || title.includes('১ বছর')) {
+      durationDays = 365;
+      planId = 'yearly';
+      packageName = 'বাৎসরিক প্রিমিয়াম প্যাকেজ (১২ মাস)';
+    }
+
+    const now = new Date();
+    const activatedAt = now.toISOString();
+    const expDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const expiresAt = expDate.toISOString();
+
+    localStorage.setItem('tamreen_premium_status', 'approved');
+    localStorage.setItem('tamreen_premium_plan', planId);
+    localStorage.setItem('tamreen_premium_package_name', packageName);
+    localStorage.setItem('tamreen_premium_activated_at', activatedAt);
+    localStorage.setItem('tamreen_premium_expires_at', expiresAt);
+    localStorage.setItem('tamreen_premium_total_days', String(durationDays));
+    if (record.transaction_id) {
+      localStorage.setItem('tamreen_premium_trx', record.transaction_id);
+    }
+
+    setUserPremium(true);
+
+    // Create Notification
+    addUserNotification({
+      id: `notif_${record.id || Date.now()}`,
+      title: '🎉 প্রিমিয়াম প্যাকেজ সক্রিয় হয়েছে!',
+      message: `আপনার '${packageName}' সফলভাবে এপ্রুভ ও সক্রিয় করা হয়েছে। এখন আপনার অ্যাকাউন্টে সকল বিষয়ভিত্তিক প্রশ্নব্যাংক, মডেল টেস্ট, লেকচার শিট ও ফিচার আনলক হয়েছে।`,
+      type: 'premium_approved',
+      date: new Date().toISOString(),
+      read: false,
+      phone: record.phone_number,
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tamreen_premium_approved_alert', {
+        detail: { packageName, durationDays, expiresAt }
+      }));
+    }
+  } catch (e) {
+    console.warn('approveUserPremiumPackage error:', e);
   }
 }
 

@@ -16,7 +16,8 @@ import {
   getUserRollNumber, getSavedExamHistory, getSavedWrongQuestions,
   removeSavedWrongQuestion, calculateRealUserMetrics, SavedWrongQuestion, getUserUniqueId,
   getLikedIds, getSavedBookmarkedQuestions, getSavedLikedQuestions, getTotalExamsCount,
-  UserReportedQuestion, getUserReportedQuestions
+  UserReportedQuestion, getUserReportedQuestions, isUserPremium, getPremiumDetails,
+  getUserNotifications, markNotificationsAsRead, AppNotification
 } from '../lib/utils';
 import { 
   fetchCourseApplicationsFromSupabase, 
@@ -32,6 +33,7 @@ import { ISLAMIC_PRESET_AVATARS, PRESET_AVATAR_URLS } from '../lib/avatarPresets
 import { CourseEnrollmentRecord, Question } from '../types';
 import { AuthModal } from './AuthModal';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
+import { PremiumDetailsModal } from './PremiumDetailsModal';
 import { QuestionActionFooter } from './QuestionActionFooter';
 import { SAMPLE_QUESTIONS } from '../data/sampleQuestions';
 import { FontFamilyType } from './Header';
@@ -113,7 +115,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [showPerformanceModal, setShowPerformanceModal] = useState<boolean>(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState<boolean>(false);
   const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
+  const [showPremiumDetailsModal, setShowPremiumDetailsModal] = useState<boolean>(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
+
+  const [premiumDetails, setPremiumDetails] = useState(() => getPremiumDetails());
+  const [appNotifications, setAppNotifications] = useState<AppNotification[]>(() => getUserNotifications());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPremiumDetails(getPremiumDetails());
+      setAppNotifications(getUserNotifications());
+    };
+    window.addEventListener('tamreen_premium_updated', handleUpdate);
+    window.addEventListener('tamreen_notification_updated', handleUpdate);
+    window.addEventListener('tamreen_premium_approved_alert', handleUpdate);
+    return () => {
+      window.removeEventListener('tamreen_premium_updated', handleUpdate);
+      window.removeEventListener('tamreen_notification_updated', handleUpdate);
+      window.removeEventListener('tamreen_premium_approved_alert', handleUpdate);
+    };
+  }, []);
 
   // Message notifications
   const [errorMsg, setErrorMsg] = useState('');
@@ -535,10 +556,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 {/* User Info Details */}
                 <div className="min-w-0 flex-1 space-y-1.5">
                   {/* Premium Member Pill */}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold shadow-xs">
-                    <Crown className="w-3.5 h-3.5 fill-amber-300" />
-                    <span>{isRegistered ? 'রেজিস্টার্ড মেম্বার' : 'গেস্ট শিক্ষার্থী'}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (premiumDetails.isPremium) {
+                        setShowPremiumDetailsModal(true);
+                      } else {
+                        setShowPremiumModal(true);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black shadow-md transition-all cursor-pointer active:scale-95 ${
+                      premiumDetails.isPremium
+                        ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-950 border border-amber-200 animate-pulse'
+                        : 'bg-amber-400/20 border border-amber-400/40 text-amber-300 hover:bg-amber-400/30'
+                    }`}
+                  >
+                    <Crown className={`w-3.5 h-3.5 ${premiumDetails.isPremium ? 'fill-amber-950 text-amber-950' : 'fill-amber-300'}`} />
+                    <span>
+                      {premiumDetails.isPremium
+                        ? '👑 প্রিমিয়াম মেম্বার (বিবরণ দেখুন)'
+                        : isRegistered
+                        ? 'রেজিস্টার্ড মেম্বার'
+                        : 'গেস্ট শিক্ষার্থী'}
+                    </span>
+                  </button>
 
                   {/* Name */}
                   <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide truncate leading-tight drop-shadow-xs font-tiro">
@@ -1124,8 +1165,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {/* 2. NOTIFICATION MODAL */}
       {showNotificationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="bg-white dark:bg-[#0D172A] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
                   <Bell className="w-4 h-4" />
@@ -1135,25 +1176,77 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </h3>
               </div>
               <button
-                onClick={() => setShowNotificationModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                onClick={() => {
+                  markNotificationsAsRead();
+                  setShowNotificationModal(false);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="py-8 text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                <Bell className="w-6 h-6 opacity-60" />
-              </div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                এই মুহূর্তে কোনো নতুন নোটিফিকেশন নেই।
-              </p>
+            <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 py-1 pr-1">
+              {appNotifications.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                    <Bell className="w-6 h-6 opacity-60" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    এই মুহূর্তে কোনো নতুন নোটিফিকেশন নেই।
+                  </p>
+                </div>
+              ) : (
+                appNotifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      notif.type === 'premium_approved'
+                        ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border-amber-400/50 dark:border-amber-500/30'
+                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 dark:text-white">
+                        {notif.type === 'premium_approved' ? (
+                          <Crown className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                        )}
+                        <span>{notif.title}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {notif.date ? new Date(notif.date).toLocaleDateString('bn-BD') : ''}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed mb-2">
+                      {notif.message}
+                    </p>
+
+                    {notif.type === 'premium_approved' && (
+                      <button
+                        onClick={() => {
+                          setShowNotificationModal(false);
+                          setShowPremiumDetailsModal(true);
+                        }}
+                        className="px-3 py-1 rounded-xl bg-amber-500 text-amber-950 font-black text-[11px] shadow-xs hover:bg-amber-400 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <Crown className="w-3 h-3 fill-amber-950" />
+                        <span>প্রিমিয়াম বিবরণ দেখুন</span>
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             <button
-              onClick={() => setShowNotificationModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+              onClick={() => {
+                markNotificationsAsRead();
+                setShowNotificationModal(false);
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer shrink-0"
             >
               বন্ধ করুন
             </button>
@@ -2564,6 +2657,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           }}
         />
       )}
+
+      {/* Premium Details & Expiry Modal */}
+      <PremiumDetailsModal
+        isOpen={showPremiumDetailsModal}
+        onClose={() => setShowPremiumDetailsModal(false)}
+        onRenew={() => setShowPremiumModal(true)}
+      />
 
     </div>
   );

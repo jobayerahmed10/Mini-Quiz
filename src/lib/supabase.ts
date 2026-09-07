@@ -23,6 +23,7 @@ import {
   isExamCompleted,
   getLikedIds,
   getBookmarkedIds,
+  approveUserPremiumPackage,
   getLocalQuestionLikeCount,
   setLocalQuestionLikeCount,
   generateUUID,
@@ -3799,8 +3800,23 @@ export async function submitEnrollmentToSupabase(
 
 export async function updateEnrollmentStatusInSupabase(
   id: string,
-  newStatus: 'pending' | 'approved' | 'rejected'
+  newStatus: 'pending' | 'approved' | 'rejected',
+  record?: CourseEnrollmentRecord
 ): Promise<{ success: boolean; error?: string }> {
+  // Update local storage cache
+  try {
+    const raw = localStorage.getItem('tamreen_enrollments');
+    if (raw) {
+      const items: CourseEnrollmentRecord[] = JSON.parse(raw);
+      const updated = items.map((item) => (item.id === id ? { ...item, status: newStatus } : item));
+      localStorage.setItem('tamreen_enrollments', JSON.stringify(updated));
+    }
+  } catch {}
+
+  if (newStatus === 'approved' && record) {
+    approveUserPremiumPackage(record);
+  }
+
   if (!supabaseInstance) return { success: true };
   try {
     const { error: err1 } = await supabaseInstance
