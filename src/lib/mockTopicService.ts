@@ -5,8 +5,8 @@ import { AUTHENTIC_TOPIC_QUESTIONS } from '../data/charyapadaQuestions';
 import { getSubjectPriority, getCanonicalSubjectName } from './subjects';
 import { getCache, setCache } from './cache';
 
-const QUESTION_SELECT_FIELDS = 'id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, sub_topic_id, topic_id, question_code, slug, status';
-const QUESTION_WITH_RELATIONS = 'id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, sub_topic_id, topic_id, question_code, slug, status, options(id, text, option_text, is_correct, sort_order)';
+const QUESTION_SELECT_FIELDS = 'id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic_id, topic_id, question_code, slug, status';
+const QUESTION_WITH_RELATIONS = 'id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic_id, topic_id, question_code, slug, status, options(id, text, option_text, is_correct, sort_order)';
 
 const ATTEMPTED_QUESTIONS_STORAGE_KEY = 'miniquiz_attempted_question_ids';
 
@@ -736,7 +736,7 @@ export async function fetchQuestionsForSelectedSubtopics(
           }
         }
 
-        // Query C: Also filter by topic and sub_topic text match for administrative flexibility
+        // Query C: Also filter by topic text match for administrative flexibility
         if (validSubtopicTitles.length > 0) {
           const { data: titleQuestions } = await supabase
             .from('questions')
@@ -746,18 +746,6 @@ export async function fetchQuestionsForSelectedSubtopics(
 
           if (titleQuestions && Array.isArray(titleQuestions)) {
             titleQuestions.forEach((q) => {
-              if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-            });
-          }
-
-          const { data: subTitleQuestions } = await supabase
-            .from('questions')
-            .select(QUESTION_WITH_RELATIONS)
-            .in('sub_topic', validSubtopicTitles)
-            .limit(queryLimit);
-
-          if (subTitleQuestions && Array.isArray(subTitleQuestions)) {
-            subTitleQuestions.forEach((q) => {
               if (q && q.id) rawQuestionsMap.set(String(q.id), q);
             });
           }

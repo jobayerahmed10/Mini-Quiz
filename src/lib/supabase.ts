@@ -35,8 +35,8 @@ import {
 import { getCache, setCache, invalidateCache } from './cache';
 
 // Optimized column lists to prevent select('*') network bloat
-export const QUESTION_COLS = 'id, exam_id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, sub_topic_id, topic_id, question_code, slug, status, mark, created_at';
-export const EXAM_COLS = 'id, title, time_minutes, total_marks, negative_mark, start_time, end_time, is_active, syllabus, created_at, subject, category, question_ids, selected_question_codes, question_count';
+export const QUESTION_COLS = 'id, exam_id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic_id, topic_id, question_code, slug, status, mark, created_at';
+export const EXAM_COLS = 'id, title, time_minutes, total_marks, negative_marks, start_time, end_time, is_active, syllabus, created_at, subject, category, question_ids, selected_question_codes, question_count';
 export const EXAM_RESULT_COLS = 'id, exam_id, user_id, user_name, score, correct_answers, wrong_answers, total_questions, time_taken, points, submitted_at, created_at, roll_number, student_id';
 export const PROFILE_COLS = 'id, email, password, full_name, roll_number, student_id, phone, avatar_url, role, updated_at, created_at';
 export const COURSE_COLS = 'id, title, description, price, duration, features, category, created_at, status, topics, routine, routine_url, image_url';
