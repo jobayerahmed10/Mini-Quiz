@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Clock, 
   Target, 
@@ -193,7 +193,11 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     }
   }, []);
 
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     loadExams(false);
   }, [loadExams]);
 

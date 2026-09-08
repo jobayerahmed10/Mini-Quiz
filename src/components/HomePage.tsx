@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bookmark,
   ChevronRight,
@@ -129,7 +129,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => getCachedBlogs().slice(0, 5));
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
 
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
     const refreshExams = (force: boolean = false) => {
       fetchExamsFromSupabase(force).then((res) => {
         if (res.exams) {
@@ -169,7 +174,6 @@ export const HomePage: React.FC<HomePageProps> = ({
     window.addEventListener('tamreen_auth_status_changed', handleDataChanged);
     window.addEventListener('tamreen_blog_changed', handleDataChanged);
     window.addEventListener('storage', handleDataChanged);
-    window.addEventListener('focus', handleDataChanged);
     return () => {
       window.removeEventListener('tamreen_data_changed', handleDataChanged);
       window.removeEventListener('tamreen_exam_completed', handleDataChanged);
@@ -177,7 +181,6 @@ export const HomePage: React.FC<HomePageProps> = ({
       window.removeEventListener('tamreen_auth_status_changed', handleDataChanged);
       window.removeEventListener('tamreen_blog_changed', handleDataChanged);
       window.removeEventListener('storage', handleDataChanged);
-      window.removeEventListener('focus', handleDataChanged);
     };
   }, []);
 
