@@ -1209,7 +1209,6 @@ export function saveUserReportedQuestions(reports: UserReportedQuestion[]): void
   try {
     localStorage.setItem(REPORTED_QUESTIONS_KEY, JSON.stringify(reports));
     window.dispatchEvent(new CustomEvent('tamreen_reports_updated', { detail: reports }));
-    window.dispatchEvent(new Event('tamreen_data_changed'));
   } catch {}
 }
 

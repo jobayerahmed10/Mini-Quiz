@@ -68,7 +68,11 @@ export const SharedExamEntranceCard: React.FC<SharedExamEntranceCardProps> = ({
   useEffect(() => {
     let isMounted = true;
     const checkCompletion = () => {
-      setHasCompleted(isExamCompleted(examId, title));
+      const alreadyDoneLocal = isExamCompleted(examId, title);
+      if (alreadyDoneLocal) {
+        setHasCompleted(true);
+        return;
+      }
 
       fetchUserCompletedExamsFromSupabase().then((completedList) => {
         if (!isMounted) return;
