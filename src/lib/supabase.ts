@@ -874,23 +874,37 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       }
     }
 
+    // 5. Ultimate Fallback: If STILL 0, fetch any recent questions from Supabase so user-added questions are never missed
+    if (rawQuestions.length === 0 && supabaseInstance) {
+      try {
+        const { data: anyQs } = await supabaseInstance
+          .from('questions')
+          .select(QUESTION_COLS)
+          .order('created_at', { ascending: false })
+          .limit(150);
+        if (anyQs && anyQs.length > 0) {
+          rawQuestions = anyQs;
+        }
+      } catch {}
+    }
+
     if (rawQuestions.length === 0) {
       return [];
     }
 
     const formattedQuestions: Question[] = rawQuestions
-      .filter((item: any) => item && item.status !== 'draft')
+      .filter((item: any) => item && String(item.status || '').toLowerCase() !== 'draft')
       .map((item: any) => ({
         id: String(item.id),
         question_code: item.question_code ? String(item.question_code) : String(item.id),
         slug: item.slug ? String(item.slug) : String(item.id),
-        question: String(item.question || item.question_text || ''),
-        option_a: String(item.option_a || ''),
-        option_b: String(item.option_b || ''),
-        option_c: String(item.option_c || ''),
-        option_d: String(item.option_d || ''),
-        correct_answer: (item.correct_answer || 'option_a') as any,
-        explanation: item.explanation ? String(item.explanation) : null,
+        question: String(item.question || item.question_text || item.title || ''),
+        option_a: String(item.option_a || item.option1 || item.choice_a || item.opt1 || ''),
+        option_b: String(item.option_b || item.option2 || item.choice_b || item.opt2 || ''),
+        option_c: String(item.option_c || item.option3 || item.choice_c || item.opt3 || ''),
+        option_d: String(item.option_d || item.option4 || item.choice_d || item.opt4 || ''),
+        correct_answer: (item.correct_answer || item.correct_option || item.answer || 'option_a') as any,
+        explanation: item.explanation || item.detail_explanation || item.note || null,
         subject: item.subject ? String(item.subject) : null,
         topic: item.topic ? String(item.topic) : null,
         status: item.status || 'published',
