@@ -7,10 +7,23 @@ import {
   Monitor, 
   BookMarked,
   Sparkles,
-  Loader2
+  Loader2,
+  Newspaper,
+  BookOpen,
+  Calculator,
+  Atom,
+  Compass,
+  ShieldCheck,
+  Cpu,
+  Brain,
+  Feather,
+  PenTool
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { subscribeToQuestionsRealtime } from '../lib/mockTopicService';
 import { isUserPremium } from '../lib/utils';
+import { getSubjectPriority, getCanonicalSubjectName, getIconType } from '../lib/subjects';
+import { getCache, setCache } from '../lib/cache';
 import { PremiumEnrollmentModal } from './PremiumEnrollmentModal';
 
 interface SubjectsPageProps {
@@ -29,14 +42,14 @@ interface SubjectItem {
 
 const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'ca', name: 'কারেন্ট অ্যাফেয়ার্স', iconType: 'news' },
-  { id: 'bn', name: 'বাংলা', iconType: 'bn1' },
+  { id: 'bn', name: 'বাংলা সাহিত্য', iconType: 'bn1' },
   { id: 'bn_grammar', name: 'বাংলা ভাষা ও ব্যাকরণ', iconType: 'bn2' },
   { id: 'eng_lit', name: 'English Literature', iconType: 'eng_lit' },
-  { id: 'eng_lang', name: 'English Language', iconType: 'eng_lang' },
+  { id: 'eng_lang', name: 'English Grammar', iconType: 'eng_lang' },
   { id: 'math', name: 'গাণিতিক যুক্তি', iconType: 'math' },
-  { id: 'general_sci', name: 'সাধারণ বিজ্ঞান', iconType: 'science' },
   { id: 'bd_affairs', name: 'বাংলাদেশ বিষয়াবলি', iconType: 'bd' },
   { id: 'intl_affairs', name: 'আন্তর্জাতিক বিষয়াবলি', iconType: 'intl' },
+  { id: 'general_sci', name: 'সাধারণ বিজ্ঞান', iconType: 'science' },
   { id: 'geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', iconType: 'geo' },
   { id: 'ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', iconType: 'ethics' },
   { id: 'ict', name: 'কম্পিউটার ও তথ্যপ্রযুক্তি', iconType: 'ict' },
@@ -44,101 +57,114 @@ const DEFAULT_SUBJECTS: SubjectItem[] = [
 ];
 
 const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) => {
-  if (!type) {
-    const firstChar = name?.trim()?.[0] || 'ব';
-    return (
-      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#046A38] text-white flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-2xs font-hind select-none">
-        {firstChar}
-      </div>
-    );
-  }
+  const resolvedType = type || getIconType(name);
 
-  switch (type) {
-    case 'news':
+  switch (resolvedType) {
+    case 'news': // 1. কারেন্ট অ্যাফেয়ার্স (Cyan blue badge with globe & NEWS text)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#00A0E9] text-white flex flex-col items-center justify-center shrink-0 shadow-2xs">
-          <Globe className="w-4 h-4 stroke-[2.2]" />
-          <span className="text-[7.5px] font-black leading-none bg-[#0070B8] px-1 py-0.2 rounded mt-0.5 tracking-tighter uppercase">NEWS</span>
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#00A0E9] text-white flex flex-col items-center justify-center shrink-0 shadow-xs overflow-hidden select-none">
+          <Globe className="w-4.5 h-4.5 stroke-[2.2] text-white mt-0.5" />
+          <span className="text-[7px] font-black leading-none bg-[#006BB8] text-white px-1 py-[1px] rounded-[2px] mt-[1px] tracking-tighter uppercase">
+            NEWS
+          </span>
         </div>
       );
-    case 'bn1':
+
+    case 'bn1': // 2. বাংলা সাহিত্য (Bold red 'অ।')
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center font-black text-base sm:text-lg shrink-0 shadow-2xs font-hind">
-          অ।
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none font-hind font-black text-2xl sm:text-3xl text-[#E03131]">
+          <span>অ</span>
+          <span className="text-[#E03131] text-xl sm:text-2xl font-bold ml-[1px]">।</span>
         </div>
       );
-    case 'bn2':
+
+    case 'bn2': // 3. বাংলা ভাষা ও ব্যাকরণ (Orange-red badge with white 'অঃ')
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-black text-base sm:text-lg shrink-0 shadow-2xs font-hind">
-          অঃ
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-gradient-to-b from-[#FF5E36] to-[#E02B00] text-white flex items-center justify-center shrink-0 shadow-xs font-hind font-black text-lg sm:text-xl select-none">
+          <span>অঃ</span>
         </div>
       );
-    case 'eng_lit':
+
+    case 'eng_lit': // 4. English Literature (Bold purple italic 'a✍')
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm sm:text-base shrink-0 shadow-2xs">
-          <span className="font-serif italic font-black text-lg">a</span>
-          <span className="text-xs ml-0.5">✍</span>
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none font-serif italic font-black text-2xl sm:text-3xl text-[#7C3AED]">
+          <span>a</span>
+          <span className="text-sm font-sans not-italic text-[#9333EA] ml-[1px]">✍</span>
         </div>
       );
-    case 'eng_lang':
+
+    case 'eng_lang': // 5. English Grammar (Purple badge with 'Aa')
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 shadow-2xs">
-          <span className="bg-white/20 px-1.5 py-0.5 rounded-md font-sans font-black tracking-tight">Aa</span>
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#7C3AED] text-white flex items-center justify-center shrink-0 shadow-xs select-none">
+          <span className="bg-white/20 px-1.5 py-0.5 rounded font-sans font-black text-xs sm:text-sm tracking-tight text-white border border-white/30">
+            Aa
+          </span>
         </div>
       );
-    case 'math':
+
+    case 'math': // 6. গাণিতিক যুক্তি (Hot pink '√x')
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-purple-700 to-pink-600 text-white flex items-center justify-center font-black text-base sm:text-lg shrink-0 shadow-2xs font-mono">
-          √x
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none font-mono font-black text-xl sm:text-2xl text-[#D946EF]">
+          <span>√x</span>
         </div>
       );
-    case 'science':
+
+    case 'bd': // 7. বাংলাদেশ বিষয়াবলি (Concentric green/white/red ring badge)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-green-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Sprout className="w-5 h-5 text-white stroke-[2.2]" />
-        </div>
-      );
-    case 'bd':
-      return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-2xs relative overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
-          <div className="w-6.5 h-6.5 sm:w-7.5 sm:h-7.5 rounded-full bg-[#006A4E] flex items-center justify-center shadow-xs">
-            <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#F42A41]"></div>
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[#006A4E] p-[3px] flex items-center justify-center shadow-xs">
+            <div className="w-full h-full rounded-full bg-white flex items-center justify-center p-[2px]">
+              <div className="w-full h-full rounded-full bg-[#F42A41]" />
+            </div>
           </div>
         </div>
       );
-    case 'intl':
+
+    case 'intl': // 8. আন্তর্জাতিক বিষয়াবলি (Magenta globe)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Globe2 className="w-5.5 h-5.5 text-white stroke-[2.2]" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#E11D48]">
+          <Globe2 className="w-7 h-7 stroke-[2.2]" />
         </div>
       );
-    case 'geo':
+
+    case 'science': // 9. সাধারণ বিজ্ঞান (Green sprout)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Globe className="w-5.5 h-5.5 text-white stroke-[2.2]" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#65A30D]">
+          <Sprout className="w-7 h-7 stroke-[2.2]" />
         </div>
       );
-    case 'ethics':
+
+    case 'geo': // 10. ভূগোল ও দুর্যোগ ব্যবস্থাপনা (Blue globe)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-violet-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Scale className="w-5.5 h-5.5 text-white stroke-[2.2]" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#2563EB]">
+          <Globe className="w-7 h-7 stroke-[2.2]" />
         </div>
       );
-    case 'ict':
+
+    case 'ethics': // 11. নৈতিকতা, মূল্যবোধ ও সুশাসন (Purple scale)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <Monitor className="w-5.5 h-5.5 text-white stroke-[2.2]" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#9333EA]">
+          <Scale className="w-7 h-7 stroke-[2.2]" />
         </div>
       );
-    case 'mental':
+
+    case 'ict': // 12. কম্পিউটার ও তথ্যপ্রযুক্তি (Indigo/purple monitor)
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-500 via-rose-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-          <BookMarked className="w-5.5 h-5.5 text-white stroke-[2.2]" />
+        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#6366F1]">
+          <Monitor className="w-7 h-7 stroke-[2.2]" />
         </div>
       );
+
+    case 'mental': // 13. মানসিক দক্ষতা (Gradient ribbon bookmark)
+      return (
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-md bg-gradient-to-b from-[#3B82F6] via-[#8B5CF6] to-[#EC4899] text-white flex items-center justify-center shrink-0 shadow-xs select-none">
+          <BookMarked className="w-5.5 h-5.5 stroke-[2.2] text-white" />
+        </div>
+      );
+
     default:
       return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#046A38] text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-base">
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#046A38] text-white flex items-center justify-center shrink-0 font-bold text-base">
           {name?.[0] || 'ব'}
         </div>
       );
@@ -167,40 +193,52 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
     let isMounted = true;
 
     async function fetchSubjects() {
+      const cached = getCache<SubjectItem[]>('subjects_page_list', 600000);
+      if (cached && cached.length > 0) {
+        if (isMounted) {
+          setSubjects(cached);
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('subjects')
           .select('id, name, code, created_at')
+          .limit(100)
           .order('id', { ascending: true });
 
         if (!error && data && data.length > 0) {
           if (isMounted) {
-            // Map Supabase subjects with icon matching
-            const mappedSubjects: SubjectItem[] = data.map((s: any) => {
-              const nameLower = (s.name || '').toLowerCase();
-              let iconType = '';
-              if (nameLower.includes('কারেন্ট') || nameLower.includes('current')) iconType = 'news';
-              else if (nameLower.includes('বাংলা ভাষা') || nameLower.includes('ব্যাকরণ')) iconType = 'bn2';
-              else if (nameLower.includes('বাংলা') || nameLower.includes('bangla')) iconType = 'bn1';
-              else if (nameLower.includes('english lit') || nameLower.includes('ইংরেজি সাহিত্য')) iconType = 'eng_lit';
-              else if (nameLower.includes('english') || nameLower.includes('ইংরেজি')) iconType = 'eng_lang';
-              else if (nameLower.includes('গণিত') || nameLower.includes('math')) iconType = 'math';
-              else if (nameLower.includes('বিজ্ঞান') || nameLower.includes('science')) iconType = 'science';
-              else if (nameLower.includes('বাংলাদেশ')) iconType = 'bd';
-              else if (nameLower.includes('আন্তর্জাতিক')) iconType = 'intl';
-              else if (nameLower.includes('ভূগোল') || nameLower.includes('দুর্যোগ')) iconType = 'geo';
-              else if (nameLower.includes('নৈতিকতা') || nameLower.includes('সুশাসন')) iconType = 'ethics';
-              else if (nameLower.includes('কম্পিউটার') || nameLower.includes('তথ্যপ্রযুক্তি') || nameLower.includes('ict')) iconType = 'ict';
-              else if (nameLower.includes('মানসিক')) iconType = 'mental';
+            // Map Supabase subjects with canonical names & icon matching
+            const subjectMap = new Map<string, SubjectItem>();
 
-              return {
+            data.forEach((s: any) => {
+              const canonicalName = getCanonicalSubjectName(s.name, s.code);
+              if (subjectMap.has(canonicalName)) return;
+
+              const iconType = getIconType(canonicalName, s.code);
+
+              subjectMap.set(canonicalName, {
                 id: s.id,
-                name: s.name,
+                name: canonicalName,
                 iconType,
                 code: s.code,
-              };
+              });
             });
+
+            const mappedSubjects = Array.from(subjectMap.values());
+
+            // Sort subjects according to priority
+            mappedSubjects.sort((a, b) => {
+              const pA = getSubjectPriority(a.name, a.code);
+              const pB = getSubjectPriority(b.name, b.code);
+              return pA - pB;
+            });
+
             setSubjects(mappedSubjects);
+            setCache('subjects_page_list', mappedSubjects);
           }
         }
       } catch (err) {
@@ -214,8 +252,15 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
 
     fetchSubjects();
 
+    const unsubscribe = subscribeToQuestionsRealtime(() => {
+      if (isMounted) {
+        fetchSubjects();
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 

@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CurriculumSubject, CurriculumTopic } from '../../data/mockCurriculum';
-import { fetchMockCurriculumFromSupabase, fetchQuestionsForSelectedSubtopics, recordAttemptedQuestionIds } from '../../lib/mockTopicService';
+import { 
+  fetchMockCurriculumFromSupabase, 
+  fetchQuestionsForSelectedSubtopics, 
+  recordAttemptedQuestionIds,
+  subscribeToQuestionsRealtime 
+} from '../../lib/mockTopicService';
 import { MockTopicSelectionView } from './MockTopicSelectionView';
 import { MockConfirmationView } from './MockConfirmationView';
 import { MockExamInterface } from './MockExamInterface';
@@ -34,16 +39,30 @@ export const MockExamFlow: React.FC<MockExamFlowProps> = ({
   const [loadingExamQuestions, setLoadingExamQuestions] = useState<boolean>(false);
   const [examQuestions, setExamQuestions] = useState<Question[]>([]);
 
-  // Load subjects & topics with dynamic counts from Supabase
+  // Load subjects & topics with dynamic counts from Supabase and subscribe to realtime updates
   useEffect(() => {
     let mounted = true;
-    fetchMockCurriculumFromSupabase().then((data) => {
-      if (!mounted) return;
-      setCurriculum(data);
-      setLoadingCurriculum(false);
+
+    const loadData = () => {
+      fetchMockCurriculumFromSupabase().then((data) => {
+        if (!mounted) return;
+        setCurriculum(data);
+        setLoadingCurriculum(false);
+      });
+    };
+
+    loadData();
+
+    // Realtime channel subscription: auto-updates when admin inserts/updates questions
+    const unsubscribe = subscribeToQuestionsRealtime(() => {
+      if (mounted) {
+        loadData();
+      }
     });
+
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, []);
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { CurriculumSubject, CurriculumTopic } from '../../data/mockCurriculum';
-import { normalizeTitle } from '../../lib/mockTopicService';
+import { normalizeTitle, compareTopicCodes } from '../../lib/mockTopicService';
 
 interface MockTopicSelectionViewProps {
   selectedSubject: CurriculumSubject;
@@ -35,7 +35,7 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
 
   const [showSubjectDrawer, setShowSubjectDrawer] = useState(false);
 
-  // Deduplicate topics within the selected subject as an extra safety guarantee
+  // Deduplicate and sort topics & subtopics within the selected subject by code/sequential order
   const uniqueTopics = useMemo(() => {
     if (!selectedSubject || !selectedSubject.topics) return [];
     const seen = new Map<string, CurriculumTopic>();
@@ -43,23 +43,34 @@ export const MockTopicSelectionView: React.FC<MockTopicSelectionViewProps> = ({
     selectedSubject.topics.forEach((top) => {
       const key = normalizeTitle(top.title);
       if (!seen.has(key)) {
-        // Also deduplicate subtopics inside this topic
+        // Deduplicate subtopics inside this topic
         const seenSub = new Map<string, any>();
         (top.subtopics || []).forEach((st) => {
           const subKey = normalizeTitle(st.title);
           if (!seenSub.has(subKey)) {
             seenSub.set(subKey, st);
+          } else {
+            const existing = seenSub.get(subKey);
+            if (!existing.code && st.code) existing.code = st.code;
           }
         });
 
+        const sortedSubtopics = Array.from(seenSub.values());
+        sortedSubtopics.sort(compareTopicCodes);
+
         seen.set(key, {
           ...top,
-          subtopics: Array.from(seenSub.values()),
+          subtopics: sortedSubtopics,
         });
+      } else {
+        const existing = seen.get(key)!;
+        if (!existing.code && top.code) existing.code = top.code;
       }
     });
 
-    return Array.from(seen.values());
+    const result = Array.from(seen.values());
+    result.sort(compareTopicCodes);
+    return result;
   }, [selectedSubject]);
 
   const toggleExpand = (topicId: string) => {

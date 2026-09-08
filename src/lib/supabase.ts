@@ -32,6 +32,15 @@ import {
   saveUserReportedQuestions,
   addUserReportedQuestion
 } from './utils';
+import { getCache, setCache, invalidateCache } from './cache';
+
+// Optimized column lists to prevent select('*') network bloat
+export const QUESTION_COLS = 'id, exam_id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, sub_topic_id, topic_id, question_code, slug, status, mark, created_at';
+export const EXAM_COLS = 'id, title, time_minutes, total_questions, total_marks, negative_mark, start_time, end_time, is_active, syllabus, created_at, subject, category, question_ids, selected_question_codes, question_count';
+export const EXAM_RESULT_COLS = 'id, exam_id, user_id, user_name, score, correct_answers, wrong_answers, total_questions, time_taken, points, submitted_at, created_at, roll_number, student_id';
+export const PROFILE_COLS = 'id, email, password, full_name, roll_number, student_id, phone, avatar_url, role, updated_at, created_at';
+export const COURSE_COLS = 'id, title, description, price, duration, features, category, created_at, status, topics, routine, routine_url, image_url';
+export const BLOG_COLS = 'id, title, content, author, category, sub_category, subject, thumbnail, thumbnail_url, excerpt, reading_time_minutes, status, created_at, updated_at, views_count, is_featured, slug';
 
 /**
  * Safely retrieve Supabase configuration.
@@ -156,7 +165,7 @@ export async function fetchWithTimeout<T>(promisePromise: Promise<T>, timeoutMs 
 
 /**
  * Fetches published questions from Supabase table 'public.questions'
- * Only fetches rows where status = 'published'
+ * and merges with admin-created questions
  */
 export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
   let cachedQuestions: Question[] = [];
@@ -170,77 +179,178 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
     }
   } catch {}
 
-  // Clean cache by removing any legacy sample questions
-  if (cachedQuestions.length > 0) {
-    cachedQuestions = cachedQuestions.filter((q: any) => q && !String(q.id).startsWith('sample-'));
+  // Merge admin created questions from local storage if any
+  const adminQuestionsMap = new Map<string, Question>();
+  if (typeof window !== 'undefined') {
+    try {
+      const rawAdmin = localStorage.getItem('miniquiz_admin_questions');
+      if (rawAdmin) {
+        const parsed = JSON.parse(rawAdmin);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((q: any) => {
+            if (q && q.id) {
+              adminQuestionsMap.set(String(q.id), q);
+            }
+          });
+        }
+      }
+    } catch {}
   }
 
   if (!supabaseInstance) {
+    const combined = Array.from(adminQuestionsMap.values());
     return {
-      questions: cachedQuestions,
+      questions: combined.length > 0 ? combined : cachedQuestions,
       isFromSupabase: false,
-      error: cachedQuestions.length > 0 ? null : 'Supabase এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা নেই।',
+      error: cachedQuestions.length > 0 || combined.length > 0 ? null : 'Supabase এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা নেই।',
     };
   }
 
   try {
-    // Select all questions (not restricting strictly to status='published' so admin created questions show up)
-    const queryPromise = Promise.resolve(supabaseInstance
-      .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false }));
+    // 1. Fetch subjects and topics map for ID-to-name lookup
+    const subjectNameMap = new Map<string, string>();
+    const topicNameMap = new Map<string, string>();
 
-    const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
-    const { data, error } = await fetchWithTimeout(queryPromise, 3500, timeoutFallback as any);
-
-    if (error) {
-      console.warn('Supabase fetch notice (using cache/presets):', error.message || error);
-      return {
-        questions: cachedQuestions,
-        isFromSupabase: false,
-        error: null,
-      };
+    try {
+      const [{ data: sData }, { data: tData }] = await Promise.all([
+        supabaseInstance.from('subjects').select('id, name'),
+        supabaseInstance.from('topics').select('id, title, subject_id'),
+      ]);
+      if (sData) {
+        sData.forEach((s: any) => subjectNameMap.set(String(s.id), s.name));
+      }
+      if (tData) {
+        tData.forEach((t: any) => topicNameMap.set(String(t.id), t.title));
+      }
+    } catch (lookupErr) {
+      console.warn('Notice loading subject/topic lookups:', lookupErr);
     }
 
-    if (!data || data.length === 0) {
-      try {
-        localStorage.setItem('miniquiz_questions_cache', JSON.stringify([]));
-      } catch {}
+    // Check in-memory cache first
+    const memoryCached = getCache<Question[]>('published_questions_cache', 300000);
+    if (memoryCached && memoryCached.length > 0) {
       return {
-        questions: [],
+        questions: memoryCached,
         isFromSupabase: true,
         error: null,
       };
     }
 
-    // Cast & format fetched items from public.questions with subject auto-detection fallback
-    const questionsList: Question[] = data
-      .filter((item: any) => item && item.status !== 'draft')
-      .map((item: any) => {
+    // 2. Select questions from Supabase (optimized specific columns & limit)
+    const queryPromise = Promise.resolve(
+      supabaseInstance
+        .from('questions')
+        .select(QUESTION_COLS)
+        .order('created_at', { ascending: false })
+        .limit(200)
+    );
+
+    const timeoutFallback = { data: null, error: { message: 'Network Timeout', code: 'TIMEOUT' } };
+    const { data, error } = await fetchWithTimeout(queryPromise, 8000, timeoutFallback as any);
+
+    if (error) {
+      console.warn('Supabase fetch notice (using cache/presets):', error.message || error);
+      const combined = Array.from(adminQuestionsMap.values());
+      return {
+        questions: combined.length > 0 ? combined : cachedQuestions,
+        isFromSupabase: false,
+        error: null,
+      };
+    }
+
+    const fetchedRows = data && Array.isArray(data) ? data : [];
+
+    // 3. Format and resolve questions
+    const questionsMap = new Map<string, Question>();
+
+    fetchedRows.forEach((item: any) => {
+      if (!item) return;
+
+      let optA = String(item.option_a || item.option1 || item.choice_a || '');
+      let optB = String(item.option_b || item.option2 || item.choice_b || '');
+      let optC = String(item.option_c || item.option3 || item.choice_c || '');
+      let optD = String(item.option_d || item.option4 || item.choice_d || '');
+      let corrAns = (item.correct_answer || item.correct_option || item.answer || 'option_a') as any;
+
+      // Check nested options relation array
+      if (Array.isArray(item.options) && item.options.length >= 2) {
+        const sorted = [...item.options].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        if (sorted[0]) optA = sorted[0].text || sorted[0].option_text || optA;
+        if (sorted[1]) optB = sorted[1].text || sorted[1].option_text || optB;
+        if (sorted[2]) optC = sorted[2].text || sorted[2].option_text || optC;
+        if (sorted[3]) optD = sorted[3].text || sorted[3].option_text || optD;
+
+        const cIdx = sorted.findIndex((o) => o.is_correct || o.isCorrect);
+        if (cIdx === 0) corrAns = 'option_a';
+        else if (cIdx === 1) corrAns = 'option_b';
+        else if (cIdx === 2) corrAns = 'option_c';
+        else if (cIdx === 3) corrAns = 'option_d';
+      }
+
+      // Resolve subject name
+      let resolvedSubject = item.subject ? String(item.subject).trim() : null;
+      if (!resolvedSubject && item.subject_id) {
+        resolvedSubject = subjectNameMap.get(String(item.subject_id)) || null;
+      }
+
+      // Resolve topic / subtopic name
+      let resolvedTopic = item.topic ? String(item.topic).trim() : null;
+      let resolvedSubTopic = item.sub_topic ? String(item.sub_topic).trim() : null;
+      if (!resolvedTopic && item.topic_id) {
+        resolvedTopic = topicNameMap.get(String(item.topic_id)) || null;
+      }
+      if (!resolvedSubTopic && item.sub_topic_id) {
+        resolvedSubTopic = topicNameMap.get(String(item.sub_topic_id)) || null;
+      }
+
+      const qText = String(item.question || item.question_text || item.title || item.text || '').trim();
+
       const qObj: Question = {
         id: String(item.id),
-        question: String(item.question || ''),
-        option_a: String(item.option_a || ''),
-        option_b: String(item.option_b || ''),
-        option_c: String(item.option_c || ''),
-        option_d: String(item.option_d || ''),
-        correct_answer: (item.correct_answer || 'option_a') as 'option_a' | 'option_b' | 'option_c' | 'option_d',
-        explanation: item.explanation ? String(item.explanation) : null,
+        question_code: item.question_code ? String(item.question_code) : String(item.id),
+        slug: item.slug ? String(item.slug) : String(item.id),
+        question: qText,
+        option_a: optA,
+        option_b: optB,
+        option_c: optC,
+        option_d: optD,
+        correct_answer: corrAns,
+        explanation: item.explanation || item.explanation_text || null,
         status: item.status || 'published',
-        subject: item.subject ? String(item.subject) : null,
-        topic: item.topic ? String(item.topic) : null,
+        subject: resolvedSubject,
+        subject_id: item.subject_id || null,
+        topic: resolvedTopic || resolvedSubTopic,
+        topic_id: item.topic_id || null,
+        sub_topic: resolvedSubTopic,
+        sub_topic_id: item.sub_topic_id || null,
         exam_id: item.exam_id ? String(item.exam_id) : null,
+        options: item.options || undefined,
         created_at: item.created_at || new Date().toISOString(),
       };
 
-      // Assign detected subject if null
-      qObj.subject = detectQuestionSubject(qObj);
-      return qObj;
+      if (!qObj.subject) {
+        qObj.subject = detectQuestionSubject(qObj);
+      }
+
+      if (qObj.question) {
+        questionsMap.set(String(qObj.id), qObj);
+      }
     });
+
+    // Merge admin localStorage questions if any were not in Supabase yet
+    adminQuestionsMap.forEach((adminQ, qId) => {
+      if (!questionsMap.has(qId)) {
+        questionsMap.set(qId, adminQ);
+      }
+    });
+
+    const questionsList = Array.from(questionsMap.values());
 
     try {
       localStorage.setItem('miniquiz_questions_cache', JSON.stringify(questionsList));
     } catch {}
+
+    setCache('published_questions_cache', questionsList);
 
     return {
       questions: questionsList,
@@ -248,8 +358,9 @@ export async function fetchPublishedQuestions(): Promise<FetchQuestionsResult> {
       error: null,
     };
   } catch (err: unknown) {
+    const combined = Array.from(adminQuestionsMap.values());
     return {
-      questions: cachedQuestions,
+      questions: combined.length > 0 ? combined : cachedQuestions,
       isFromSupabase: false,
       error: null,
     };
@@ -293,6 +404,17 @@ export const DEFAULT_EXAM_PRESETS: ExamItem[] = [];
  * Fetches exams/model tests from Supabase table 'public.exams'
  */
 export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Promise<FetchExamsResult> {
+  if (!forceRefresh) {
+    const memCache = getCache<ExamItem[]>('exams_list_cache', 300000);
+    if (memCache && memCache.length > 0) {
+      return {
+        exams: memCache,
+        isFromSupabase: true,
+        error: null,
+      };
+    }
+  }
+
   let cachedExams: ExamItem[] = [];
   if (!forceRefresh) {
     try {
@@ -315,8 +437,9 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
   try {
     const queryPromise = Promise.resolve(supabaseInstance
       .from('exams')
-      .select('*')
-      .order('created_at', { ascending: false }));
+      .select(EXAM_COLS)
+      .order('created_at', { ascending: false })
+      .limit(100));
 
     const timeoutFallback = { data: null, error: { message: 'Network Timeout (Mobile Data)', code: 'TIMEOUT' } };
     const { data, error } = await fetchWithTimeout(queryPromise, 6000, timeoutFallback as any);
@@ -396,6 +519,8 @@ export async function fetchExamsFromSupabase(forceRefresh: boolean = false): Pro
     try {
       localStorage.setItem('miniquiz_exams_cache', JSON.stringify(fetchedExams));
     } catch {}
+
+    setCache('exams_list_cache', fetchedExams);
 
     return {
       exams: fetchedExams,
@@ -593,16 +718,16 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
     let examRecord: any = null;
 
     // Try finding by id
-    const { data: idExams } = await supabaseInstance.from('exams').select('*').eq('id', cleanExamId);
+    const { data: idExams } = await supabaseInstance.from('exams').select(EXAM_COLS).eq('id', cleanExamId).limit(1);
     if (idExams && idExams.length > 0) {
       examRecord = idExams[0];
     } else {
       // Try finding by title
-      const { data: titleExams } = await supabaseInstance.from('exams').select('*').eq('title', cleanExamId);
+      const { data: titleExams } = await supabaseInstance.from('exams').select(EXAM_COLS).eq('title', cleanExamId).limit(1);
       if (titleExams && titleExams.length > 0) {
         examRecord = titleExams[0];
       } else if (examTitle && examTitle.trim()) {
-        const { data: titleExams2 } = await supabaseInstance.from('exams').select('*').eq('title', examTitle.trim());
+        const { data: titleExams2 } = await supabaseInstance.from('exams').select(EXAM_COLS).eq('title', examTitle.trim()).limit(1);
         if (titleExams2 && titleExams2.length > 0) {
           examRecord = titleExams2[0];
         }
@@ -634,7 +759,9 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         ...extractCodes(examRecord.selected_questions),
         ...extractCodes(examRecord.questions),
       ];
-      selectedCodesList = Array.from(new Set(codes));
+      selectedCodesList = Array.from(new Set(codes)).filter(
+        (code) => code !== null && code !== undefined && String(code).trim() !== '' && String(code).trim() !== 'undefined' && String(code).trim() !== 'null'
+      );
     }
 
     // 2. If selected question codes exist, fetch specifically those Question Codes
@@ -642,7 +769,7 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       // Query questions by id
       const { data: byIdData, error: byIdErr } = await supabaseInstance
         .from('questions')
-        .select('*')
+        .select(QUESTION_COLS)
         .in('id', selectedCodesList);
 
       let matchedQuestions: any[] = [];
@@ -654,7 +781,7 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       if (matchedQuestions.length === 0) {
         const { data: byCodeData, error: byCodeErr } = await supabaseInstance
           .from('questions')
-          .select('*')
+          .select(QUESTION_COLS)
           .in('question_code', selectedCodesList);
         if (!byCodeErr && byCodeData && byCodeData.length > 0) {
           matchedQuestions = byCodeData;
@@ -665,7 +792,7 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
       if (matchedQuestions.length === 0) {
         const { data: bySlugData } = await supabaseInstance
           .from('questions')
-          .select('*')
+          .select(QUESTION_COLS)
           .in('slug', selectedCodesList);
         if (bySlugData && bySlugData.length > 0) {
           matchedQuestions = bySlugData;
@@ -703,23 +830,27 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         examRecord?.id ? String(examRecord.id).trim() : null,
         examRecord?.title ? String(examRecord.title).trim() : null,
         examTitle ? String(examTitle).trim() : null,
-      ])).filter(Boolean) as string[];
+      ])).filter((key) => key !== null && key !== undefined && String(key).trim() !== '' && String(key).trim() !== 'undefined' && String(key).trim() !== 'null') as string[];
 
-      const { data: directData, error: directErr } = await supabaseInstance
-        .from('questions')
-        .select('*')
-        .in('exam_id', candidateExamKeys)
-        .order('created_at', { ascending: true });
+      if (candidateExamKeys.length > 0) {
+        const { data: directData, error: directErr } = await supabaseInstance
+          .from('questions')
+          .select(QUESTION_COLS)
+          .in('exam_id', candidateExamKeys)
+          .order('created_at', { ascending: true })
+          .limit(100);
 
-      if (!directErr && directData && directData.length > 0) {
-        rawQuestions = directData;
+        if (!directErr && directData && directData.length > 0) {
+          rawQuestions = directData;
+        }
       } else {
         // Try ilike for partial exam_id match
         const { data: ilikeData } = await supabaseInstance
           .from('questions')
-          .select('*')
+          .select(QUESTION_COLS)
           .ilike('exam_id', `%${cleanExamId}%`)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: true })
+          .limit(100);
         if (ilikeData && ilikeData.length > 0) {
           rawQuestions = ilikeData;
         }
@@ -733,9 +864,10 @@ export async function fetchQuestionsByExamId(examId: string, examSubject?: strin
         const cleanSubj = String(targetSubj).trim();
         const { data: subjData } = await supabaseInstance
           .from('questions')
-          .select('*')
+          .select(QUESTION_COLS)
           .ilike('subject', `%${cleanSubj}%`)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: true })
+          .limit(100);
         if (subjData && subjData.length > 0) {
           rawQuestions = subjData;
         }
@@ -799,7 +931,7 @@ export async function fetchQuestionBySlugOrId(slugOrId: string): Promise<Questio
       if (isUuidString(cleanVal)) {
         const { data } = await supabaseInstance
           .from('questions')
-          .select('*')
+          .select(QUESTION_COLS)
           .eq('id', cleanVal)
           .limit(1);
 
@@ -826,7 +958,7 @@ export async function fetchQuestionBySlugOrId(slugOrId: string): Promise<Questio
 
       const { data: slugData } = await supabaseInstance
         .from('questions')
-        .select('*')
+        .select(QUESTION_COLS)
         .eq('slug', cleanVal)
         .limit(1);
 
@@ -1173,6 +1305,8 @@ export function saveLocalLeaderboardEntry(entry: LeaderboardEntry): void {
   } catch {}
 }
 
+const recentlySubmittedExams = new Map<string, number>();
+
 /**
  * Submit exam result securely to Supabase `exam_results` table,
  * sync user profile, and update server storage.
@@ -1197,6 +1331,15 @@ export async function submitExamResultToSupabase(params: {
   time_taken_seconds?: number;
   submitted_at?: string;
 }): Promise<{ success: boolean; error?: string; alreadySubmitted?: boolean }> {
+  const now = Date.now();
+  const submissionKey = `${params.exam_id}_${params.user_id || 'guest'}_${params.score}`;
+  const lastSub = recentlySubmittedExams.get(submissionKey);
+  if (lastSub && (now - lastSub < 5000)) {
+    console.log('Debouncing repeated submission for exam:', params.exam_id);
+    return { success: true, alreadySubmitted: true };
+  }
+  recentlySubmittedExams.set(submissionKey, now);
+
   const submittedAt = params.submitted_at || new Date().toISOString();
   const timeTaken = Number(params.time_taken_seconds || 0);
   const points = Number(params.points !== undefined && params.points !== null ? params.points : (params.correct_answers ?? 0));
@@ -1737,7 +1880,7 @@ export async function getDistinctExamParticipantCounts(): Promise<Record<string,
   if (supabaseInstance) {
     try {
       let { data, error } = await fetchWithTimeout(
-        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        Promise.resolve(supabaseInstance.from('exam_results').select(EXAM_RESULT_COLS).limit(200)),
         5000,
         { data: null, error: null } as any
       );
@@ -1845,9 +1988,9 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
   // 1. Direct Supabase Query from `exam_results` table
   if (supabaseInstance) {
     try {
-      // Query all rows from exam_results safely with select('*')
+      // Query exam_results with explicit column list and limit
       let { data, error } = await fetchWithTimeout(
-        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        Promise.resolve(supabaseInstance.from('exam_results').select(EXAM_RESULT_COLS).limit(200)),
         6000,
         { data: null, error: null } as any
       );
@@ -1882,7 +2025,8 @@ export async function getExamLeaderboard(examId: string): Promise<ExamLeaderboar
         try {
           const { data: profs } = await supabaseInstance
             .from('profiles')
-            .select('id, full_name, avatar_url, roll_number, student_id, phone');
+            .select('id, full_name, avatar_url, roll_number, student_id, phone')
+            .limit(200);
           if (profs && Array.isArray(profs)) {
             profs.forEach((p: any) => {
               if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
@@ -2464,7 +2608,7 @@ export async function getTamreenLeaderboard(params: {
       autoHealSupabaseExamResultsPoints().catch(() => {});
 
       let { data: rawResults, error: qErr } = await fetchWithTimeout(
-        Promise.resolve(supabaseInstance.from('exam_results').select('*')),
+        Promise.resolve(supabaseInstance.from('exam_results').select(EXAM_RESULT_COLS).limit(200)),
         6000,
         { data: null, error: null } as any
       );
@@ -2485,7 +2629,8 @@ export async function getTamreenLeaderboard(params: {
         try {
           const { data: profs } = await supabaseInstance
             .from('profiles')
-            .select('id, full_name, avatar_url, roll_number, student_id, phone');
+            .select('id, full_name, avatar_url, roll_number, student_id, phone')
+            .limit(200);
           if (profs && Array.isArray(profs)) {
             profs.forEach((p) => {
               if (p.id) profilesMap.set(String(p.id).toLowerCase(), p);
@@ -2947,9 +3092,9 @@ export async function fetchLeaderboardEntriesFromSupabase(examId?: string): Prom
 
       let query = supabaseInstance
         .from('exam_results')
-        .select('*')
+        .select(EXAM_RESULT_COLS)
         .order('score', { ascending: false })
-        .limit(1000);
+        .limit(100);
 
       if (examId && examId !== 'all') {
         const cleanExamId = examId.trim();
@@ -3147,6 +3292,15 @@ export function normalizeCourseCategory(cat: string | undefined): string {
 }
 
 export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModule[]; isFromSupabase: boolean; error?: string | null }> {
+  const memCached = getCache<CourseModule[]>('courses_list_cache', 300000);
+  if (memCached && memCached.length > 0) {
+    return {
+      courses: memCached,
+      isFromSupabase: true,
+      error: null,
+    };
+  }
+
   let cachedCourses: CourseModule[] = [];
   try {
     const raw = localStorage.getItem('tamreen_courses_cache');
@@ -3167,10 +3321,11 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
   }
 
   try {
-    // Select all courses directly from Supabase with timeout protection
+    // Select courses directly from Supabase with timeout protection & limit
     const queryPromise = Promise.resolve(supabaseInstance
       .from('courses')
-      .select('*'));
+      .select(COURSE_COLS)
+      .limit(50));
 
     const { data, error } = await fetchWithTimeout(queryPromise, 3500, { data: null, error: { message: 'Network Timeout' } } as any);
 
@@ -3253,6 +3408,8 @@ export async function fetchCoursesFromSupabase(): Promise<{ courses: CourseModul
     try {
       localStorage.setItem('tamreen_courses_cache', JSON.stringify(fetchedCourses));
     } catch {}
+
+    setCache('courses_list_cache', fetchedCourses);
 
     return {
       courses: fetchedCourses,
@@ -3935,7 +4092,8 @@ export async function fetchCourseSheetsFromSupabase(
     // Query course_sheets safely without strict .or() that fails on non-existent columns
     const { data, error } = await supabaseInstance
       .from('course_sheets')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (error || !data) {
       return { sheets: [], error: error?.message || null };
@@ -3997,7 +4155,8 @@ export async function fetchCourseExamsFromSupabase(
     // 1. First fetch all course_exams safely without column-specific PostgREST filters
     const { data: courseExamsData, error: courseExamsError } = await supabaseInstance
       .from('course_exams')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (!courseExamsError && courseExamsData && courseExamsData.length > 0) {
       const matchedExams = courseExamsData.filter((item: any) => {
@@ -4044,7 +4203,8 @@ export async function fetchCourseExamsFromSupabase(
     // 2. Fallback check on 'exams' table for course_id === courseId
     const { data: generalExamsData, error: generalExamsError } = await supabaseInstance
       .from('exams')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (!generalExamsError && generalExamsData && generalExamsData.length > 0) {
       const matchedGeneral = generalExamsData.filter((item: any) => {
@@ -4100,7 +4260,8 @@ export async function fetchCourseRoutinesFromSupabase(
     // 1. Try course_routines
     const { data: routineData, error: routineError } = await supabaseInstance
       .from('course_routines')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (!routineError && routineData && routineData.length > 0) {
       const matched = routineData.filter((item: any) => {
@@ -4135,7 +4296,8 @@ export async function fetchCourseRoutinesFromSupabase(
     // 2. Try routines table
     const { data: generalRoutines, error: generalError } = await supabaseInstance
       .from('routines')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (!generalError && generalRoutines && generalRoutines.length > 0) {
       const matched = generalRoutines.filter((item: any) => {
@@ -4190,7 +4352,8 @@ export async function fetchCourseSyllabusFromSupabase(
     // 1. Try course_syllabus table
     const { data, error } = await supabaseInstance
       .from('course_syllabus')
-      .select('*');
+      .select('*')
+      .limit(100);
 
     if (!error && data && data.length > 0) {
       const matched = data.filter((item: any) => {
@@ -5103,8 +5266,9 @@ export async function fetchAllRegisteredUsers(): Promise<{
     try {
       const { data, error } = await supabaseInstance
         .from('profiles')
-        .select('*')
-        .order('updated_at', { ascending: false });
+        .select(PROFILE_COLS)
+        .order('updated_at', { ascending: false })
+        .limit(500);
 
       if (!error && Array.isArray(data)) {
         data.forEach((p) => {
@@ -5181,8 +5345,9 @@ export async function fetchSubjectPostsFromSupabase(): Promise<MainSubjectPost[]
     try {
       const queryPromise = Promise.resolve(supabaseInstance
         .from('subject_posts')
-        .select('*')
-        .order('created_at', { ascending: true }));
+        .select('id, name, code, tagline, badge, subtitle, icon_name, theme_color, accent_gradient, gradient_class, topics, description, created_at')
+        .order('created_at', { ascending: true })
+        .limit(100));
 
       const { data, error } = await fetchWithTimeout(queryPromise, 3500, { data: null, error: { message: 'Timeout' } } as any);
 
@@ -5714,8 +5879,9 @@ export async function fetchUserQuestionReportsFromSupabase(
     try {
       let query = supabaseInstance
         .from('question_reports')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, question_id, question_title, reason, details, status, created_at, user_id')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (currentUserId) {
         query = query.eq('user_id', currentUserId);
@@ -5799,10 +5965,11 @@ export async function fetchQuestionCommunityExplanations(
     try {
       const { data, error } = await supabaseInstance
         .from('question_explanations')
-        .select('*')
+        .select('id, question_id, user_id, author_name, author_avatar, explanation, likes_count, status, created_at')
         .eq('question_id', qId)
         .eq('status', 'approved')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(30);
 
       if (!error && Array.isArray(data)) {
         return data.map((item: any) => ({
@@ -5933,8 +6100,9 @@ export async function fetchAllExplanationsForAdmin(): Promise<QuestionCommunityE
     try {
       const { data, error } = await supabaseInstance
         .from('question_explanations')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, question_id, user_id, author_name, author_avatar, explanation, likes_count, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (!error && Array.isArray(data)) {
         return data.map((item: any) => ({
@@ -6032,8 +6200,9 @@ export async function fetchAllQuestionReportsForAdmin(): Promise<any[]> {
     try {
       const { data, error } = await supabaseInstance
         .from('question_reports')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, question_id, question_title, reason, details, status, created_at, user_id, user_phone')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (!error && Array.isArray(data)) {
         return data;
@@ -6077,7 +6246,7 @@ export async function customPhoneLoginOrRegister(
     // 1. Check if phone exists
     const { data: existingProfile, error: searchError } = await supabaseInstance
       .from('profiles')
-      .select('*')
+      .select(PROFILE_COLS)
       .eq('phone', cleanPhone)
       .maybeSingle();
 
@@ -6130,7 +6299,7 @@ export async function customPhoneLoginOrRegister(
     try {
       const { data: fetched } = await supabaseInstance
         .from('profiles')
-        .select('*')
+        .select(PROFILE_COLS)
         .eq('id', newId)
         .maybeSingle();
       if (fetched) createdProfile = fetched;
@@ -6174,7 +6343,7 @@ export async function customPhoneLogin(phone: string, password?: string): Promis
 
     const { data: existingProfile, error: searchError } = await supabaseInstance
       .from('profiles')
-      .select('*')
+      .select(PROFILE_COLS)
       .eq('phone', cleanPhone)
       .maybeSingle();
 
@@ -6271,7 +6440,7 @@ export async function customPhoneRegister(
     try {
       const { data: fetched } = await supabaseInstance
         .from('profiles')
-        .select('*')
+        .select(PROFILE_COLS)
         .eq('id', newId)
         .maybeSingle();
       if (fetched) createdProfile = fetched;
@@ -6384,8 +6553,9 @@ export async function fetchBlogPosts(filterOptions?: { category?: string; sub_ca
     try {
       let query = supabaseInstance
         .from('blogs')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select(BLOG_COLS)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (filterOptions?.category && filterOptions.category !== 'সবগুলো') {
         query = query.eq('category', filterOptions.category);

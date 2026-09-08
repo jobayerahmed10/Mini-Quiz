@@ -4,6 +4,8 @@
 export interface CurriculumSubtopic {
   id: string;
   title: string;
+  code?: string;
+  created_at?: string;
   totalQuestions: number;
   solvedQuestions: number;
 }
@@ -11,6 +13,8 @@ export interface CurriculumSubtopic {
 export interface CurriculumTopic {
   id: string;
   title: string;
+  code?: string;
+  created_at?: string;
   totalQuestions: number;
   solvedQuestions: number;
   subtopics: CurriculumSubtopic[];

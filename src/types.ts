@@ -11,8 +11,13 @@ export interface Question {
   explanation?: string | null;
   status?: 'published' | 'draft' | string;
   subject?: string | null;
+  subject_id?: string | number | null;
   topic?: string | null;
+  topic_id?: string | number | null;
+  sub_topic?: string | null;
+  sub_topic_id?: string | number | null;
   exam_id?: string | null;
+  options?: any[];
   created_at?: string;
 }
 

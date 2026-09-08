@@ -62,6 +62,7 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   }, [safeTimeMinutes]);
 
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(examId && examId !== 'general'));
+  const fetchedExamIdRef = useRef<string | null>(null);
 
   // Strict question matching for specific exams (by Question Codes or exam_id) and general topic practice
   const getResolvedQuestions = (pool: Question[], subj: string, topic?: string, count?: number, activeExamId?: string): Question[] => {
@@ -266,6 +267,11 @@ export const PracticePage: React.FC<PracticePageProps> = ({
   useEffect(() => {
     let isMounted = true;
     if (examId && examId !== 'general') {
+      if (fetchedExamIdRef.current === examId) {
+        // Already fetched for this exam ID
+        return;
+      }
+      fetchedExamIdRef.current = examId;
       setIsLoading(true);
       fetchQuestionsByExamId(examId, activeSubject, examTitle, effectiveLimit).then((fetchedFromDb) => {
         if (!isMounted) return;

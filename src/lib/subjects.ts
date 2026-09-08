@@ -282,6 +282,101 @@ export const SUBJECT_CATEGORIES: SubjectCategory[] = [
 ];
 
 /**
+ * Returns exact priority order (1 to 13) for subjects
+ */
+export function getSubjectPriority(name: string, code?: string): number {
+  const n = (name || '').toLowerCase().trim();
+  const c = (code || '').toUpperCase().trim();
+
+  // 1. কারেন্ট অ্যাফেয়ার্স
+  if (n.includes('কারেন্ট') || n.includes('current') || c === 'GK-CA') return 1;
+
+  // 2. বাংলা সাহিত্য
+  if ((n.includes('বাংলা') && n.includes('সাহিত্য')) || c === 'BNG-LIT' || n === 'বাংলা') return 2;
+
+  // 3. বাংলা ভাষা ও ব্যাকরণ
+  if (n.includes('বাংলা ভাষা') || n.includes('ব্যাকরণ') || c === 'BNG-LNG') return 3;
+
+  // 4. English Literature
+  if (n.includes('english lit') || n.includes('ইংরেজি সাহিত্য') || c === 'ENG-LIT') return 4;
+
+  // 5. English Language / English Grammar
+  if (n.includes('english') || n.includes('grammar') || n.includes('ইংরেজি') || c === 'ENG-GRM' || c === 'ENG-LNG') return 5;
+
+  // 6. গাণিতিক যুক্তি
+  if (n.includes('গণিত') || n.includes('math') || c === 'MATH') return 6;
+
+  // 7. বাংলাদেশ বিষয়াবলি
+  if (n.includes('বাংলাদেশ') || c === 'GK-BD') return 7;
+
+  // 8. আন্তর্জাতিক বিষয়াবলি
+  if (n.includes('আন্তর্জাতিক') || c === 'GK-INT') return 8;
+
+  // 9. সাধারণ বিজ্ঞান
+  if (n.includes('বিজ্ঞান') || n.includes('science') || c === 'GK-SCI' || c === 'GEN-SCI') return 9;
+
+  // 10. ভূগোল ও দুর্যোগ ব্যবস্থাপনা
+  if (n.includes('ভূগোল') || n.includes('দুর্যোগ') || n.includes('পরিবেশ') || c === 'GK-GEO' || c === 'GEO') return 10;
+
+  // 11. নৈতিকতা, মূল্যবোধ ও সুশাসন
+  if (n.includes('নৈতিকতা') || n.includes('সুশাসন') || c === 'ETH') return 11;
+
+  // 12. কম্পিউটার ও তথ্যপ্রযুক্তি
+  if (n.includes('কম্পিউটার') || n.includes('তথ্যপ্রযুক্তি') || n.includes('তথ্য প্রযুক্তি') || n.includes('ict') || c === 'GK-CS' || c === 'CS-IT') return 12;
+
+  // 13. মানসিক দক্ষতা
+  if (n.includes('মানসিক') || c === 'MENTAL') return 13;
+
+  return 99;
+}
+
+/**
+ * Returns canonical display name for a subject to avoid duplicate or English alias names
+ */
+export function getCanonicalSubjectName(name: string, code?: string): string {
+  const priority = getSubjectPriority(name, code);
+  switch (priority) {
+    case 1: return 'কারেন্ট অ্যাফেয়ার্স';
+    case 2: return 'বাংলা সাহিত্য';
+    case 3: return 'বাংলা ভাষা ও ব্যাকরণ';
+    case 4: return 'English Literature';
+    case 5: return 'English Grammar';
+    case 6: return 'গাণিতিক যুক্তি';
+    case 7: return 'বাংলাদেশ বিষয়াবলি';
+    case 8: return 'আন্তর্জাতিক বিষয়াবলি';
+    case 9: return 'সাধারণ বিজ্ঞান';
+    case 10: return 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা';
+    case 11: return 'নৈতিকতা, মূল্যবোধ ও সুশাসন';
+    case 12: return 'কম্পিউটার ও তথ্যপ্রযুক্তি';
+    case 13: return 'মানসিক দক্ষতা';
+    default: return name || 'বিষয়';
+  }
+}
+
+/**
+ * Returns icon key string based on subject name or code
+ */
+export function getIconType(name: string, code?: string): string {
+  const priority = getSubjectPriority(name, code);
+  switch (priority) {
+    case 1: return 'news';
+    case 2: return 'bn1';
+    case 3: return 'bn2';
+    case 4: return 'eng_lit';
+    case 5: return 'eng_lang';
+    case 6: return 'math';
+    case 7: return 'bd';
+    case 8: return 'intl';
+    case 9: return 'science';
+    case 10: return 'geo';
+    case 11: return 'ethics';
+    case 12: return 'ict';
+    case 13: return 'mental';
+    default: return '';
+  }
+}
+
+/**
  * Helper to auto-classify questions into subjects if `subject` field is null or unspecified
  */
 export function detectQuestionSubject(question: Question): string {
