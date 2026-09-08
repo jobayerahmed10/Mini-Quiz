@@ -32,18 +32,22 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   const currentUserAvatar = userProfile?.avatar;
   const examTitle = result.examTitle || result.selectedSubject || 'বাংলা মডেল টেস্ট';
 
-  // Format Elapsed Time: 00:00:29
+  // Format Elapsed Time
   const formatElapsedTime = (totalSeconds: number = 0) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    if (!totalSeconds || totalSeconds < 60) {
+      return `${toBengaliNumeral(totalSeconds || 1)} সেকেন্ড`;
+    }
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (secs === 0) {
+      return `${toBengaliNumeral(mins)} মিনিট`;
+    }
+    return `${toBengaliNumeral(mins)} মিনিট ${toBengaliNumeral(secs)} সেকেন্ড`;
   };
 
-  const formattedTimeBengali = formatElapsedTime(result.timeTakenSeconds || 29);
+  const formattedTimeBengali = formatElapsedTime(result.timeTakenSeconds || 60);
 
-  // Negative Marking Calculation: wrongCount * 0.25
+  // Negative Marking Calculation
   const negativeMarkVal = result.negativeMarks !== undefined 
     ? result.negativeMarks 
     : Number((result.wrongCount * 0.25).toFixed(2));
@@ -51,19 +55,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   const obtainedMarksVal = Math.max(0, Number((result.correctCount - negativeMarkVal).toFixed(2)));
   const isPassed = result.percentage >= 40;
 
-  // Calculate score percentage (supporting both result.percentage and raw questions score)
   const scorePercentage = result.percentage !== undefined && result.percentage > 0
     ? result.percentage
     : (result.totalQuestions > 0 ? (result.correctCount / result.totalQuestions) * 100 : 0);
 
-  // Check if user achieved a score higher than 80%
   const isHighScore = scorePercentage > 80;
   const hasTriggeredConfetti = useRef(false);
 
-  // Confetti celebration trigger with multi-stage burst effect
   const triggerCelebrationConfetti = () => {
     try {
-      // Stage 1: Big center explosion
       confetti({
         particleCount: 100,
         spread: 90,
@@ -72,7 +72,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         disableForReducedMotion: true,
       });
 
-      // Stage 2: Left & Right side cannon streams
       const duration = 2400;
       const animationEnd = Date.now() + duration;
       const celebrationColors = ['#046A38', '#EAB308', '#0288D1', '#10B981', '#F59E0B'];
@@ -105,7 +104,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     }
   };
 
-  // Trigger confetti automatically when user achieves score higher than 80%
   useEffect(() => {
     if (isHighScore && !hasTriggeredConfetti.current) {
       hasTriggeredConfetti.current = true;
@@ -130,14 +128,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     }
   };
 
+  const skippedCount = Math.max(0, result.totalQuestions - result.correctCount - result.wrongCount);
+
   return (
     <div className="min-h-screen bg-[#F0F4F8] dark:bg-[#070D1E] pb-28 animate-fade-in font-hind">
       
       <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4">
         
-        {/* 1. TOP DUAL ACTION BUTTONS (EXACT SCREENSHOT 1) */}
+        {/* 1. TOP DUAL ACTION BUTTONS (Back & Share) */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Left: পরীক্ষার তালিকায় ফিরে যান */}
           <button
             onClick={onNavigateHome}
             className="neu-card !rounded-2xl py-3 px-3 sm:px-4 flex items-center justify-center gap-2 text-slate-800 dark:text-slate-100 font-extrabold text-xs sm:text-sm hover:border-emerald-400 active:scale-95 transition-all cursor-pointer shadow-xs bg-white dark:bg-[#0D172A] border border-slate-200/80 dark:border-slate-800"
@@ -146,7 +145,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             <span className="truncate">পরীক্ষার তালিকায় ফিরে যান</span>
           </button>
 
-          {/* Right: ফলাফল শেয়ার করুন */}
           <button
             onClick={handleShareResult}
             className="neu-card !rounded-2xl py-3 px-3 sm:px-4 flex items-center justify-center gap-2 text-sky-600 dark:text-sky-400 font-black text-xs sm:text-sm hover:border-sky-400 active:scale-95 transition-all cursor-pointer shadow-xs bg-white dark:bg-[#0D172A] border border-sky-200 dark:border-sky-900/60"
@@ -171,9 +169,6 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                   <span className="text-xs sm:text-sm font-black text-amber-900 dark:text-amber-200">
                     🎉 অসাধারণ ফলাফল! ({toBengaliNumeral(Math.round(scorePercentage))}%)
                   </span>
-                  <span className="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-black rounded-md bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
-                    ৮০%+ স্কোর
-                  </span>
                 </div>
                 <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">
                   আপনি ৮০% এর বেশি নম্বর পেয়ে বিশেষ কৃতিত্ব অর্জন করেছেন!
@@ -193,108 +188,111 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           </div>
         )}
 
-        {/* 2. USER PROFILE HERO BANNER (EXACT CYAN/BLUE BANNER IN SCREENSHOT 1) */}
-        <div className="rounded-[28px] p-4 sm:p-5 bg-gradient-to-r from-[#0288D1] via-[#039BE5] to-[#29B6F6] text-white shadow-md flex items-center gap-4 relative overflow-hidden">
-          {/* Avatar with rounded squircle */}
-          <div className="relative shrink-0">
-            {currentUserAvatar ? (
-              <img
-                src={currentUserAvatar}
-                alt={currentUserName}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-white/80 shadow-md"
-              />
-            ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/20 border-2 border-white/80 flex items-center justify-center text-white font-black text-xl shadow-md">
-                <UserIcon className="w-8 h-8 text-white" />
-              </div>
-            )}
+        {/* 2. CHORCHA STYLE RESULT CARD (MATCHING USER SCREENSHOT EXACTLY) */}
+        <div className="bg-white dark:bg-[#0D172A] rounded-[32px] p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 text-center space-y-5">
+          
+          {/* Cute Mascot Illustration */}
+          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-rose-500/10 to-amber-500/10 rounded-full flex items-center justify-center relative shadow-inner">
+            <svg viewBox="0 0 200 200" className="w-28 h-28 drop-shadow-md">
+              {/* Cute Red Bear Mascot Body */}
+              <ellipse cx="100" cy="115" rx="55" ry="50" fill="#E53935" />
+              <path d="M70 70 Q100 45 130 70 Z" fill="#C62828" />
+              {/* Ears */}
+              <circle cx="65" cy="75" r="14" fill="#E53935" />
+              <circle cx="135" cy="75" r="14" fill="#E53935" />
+              <circle cx="65" cy="75" r="7" fill="#FFCDD2" />
+              <circle cx="135" cy="75" r="7" fill="#FFCDD2" />
+              {/* Face Belly Patch */}
+              <ellipse cx="100" cy="120" rx="38" ry="32" fill="#FFF" />
+              {/* Happy Eyes */}
+              <path d="M82 105 Q88 98 94 105" stroke="#263238" strokeWidth="4" strokeLinecap="round" fill="none" />
+              <path d="M106 105 Q112 98 118 105" stroke="#263238" strokeWidth="4" strokeLinecap="round" fill="none" />
+              {/* Nose & Smile */}
+              <circle cx="100" cy="112" r="3.5" fill="#263238" />
+              <path d="M92 118 Q100 126 108 118" stroke="#263238" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+              {/* Blushing Cheeks */}
+              <circle cx="76" cy="112" r="6" fill="#FF8A80" opacity="0.6" />
+              <circle cx="124" cy="112" r="6" fill="#FF8A80" opacity="0.6" />
+              {/* Paws */}
+              <circle cx="75" cy="140" r="10" fill="#C62828" />
+              <circle cx="125" cy="140" r="10" fill="#C62828" />
+            </svg>
           </div>
 
-          {/* Name & Exam Title */}
-          <div className="min-w-0 space-y-1 text-white">
-            <div className="flex items-center gap-1.5">
-              <UserIcon className="w-4 h-4 text-white/90 shrink-0" />
-              <h2 className="text-base sm:text-lg font-black text-white truncate drop-shadow-xs">
-                {currentUserName}
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm font-semibold text-white/95 truncate">
-              পরীক্ষা: {examTitle}
+          <div className="space-y-1.5">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              পয়েন্ট দেখে তোমার ব্রেইন নিয়ে গবেষণা শুরু করেছি
+            </h2>
+            <p className="text-xs sm:text-sm font-extrabold text-[#046A38] dark:text-emerald-400">
+              {isPassed ? 'অসাধারণ পারফরম্যান্স! চালিয়ে যাও' : 'চেষ্টা বজায় রাখো'}
             </p>
           </div>
+
+          {/* 3 Top Stat Cards (Point, Marks, Time) */}
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
+            {/* Card 1: Point */}
+            <div className="rounded-2xl border-2 border-amber-400/80 bg-amber-50/50 dark:bg-amber-950/20 overflow-hidden shadow-xs">
+              <div className="bg-amber-400 text-slate-950 text-xs font-black py-1 px-1 text-center">
+                পয়েন্ট
+              </div>
+              <div className="py-2.5 px-2 text-center flex items-center justify-center gap-1 text-slate-900 dark:text-white font-black text-xs sm:text-sm">
+                <span>⭐</span>
+                <span>{toBengaliNumeral(Math.round(obtainedMarksVal))}</span>
+              </div>
+            </div>
+
+            {/* Card 2: Marks */}
+            <div className="rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/50 dark:bg-emerald-950/20 overflow-hidden shadow-xs">
+              <div className="bg-emerald-600 text-white text-xs font-black py-1 px-1 text-center">
+                মার্কস
+              </div>
+              <div className="py-2.5 px-2 text-center flex items-center justify-center gap-1 text-emerald-800 dark:text-emerald-300 font-black text-xs sm:text-sm">
+                <span>🎯</span>
+                <span>{toBengaliNumeral(result.correctCount)} / {toBengaliNumeral(result.totalQuestions)}</span>
+              </div>
+            </div>
+
+            {/* Card 3: Time */}
+            <div className="rounded-2xl border-2 border-sky-400/80 bg-sky-50/50 dark:bg-sky-950/20 overflow-hidden shadow-xs">
+              <div className="bg-sky-500 text-white text-xs font-black py-1 px-1 text-center">
+                সময়
+              </div>
+              <div className="py-2.5 px-2 text-center flex items-center justify-center gap-1 text-sky-900 dark:text-sky-200 font-bold text-xs truncate">
+                <span>⏱️</span>
+                <span className="truncate">{formattedTimeBengali}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Pills (Correct, Wrong, Skipped) */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="py-2 px-2 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-[#0D172A] flex items-center justify-center gap-1.5 text-xs font-black text-emerald-700 dark:text-emerald-400 shadow-2xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+              <span className="truncate">{toBengaliNumeral(result.correctCount)} সঠিক</span>
+            </div>
+            <div className="py-2 px-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#0D172A] flex items-center justify-center gap-1.5 text-xs font-black text-rose-600 dark:text-rose-400 shadow-2xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shrink-0"></span>
+              <span className="truncate">{toBengaliNumeral(result.wrongCount)} ভুল</span>
+            </div>
+            <div className="py-2 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D172A] flex items-center justify-center gap-1.5 text-xs font-black text-slate-600 dark:text-slate-400 shadow-2xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block shrink-0"></span>
+              <span className="truncate">{toBengaliNumeral(skippedCount)} স্কিপ</span>
+            </div>
+          </div>
+
+          {/* Bottom Action Button: এগিয়ে যান */}
+          <div className="pt-2">
+            <button
+              onClick={onNavigateHome}
+              className="w-full py-3.5 px-6 rounded-2xl bg-[#046A38] hover:bg-[#03542d] active:scale-95 text-white font-black text-base shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>এগিয়ে যান</span>
+            </button>
+          </div>
         </div>
 
-        {/* 3. PERFORMANCE METRICS LIST (EXACT SCREENSHOTS 1 & 2) */}
-        <div className="bg-white dark:bg-[#0D172A] rounded-[28px] divide-y divide-slate-100 dark:divide-slate-800 shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-          
-          {/* Row 1: মোট প্রশ্ন */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-slate-800 dark:text-slate-200">মোট প্রশ্ন</span>
-            <span className="text-slate-900 dark:text-white font-black text-sm sm:text-base">
-              {toBengaliNumeral(result.totalQuestions)}
-            </span>
-          </div>
-
-          {/* Row 2: সঠিক উত্তর */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">সঠিক উত্তর</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm sm:text-base">
-              {toBengaliNumeral(result.correctCount)}
-            </span>
-          </div>
-
-          {/* Row 3: ভুল উত্তর */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-rose-600 dark:text-rose-400 font-extrabold">ভুল উত্তর</span>
-            <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
-              {toBengaliNumeral(result.wrongCount)}
-            </span>
-          </div>
-
-          {/* Row 4: নেগেটিভ মার্ক */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-rose-600 dark:text-rose-400 font-extrabold">নেগেটিভ মার্ক</span>
-            <span className="text-rose-600 dark:text-rose-400 font-black text-sm sm:text-base">
-              {toBengaliNumeral(negativeMarkVal.toFixed(2))}
-            </span>
-          </div>
-
-          {/* Row 5: প্রাপ্ত নম্বর */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">প্রাপ্ত নম্বর</span>
-            <span className="text-emerald-700 dark:text-emerald-400 font-black text-sm sm:text-base">
-              {toBengaliNumeral(obtainedMarksVal)}
-            </span>
-          </div>
-
-          {/* Row 6: অর্জিত পয়েন্ট */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold bg-indigo-50/40 dark:bg-indigo-950/20">
-            <span className="text-indigo-700 dark:text-indigo-400 font-extrabold">পয়েন্ট</span>
-            <span className="text-indigo-700 dark:text-indigo-400 font-black text-sm sm:text-base">
-              {toBengaliNumeral(result.correctCount)} পয়েন্ট
-            </span>
-          </div>
-
-          {/* Row 8: রেজাল্ট */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-slate-800 dark:text-slate-200">রেজাল্ট</span>
-            <span className={`font-black text-sm sm:text-base ${isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-              {isPassed ? 'Passed' : 'Failed'}
-            </span>
-          </div>
-
-          {/* Row 9: সময় গ্রহণ */}
-          <div className="px-5 py-3.5 flex items-center justify-between text-xs sm:text-sm font-bold">
-            <span className="text-slate-800 dark:text-slate-200">সময় গ্রহণ</span>
-            <span className="text-slate-800 dark:text-slate-200 font-mono font-black text-sm sm:text-base tracking-wider">
-              {formattedTimeBengali}
-            </span>
-          </div>
-
-        </div>
-
-        {/* 4. DETAILED EXPLANATIONS & ALL QUESTIONS WITH ANSWERS */}
-        <div className="space-y-4 animate-fade-in">
+        {/* 3. DETAILED EXPLANATIONS & ALL QUESTIONS WITH ANSWERS */}
+        <div className="space-y-4 animate-fade-in pt-2">
           {/* Header Banner */}
           <div className="bg-white dark:bg-[#0D172A] rounded-2xl p-4 flex items-center justify-between border border-slate-200 dark:border-slate-800 shadow-xs">
             <div className="flex items-center gap-2 text-[#046A38] dark:text-emerald-400">
@@ -410,7 +408,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     );
                   })()}
 
-                  {/* Question Actions Footer (Likes, Bookmarks, Reports, Explanations) */}
+                  {/* Question Actions Footer (Explanations, etc.) */}
                   {(() => {
                     const questionObj: Question = {
                       id: answer.questionId,
