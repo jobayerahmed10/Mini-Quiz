@@ -265,51 +265,24 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
   }, []);
 
   const handleCardClick = (subject: SubjectItem) => {
-    if (activeTab === 'mock' && onStartMockFlow) {
+    if (onStartMockFlow) {
       onStartMockFlow(subject.name);
       return;
     }
     onSelectSubject({
       subject: subject.name,
       questionCount: 25,
-      timeMinutes: activeTab === 'quick' ? 15 : 30,
-      isMockFlow: activeTab === 'mock',
+      timeMinutes: 30,
+      isMockFlow: true,
     });
   };
 
   return (
     <div className="max-w-3xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 mb-24 space-y-4 font-hind">
-      {/* Top Navigation Tabs Switcher */}
-      <div className="flex items-center justify-center gap-6 sm:gap-10 border-b border-slate-200/80 dark:border-slate-800 pb-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('mock')}
-          className={`relative py-2.5 text-lg sm:text-xl font-black transition-colors cursor-pointer select-none ${
-            activeTab === 'mock'
-              ? 'text-slate-900 dark:text-white'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500'
-          }`}
-        >
-          <span>মক পরীক্ষা</span>
-          {activeTab === 'mock' && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#046A38] rounded-full" />
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('quick')}
-          className={`relative py-2.5 text-lg sm:text-xl font-black transition-colors cursor-pointer select-none ${
-            activeTab === 'quick'
-              ? 'text-slate-900 dark:text-white'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500'
-          }`}
-        >
-          <span>দ্রুত প্র্যাকটিস</span>
-          {activeTab === 'quick' && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#046A38] rounded-full" />
-          )}
-        </button>
+      <div className="text-center pt-1 pb-1">
+        <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+          মক পরীক্ষা
+        </h2>
       </div>
 
       {/* Loading state */}
@@ -321,57 +294,24 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
           </p>
         </div>
       ) : (
-        <>
-          {/* TAB 1: MOCK EXAM VIEW (মক পরীক্ষা) */}
-          {activeTab === 'mock' && (
-            <div className="space-y-4 animate-fade-in">
-              <div className="text-center pt-1 pb-1">
-                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                  বিষয় ভিত্তিক
-                </h2>
+        <div className="space-y-4 animate-fade-in">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {subjects.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => handleCardClick(item)}
+                className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between gap-2 sm:gap-3 group relative overflow-hidden"
+              >
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <SubjectIcon type={item.iconType} name={item.name} />
+                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
+                    {item.name}
+                  </span>
+                </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {subjects.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleCardClick(item)}
-                    className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 border-b-[3px] border-b-[#046A38] rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between gap-2 sm:gap-3 group relative overflow-hidden"
-                  >
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      <SubjectIcon type={item.iconType} name={item.name} />
-                      <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
-                        {item.name}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: QUICK PRACTICE VIEW (দ্রুত প্র্যাকটিস) */}
-          {activeTab === 'quick' && (
-            <div className="space-y-3 animate-fade-in pt-1">
-              <div className="flex flex-col gap-3 sm:gap-3.5">
-                {subjects.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleCardClick(item)}
-                    className="bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-md hover:scale-[1.005] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between gap-4 group"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <SubjectIcon type={item.iconType} name={item.name} />
-                      <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-[#046A38] dark:group-hover:text-emerald-400 transition-colors truncate">
-                        {item.name}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Premium Enrollment Modal */}
