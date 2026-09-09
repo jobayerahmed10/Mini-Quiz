@@ -1154,13 +1154,40 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
   }
 
   try {
-    let finalTopicId = input.topic_id || null;
-    let finalSubTopicId = input.sub_topic_id || null;
-    let finalSubjectId = input.subject_id || null;
+    let finalTopicId = input.topic_id ? String(input.topic_id).trim() : null;
+    let finalSubTopicId = input.sub_topic_id ? String(input.sub_topic_id).trim() : null;
+    let finalSubjectId = input.subject_id ? String(input.subject_id).trim() : null;
     let finalTopicName = input.topic ? input.topic.trim() : null;
     let finalSubTopicName = input.sub_topic ? input.sub_topic.trim() : null;
+    let finalSubjectName = input.subject ? input.subject.trim() : null;
 
-    // 1. If topic_id is missing, look up actual id from 'topics' table
+    // 1. If subject_id is missing, look up from subjects table by name
+    if (!finalSubjectId && finalSubjectName) {
+      try {
+        const { data: matchedSubjects } = await supabaseInstance
+          .from('subjects')
+          .select('id, name')
+          .ilike('name', finalSubjectName)
+          .limit(1);
+        if (matchedSubjects && matchedSubjects.length > 0) {
+          finalSubjectId = String(matchedSubjects[0].id);
+        }
+      } catch {}
+    } else if (finalSubjectId && !finalSubjectName) {
+      // If subject name is missing but subject_id is provided, resolve name
+      try {
+        const { data: matchedSubjects } = await supabaseInstance
+          .from('subjects')
+          .select('id, name')
+          .eq('id', finalSubjectId)
+          .limit(1);
+        if (matchedSubjects && matchedSubjects.length > 0) {
+          finalSubjectName = matchedSubjects[0].name;
+        }
+      } catch {}
+    }
+
+    // 2. If topic_id is missing, look up actual id from 'topics' table
     if (!finalTopicId && finalTopicName) {
       try {
         const { data: matchedTopics } = await supabaseInstance
@@ -1177,9 +1204,24 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       } catch (lookupErr) {
         console.warn('Notice resolving topic_id:', lookupErr);
       }
+    } else if (finalTopicId && !finalTopicName) {
+      // If topic title is missing but topic_id is provided, resolve title
+      try {
+        const { data: matchedTopics } = await supabaseInstance
+          .from('topics')
+          .select('id, title, subject_id')
+          .eq('id', finalTopicId)
+          .limit(1);
+        if (matchedTopics && matchedTopics.length > 0) {
+          finalTopicName = matchedTopics[0].title;
+          if (!finalSubjectId && matchedTopics[0].subject_id) {
+            finalSubjectId = String(matchedTopics[0].subject_id);
+          }
+        }
+      } catch {}
     }
 
-    // 2. If sub_topic_id is missing, look up actual id from 'sub_topics' and child 'topics'
+    // 3. If sub_topic_id is missing, look up actual id from 'sub_topics' and child 'topics'
     if (!finalSubTopicId && (finalSubTopicName || finalTopicName)) {
       const searchSubName = (finalSubTopicName || finalTopicName)!;
       try {
@@ -1192,6 +1234,9 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
 
         if (matchedSubTopics && matchedSubTopics.length > 0) {
           finalSubTopicId = String(matchedSubTopics[0].id);
+          if (!finalSubTopicName) {
+            finalSubTopicName = matchedSubTopics[0].title || matchedSubTopics[0].name;
+          }
           if (!finalTopicId && matchedSubTopics[0].topic_id) {
             finalTopicId = String(matchedSubTopics[0].topic_id);
           }
@@ -1199,62 +1244,96 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
           // Check child topics in topics table where parent_id is not null
           const { data: matchedChildTopics } = await supabaseInstance
             .from('topics')
-            .select('id, title, parent_id')
+            .select('id, title, parent_id, subject_id')
             .not('parent_id', 'is', null)
             .ilike('title', `%${searchSubName}%`)
             .limit(1);
           if (matchedChildTopics && matchedChildTopics.length > 0) {
             finalSubTopicId = String(matchedChildTopics[0].id);
+            if (!finalSubTopicName) {
+              finalSubTopicName = matchedChildTopics[0].title;
+            }
             if (!finalTopicId && matchedChildTopics[0].parent_id) {
               finalTopicId = String(matchedChildTopics[0].parent_id);
+            }
+            if (!finalSubjectId && matchedChildTopics[0].subject_id) {
+              finalSubjectId = String(matchedChildTopics[0].subject_id);
             }
           }
         }
       } catch (lookupErr) {
         console.warn('Notice resolving sub_topic_id:', lookupErr);
       }
-    }
-
-    // 3. If subject_id is missing, look up from subjects table
-    if (!finalSubjectId && input.subject) {
+    } else if (finalSubTopicId && !finalSubTopicName) {
+      // If sub_topic name is missing but sub_topic_id is provided, resolve name
       try {
-        const { data: matchedSubjects } = await supabaseInstance
-          .from('subjects')
-          .select('id, name')
-          .ilike('name', input.subject.trim())
+        const { data: matchedSubTopics } = await supabaseInstance
+          .from('sub_topics')
+          .select('id, title, name, topic_id')
+          .eq('id', finalSubTopicId)
           .limit(1);
-        if (matchedSubjects && matchedSubjects.length > 0) {
-          finalSubjectId = String(matchedSubjects[0].id);
+        if (matchedSubTopics && matchedSubTopics.length > 0) {
+          finalSubTopicName = matchedSubTopics[0].title || matchedSubTopics[0].name;
+          if (!finalTopicId && matchedSubTopics[0].topic_id) {
+            finalTopicId = String(matchedSubTopics[0].topic_id);
+          }
+        } else {
+          const { data: matchedChildTopics } = await supabaseInstance
+            .from('topics')
+            .select('id, title, parent_id, subject_id')
+            .eq('id', finalSubTopicId)
+            .limit(1);
+          if (matchedChildTopics && matchedChildTopics.length > 0) {
+            finalSubTopicName = matchedChildTopics[0].title;
+            if (!finalTopicId && matchedChildTopics[0].parent_id) {
+              finalTopicId = String(matchedChildTopics[0].parent_id);
+            }
+            if (!finalSubjectId && matchedChildTopics[0].subject_id) {
+              finalSubjectId = String(matchedChildTopics[0].subject_id);
+            }
+          }
         }
       } catch {}
     }
 
-    const newRecord: any = {
+    // Re-verify subject if subject_id was resolved but subject name is still empty
+    if (!finalSubjectName && finalSubjectId) {
+      try {
+        const { data: matchedSubjects } = await supabaseInstance
+          .from('subjects')
+          .select('id, name')
+          .eq('id', finalSubjectId)
+          .limit(1);
+        if (matchedSubjects && matchedSubjects.length > 0) {
+          finalSubjectName = matchedSubjects[0].name;
+        }
+      } catch {}
+    }
+
+    // Explicitly construct new record storing all 6 fields: subject, subject_id, topic, topic_id, sub_topic, sub_topic_id
+    const newRecord: Record<string, any> = {
       question: input.question.trim(),
       option_a: input.option_a.trim(),
       option_b: input.option_b.trim(),
       option_c: input.option_c.trim(),
       option_d: input.option_d.trim(),
       correct_answer: input.correct_answer,
-      subject: input.subject.trim(),
-      topic: finalTopicName,
-      sub_topic: finalSubTopicName,
-      topic_id: finalTopicId,
-      sub_topic_id: finalSubTopicId,
+      subject: finalSubjectName || (input.subject ? input.subject.trim() : 'সাধারণ'),
+      subject_id: finalSubjectId || null,
+      topic: finalTopicName || null,
+      topic_id: finalTopicId || null,
+      sub_topic: finalSubTopicName || null,
+      sub_topic_id: finalSubTopicId || null,
       explanation: input.explanation?.trim() || null,
       status: input.status || 'published',
       created_at: new Date().toISOString(),
     };
 
-    if (finalSubjectId) {
-      newRecord.subject_id = finalSubjectId;
-    }
-
     if (input.exam_id && input.exam_id.trim() !== '') {
       newRecord.exam_id = input.exam_id.trim();
     }
 
-    // Try inserting with both topic_id and sub_topic_id
+    // Try inserting with all relational and text columns
     let insertedRow: any = null;
     let { data, error } = await supabaseInstance
       .from('questions')
@@ -1262,10 +1341,14 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       .select()
       .single();
 
-    // If error occurs due to sub_topic_id column not existing in DB schema yet, retry without sub_topic_id
-    if (error && error.message && (error.message.includes('sub_topic_id') || error.message.includes('column'))) {
+    // Fallback: If DB schema is missing any specific column, retry removing only the missing column
+    if (error && error.message && error.message.toLowerCase().includes('column')) {
       const fallbackRecord = { ...newRecord };
-      delete fallbackRecord.sub_topic_id;
+      if (error.message.includes('sub_topic_id')) delete fallbackRecord.sub_topic_id;
+      if (error.message.includes('subject_id')) delete fallbackRecord.subject_id;
+      if (error.message.includes('topic_id')) delete fallbackRecord.topic_id;
+      if (error.message.includes('sub_topic')) delete fallbackRecord.sub_topic;
+
       const retryResult = await supabaseInstance
         .from('questions')
         .insert([fallbackRecord])
@@ -1327,6 +1410,10 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
         localStorage.removeItem('mock_curriculum_data_v4');
       } catch {}
 
+      invalidateCache('admin_all_questions');
+      invalidateCache('mock_curriculum_data');
+      invalidateCache('subtopic_questions');
+
       window.dispatchEvent(new Event('tamreen_data_changed'));
       window.dispatchEvent(new Event('tamreen_questions_updated'));
     }
@@ -1380,10 +1467,13 @@ export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[])
       .insert(newRecords)
       .select();
 
-    if (error && error.message && error.message.includes('sub_topic_id')) {
+    if (error && error.message && error.message.toLowerCase().includes('column')) {
       const fallbackRecords = newRecords.map(r => {
         const copy = { ...r };
-        delete copy.sub_topic_id;
+        if (error!.message.includes('sub_topic_id')) delete copy.sub_topic_id;
+        if (error!.message.includes('subject_id')) delete copy.subject_id;
+        if (error!.message.includes('topic_id')) delete copy.topic_id;
+        if (error!.message.includes('sub_topic')) delete copy.sub_topic;
         return copy;
       });
       const retryResult = await supabaseInstance
@@ -1410,6 +1500,11 @@ export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[])
       localStorage.removeItem('published_questions_cache');
       localStorage.removeItem('mock_curriculum_data_v4');
     } catch {}
+
+    invalidateCache('admin_all_questions');
+    invalidateCache('mock_curriculum_data');
+    invalidateCache('subtopic_questions');
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('tamreen_data_changed'));
       window.dispatchEvent(new Event('tamreen_questions_updated'));

@@ -157,7 +157,8 @@ export async function getAllAvailableAdminQuestions(): Promise<any[]> {
       const { data: supaQ, error } = await supabase
         .from('questions')
         .select(QUESTION_SELECT_FIELDS)
-        .limit(500);
+        .order('created_at', { ascending: false })
+        .limit(2000);
 
       if (!error && supaQ && Array.isArray(supaQ)) {
         supaQ.forEach((q) => {
@@ -736,118 +737,198 @@ export async function fetchQuestionsForSelectedSubtopics(
     return [];
   }
 
-  const cacheKey = `subtopic_questions_${[...validSubtopicIds].sort().join('_')}_${targetCount}`;
-  const cached = getCache<Question[]>(cacheKey, 300000);
-  if (cached) return cached;
+  // If subtopic titles were not provided, resolve them from Supabase sub_topics / topics tables
+  if (validSubtopicIds.length > 0 && validSubtopicTitles.length === 0 && supabase) {
+    try {
+      const [{ data: stList }, { data: tList }] = await Promise.all([
+        supabase.from('sub_topics').select('id, title, name').in('id', validSubtopicIds),
+        supabase.from('topics').select('id, title').in('id', validSubtopicIds),
+      ]);
+      if (stList) {
+        stList.forEach((st: any) => {
+          const t = (st.title || st.name || '').trim();
+          if (t && !validSubtopicTitles.includes(t)) validSubtopicTitles.push(t);
+        });
+      }
+      if (tList) {
+        tList.forEach((t: any) => {
+          const tName = (t.title || '').trim();
+          if (tName && !validSubtopicTitles.includes(tName)) validSubtopicTitles.push(tName);
+        });
+      }
+    } catch {}
+  }
+
+  // If subtopic IDs were not provided, resolve them from titles
+  if (validSubtopicTitles.length > 0 && validSubtopicIds.length === 0 && supabase) {
+    try {
+      const [{ data: stList }, { data: tList }] = await Promise.all([
+        supabase.from('sub_topics').select('id, title, name').in('title', validSubtopicTitles),
+        supabase.from('topics').select('id, title').in('title', validSubtopicTitles),
+      ]);
+      if (stList) {
+        stList.forEach((st: any) => {
+          const id = String(st.id);
+          if (id && !validSubtopicIds.includes(id)) validSubtopicIds.push(id);
+        });
+      }
+      if (tList) {
+        tList.forEach((t: any) => {
+          const id = String(t.id);
+          if (id && !validSubtopicIds.includes(id)) validSubtopicIds.push(id);
+        });
+      }
+    } catch {}
+  }
+
+  const cacheKey = `subtopic_questions_${[...validSubtopicIds, ...validSubtopicTitles].sort().join('_')}_${targetCount}`;
+  const cached = getCache<Question[]>(cacheKey, 120000);
+  if (cached && cached.length >= Math.min(targetCount, 5)) return cached;
 
   try {
     const rawQuestionsMap = new Map<string, any>();
 
-    // 1. Relational Fetching in Mock Test App as required:
-    // "When loading topics/sub-topics and their questions, fetch questions using relational join or matching topic_id / sub_topic_id:
-    // supabase.from('questions').select('*, topics!inner(*), sub_topics!inner(*)').eq('sub_topic_id', selectedSubTopicId)
-    // As a fallback for existing questions that don't have topic_id populated, match by comparing questions.topic (text) with topics.name (text)."
+    // 1. Dynamic Querying: Fetch questions matching either sub_topic_id OR sub_topic name
+    // Ensures both new questions (with FK sub_topic_id) and legacy questions (with text name) are loaded
     if (supabase) {
       try {
-        const queryLimit = Math.min(targetCount * 3, 100);
+        const queryLimit = Math.max(targetCount * 3, 100);
+        const queryPromises: Promise<any>[] = [];
 
-        // A. Primary relational fetch with sub_topics!inner(*) and topics!inner(*)
-        for (const subId of validSubtopicIds) {
-          try {
-            const { data: relJoinData, error: relJoinErr } = await supabase
-              .from('questions')
-              .select('*, topics!inner(*), sub_topics!inner(*)')
-              .eq('sub_topic_id', subId)
-              .limit(queryLimit);
+        // A. Match by sub_topic_id (Foreign Key for newly added questions)
+        if (validSubtopicIds.length > 0) {
+          queryPromises.push(
+            (async () => {
+              const { data, error } = await supabase
+                .from('questions')
+                .select(QUESTION_SELECT_FIELDS)
+                .in('sub_topic_id', validSubtopicIds)
+                .limit(queryLimit);
+              if (!error && data && Array.isArray(data)) {
+                data.forEach((q) => {
+                  if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                });
+              }
+            })()
+          );
 
-            if (!relJoinErr && relJoinData && relJoinData.length > 0) {
-              relJoinData.forEach((q: any) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
-            }
-          } catch (relErr) {
-            // Relational join fallback if sub_topics relation is not defined in database
+          // Also attempt relational join if foreign key constraint exists in Supabase
+          for (const subId of validSubtopicIds) {
+            queryPromises.push(
+              (async () => {
+                try {
+                  const { data, error } = await supabase
+                    .from('questions')
+                    .select('*, topics!inner(*), sub_topics!inner(*)')
+                    .eq('sub_topic_id', subId)
+                    .limit(queryLimit);
+                  if (!error && data && Array.isArray(data)) {
+                    data.forEach((q: any) => {
+                      if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                    });
+                  }
+                } catch {}
+              })()
+            );
           }
         }
 
-        // B. Relational join with topics!inner(*) on topic_id
-        for (const subId of validSubtopicIds) {
-          try {
-            const { data: topRelData, error: topRelErr } = await supabase
-              .from('questions')
-              .select('*, topics!inner(*)')
-              .eq('topic_id', subId)
-              .limit(queryLimit);
-
-            if (!topRelErr && topRelData && topRelData.length > 0) {
-              topRelData.forEach((q: any) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
-            }
-          } catch (topErr) {}
-        }
-
-        // C. Direct matching by sub_topic_id or topic_id
-        if (validSubtopicIds.length > 0) {
-          try {
-            const { data: rawSubData } = await supabase
-              .from('questions')
-              .select(QUESTION_SELECT_FIELDS)
-              .in('sub_topic_id', validSubtopicIds)
-              .limit(queryLimit);
-
-            if (rawSubData && Array.isArray(rawSubData)) {
-              rawSubData.forEach((q) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
-            }
-          } catch {}
-
-          try {
-            const { data: rawTopData } = await supabase
-              .from('questions')
-              .select(QUESTION_SELECT_FIELDS)
-              .in('topic_id', validSubtopicIds)
-              .limit(queryLimit);
-
-            if (rawTopData && Array.isArray(rawTopData)) {
-              rawTopData.forEach((q) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
-            }
-          } catch {}
-        }
-
-        // D. Fallback matching: comparing questions.topic (text) with topics.name / subtopics titles
+        // B. Match by sub_topic name (Text column matching for both old and new questions)
         if (validSubtopicTitles.length > 0) {
-          try {
-            const { data: titleQuestions } = await supabase
-              .from('questions')
-              .select(QUESTION_SELECT_FIELDS)
-              .in('topic', validSubtopicTitles)
-              .limit(queryLimit);
+          queryPromises.push(
+            (async () => {
+              const { data, error } = await supabase
+                .from('questions')
+                .select(QUESTION_SELECT_FIELDS)
+                .in('sub_topic', validSubtopicTitles)
+                .limit(queryLimit);
+              if (!error && data && Array.isArray(data)) {
+                data.forEach((q) => {
+                  if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                });
+              }
+            })()
+          );
 
-            if (titleQuestions && Array.isArray(titleQuestions)) {
-              titleQuestions.forEach((q) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
+          // Handle slight whitespace/case variations with ilike for each subtopic title
+          for (const title of validSubtopicTitles) {
+            const cleanT = title.trim();
+            if (cleanT.length >= 2) {
+              queryPromises.push(
+                (async () => {
+                  const { data, error } = await supabase
+                    .from('questions')
+                    .select(QUESTION_SELECT_FIELDS)
+                    .ilike('sub_topic', `%${cleanT}%`)
+                    .limit(queryLimit);
+                  if (!error && data && Array.isArray(data)) {
+                    data.forEach((q) => {
+                      if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                    });
+                  }
+                })()
+              );
             }
-          } catch {}
-
-          try {
-            const { data: subColQuestions } = await supabase
-              .from('questions')
-              .select(QUESTION_SELECT_FIELDS)
-              .in('sub_topic', validSubtopicTitles)
-              .limit(queryLimit);
-
-            if (subColQuestions && Array.isArray(subColQuestions)) {
-              subColQuestions.forEach((q) => {
-                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-              });
-            }
-          } catch {}
+          }
         }
+
+        // C. Backward compatibility fallback: match by topic name (for older questions where subtopic name was stored in topic)
+        if (validSubtopicTitles.length > 0) {
+          queryPromises.push(
+            (async () => {
+              const { data, error } = await supabase
+                .from('questions')
+                .select(QUESTION_SELECT_FIELDS)
+                .in('topic', validSubtopicTitles)
+                .limit(queryLimit);
+              if (!error && data && Array.isArray(data)) {
+                data.forEach((q) => {
+                  if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                });
+              }
+            })()
+          );
+
+          for (const title of validSubtopicTitles) {
+            const cleanT = title.trim();
+            if (cleanT.length >= 2) {
+              queryPromises.push(
+                (async () => {
+                  const { data, error } = await supabase
+                    .from('questions')
+                    .select(QUESTION_SELECT_FIELDS)
+                    .ilike('topic', `%${cleanT}%`)
+                    .limit(queryLimit);
+                  if (!error && data && Array.isArray(data)) {
+                    data.forEach((q) => {
+                      if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                    });
+                  }
+                })()
+              );
+            }
+          }
+        }
+
+        // D. Backward compatibility fallback: match by topic_id
+        if (validSubtopicIds.length > 0) {
+          queryPromises.push(
+            (async () => {
+              const { data, error } = await supabase
+                .from('questions')
+                .select(QUESTION_SELECT_FIELDS)
+                .in('topic_id', validSubtopicIds)
+                .limit(queryLimit);
+              if (!error && data && Array.isArray(data)) {
+                data.forEach((q) => {
+                  if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+                });
+              }
+            })()
+          );
+        }
+
+        await Promise.allSettled(queryPromises);
       } catch (err) {
         console.warn('Notice querying Supabase questions for subtopics:', err);
       }
@@ -855,8 +936,8 @@ export async function fetchQuestionsForSelectedSubtopics(
 
     // 2. Also incorporate newly added questions from Admin cache in localStorage
     const allAdminQuestions = await getAllAvailableAdminQuestions();
-    const selectedIdSet = new Set(selectedSubtopicIds.map((id) => String(id).trim()));
-    const selectedNormTitles = new Set(selectedSubtopicTitles.map((t) => normalizeTitle(t)));
+    const selectedIdSet = new Set(validSubtopicIds.map((id) => String(id).trim()));
+    const selectedNormTitles = new Set(validSubtopicTitles.map((t) => normalizeTitle(t)));
 
     allAdminQuestions.forEach((q) => {
       if (!q || !q.id) return;
@@ -865,15 +946,28 @@ export async function fetchQuestionsForSelectedSubtopics(
 
       const qSubId = q.sub_topic_id ? String(q.sub_topic_id).trim() : '';
       const qTopicId = q.topic_id ? String(q.topic_id).trim() : '';
-      const qTopicNorm = normalizeTitle(q.topic);
       const qSubTopicNorm = normalizeTitle(q.sub_topic);
+      const qTopicNorm = normalizeTitle(q.topic);
 
-      if (
-        (qSubId && selectedIdSet.has(qSubId)) ||
-        (qTopicId && selectedIdSet.has(qTopicId)) ||
-        (qTopicNorm && selectedNormTitles.has(qTopicNorm)) ||
-        (qSubTopicNorm && selectedNormTitles.has(qSubTopicNorm))
-      ) {
+      // Match questions by either sub_topic_id OR sub_topic name
+      const matchesSubTopicId = qSubId && selectedIdSet.has(qSubId);
+      const matchesSubTopicName =
+        qSubTopicNorm &&
+        (selectedNormTitles.has(qSubTopicNorm) ||
+          Array.from(selectedNormTitles).some(
+            (st) => qSubTopicNorm.includes(st) || st.includes(qSubTopicNorm)
+          ));
+
+      // Backward compatibility fallback for legacy questions
+      const matchesTopicId = qTopicId && selectedIdSet.has(qTopicId);
+      const matchesTopicName =
+        qTopicNorm &&
+        (selectedNormTitles.has(qTopicNorm) ||
+          Array.from(selectedNormTitles).some(
+            (st) => qTopicNorm.includes(st) || st.includes(qTopicNorm)
+          ));
+
+      if (matchesSubTopicId || matchesSubTopicName || matchesTopicId || matchesTopicName) {
         rawQuestionsMap.set(qId, q);
       }
     });
@@ -955,44 +1049,73 @@ export async function fetchQuestionsForSelectedSubtopics(
 export async function countQuestionsBySubTopicForeignKey(subTopicId: string, fallbackTitle?: string): Promise<number> {
   if (!supabase || !subTopicId) return 0;
 
+  const foundIds = new Set<string>();
+
   try {
-    // 1. Direct foreign key count on sub_topic_id:
-    const { count, error } = await supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .eq('sub_topic_id', subTopicId);
+    const promises: Promise<any>[] = [];
 
-    if (!error && typeof count === 'number' && count > 0) {
-      return count;
+    // 1. Direct foreign key count on sub_topic_id
+    promises.push(
+      (async () => {
+        const { data } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('sub_topic_id', subTopicId)
+          .limit(1000);
+        if (data && Array.isArray(data)) {
+          data.forEach((row) => row?.id && foundIds.add(String(row.id)));
+        }
+      })()
+    );
+
+    // 2. Fallback matching sub_topic text column
+    if (fallbackTitle && fallbackTitle.trim() !== '') {
+      promises.push(
+        (async () => {
+          const { data } = await supabase
+            .from('questions')
+            .select('id')
+            .eq('sub_topic', fallbackTitle.trim())
+            .limit(1000);
+          if (data && Array.isArray(data)) {
+            data.forEach((row) => row?.id && foundIds.add(String(row.id)));
+          }
+        })()
+      );
+
+      // 3. Fallback matching questions.topic (text) with fallbackTitle
+      promises.push(
+        (async () => {
+          const { data } = await supabase
+            .from('questions')
+            .select('id')
+            .eq('topic', fallbackTitle.trim())
+            .limit(1000);
+          if (data && Array.isArray(data)) {
+            data.forEach((row) => row?.id && foundIds.add(String(row.id)));
+          }
+        })()
+      );
     }
-  } catch (err) {}
 
-  // 2. Count on topic_id foreign key:
-  try {
-    const { count, error } = await supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .eq('topic_id', subTopicId);
+    // 4. Fallback matching topic_id
+    promises.push(
+      (async () => {
+        const { data } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('topic_id', subTopicId)
+          .limit(1000);
+        if (data && Array.isArray(data)) {
+          data.forEach((row) => row?.id && foundIds.add(String(row.id)));
+        }
+      })()
+    );
 
-    if (!error && typeof count === 'number' && count > 0) {
-      return count;
-    }
-  } catch (err) {}
-
-  // 3. Fallback matching questions.topic (text) with fallbackTitle:
-  if (fallbackTitle) {
-    try {
-      const { count, error } = await supabase
-        .from('questions')
-        .select('id', { count: 'exact', head: true })
-        .eq('topic', fallbackTitle);
-
-      if (!error && typeof count === 'number') {
-        return count;
-      }
-    } catch (err) {}
+    await Promise.allSettled(promises);
+    return foundIds.size;
+  } catch (err) {
+    return foundIds.size;
   }
-
-  return 0;
 }
 
