@@ -292,10 +292,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
           setQTopicName(tops[0].title);
           const subTops = await fetchSubTopicsForAdmin(tops[0].id);
           setQuestionSubTopics(subTops);
-          if (subTops.length > 0) {
-            setQSubTopicId(subTops[0].id);
-            setQSubTopicName(subTops[0].title);
-          }
+          setQSubTopicId('');
+          setQSubTopicName('');
         }
       }
     } catch (e) {
@@ -331,10 +329,8 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
       setQTopicName(tops[0].title);
       const subTops = await fetchSubTopicsForAdmin(tops[0].id);
       setQuestionSubTopics(subTops);
-      if (subTops.length > 0) {
-        setQSubTopicId(subTops[0].id);
-        setQSubTopicName(subTops[0].title);
-      }
+      setQSubTopicId('');
+      setQSubTopicName('');
     } else {
       setQuestionSubTopics([]);
     }
@@ -348,16 +344,20 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
     setQSubTopicId('');
     setQSubTopicName('');
 
-    const subTops = await fetchSubTopicsForAdmin(topId);
-    setQuestionSubTopics(subTops);
-    if (subTops.length > 0) {
-      setQSubTopicId(subTops[0].id);
-      setQSubTopicName(subTops[0].title);
+    if (topId) {
+      const subTops = await fetchSubTopicsForAdmin(topId);
+      setQuestionSubTopics(subTops);
+    } else {
+      setQuestionSubTopics([]);
     }
   };
 
   const handleSubTopicChange = (subId: string) => {
     setQSubTopicId(subId);
+    if (!subId) {
+      setQSubTopicName('');
+      return;
+    }
     const matched = questionSubTopics.find((st) => st.id === subId);
     setQSubTopicName(matched ? matched.title : '');
   };

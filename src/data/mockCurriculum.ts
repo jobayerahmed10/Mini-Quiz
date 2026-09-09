@@ -123,22 +123,36 @@ export const DEFAULT_MOCK_CURRICULUM: CurriculumSubject[] = [
     ],
   },
   {
-    id: 'subj-english',
-    name: 'ইংরেজি ভাষা ও সাহিত্য',
-    iconType: 'english',
-    totalQuestions: 7850,
+    id: 'subj-english-grammar',
+    name: 'English Grammar',
+    iconType: 'eng_lang',
+    totalQuestions: 6050,
     topics: [
+      {
+        id: 'top-en-pos',
+        title: 'Parts of Speech',
+        totalQuestions: 2450,
+        solvedQuestions: 0,
+        subtopics: [
+          { id: 'sub-en-noun', title: 'Noun & Pronoun', totalQuestions: 480, solvedQuestions: 0 },
+          { id: 'sub-en-adj', title: 'Adjective & Adverb', totalQuestions: 420, solvedQuestions: 0 },
+          { id: 'sub-en-verb', title: 'Verb & Finite/Non-Finite', totalQuestions: 460, solvedQuestions: 0 },
+          { id: 'sub-en-prep', title: 'Preposition', totalQuestions: 650, solvedQuestions: 0 },
+          { id: 'sub-en-conj', title: 'Conjunction & Interjection', totalQuestions: 240, solvedQuestions: 0 },
+          { id: 'sub-en-art', title: 'Articles & Determiners', totalQuestions: 200, solvedQuestions: 0 },
+        ],
+      },
       {
         id: 'top-en-grammar',
         title: 'English Grammar & Usage',
-        totalQuestions: 3600,
+        totalQuestions: 2600,
         solvedQuestions: 0,
         subtopics: [
-          { id: 'sub-en-1', title: 'Parts of Speech & Determiners', totalQuestions: 950, solvedQuestions: 0 },
-          { id: 'sub-en-2', title: 'Right Form of Verbs & Tense', totalQuestions: 820, solvedQuestions: 0 },
-          { id: 'sub-en-3', title: 'Subject-Verb Agreement', totalQuestions: 640, solvedQuestions: 0 },
-          { id: 'sub-en-4', title: 'Voice, Narration & Modifiers', totalQuestions: 590, solvedQuestions: 0 },
-          { id: 'sub-en-5', title: 'Prepositions & Conjunctions', totalQuestions: 600, solvedQuestions: 0 },
+          { id: 'sub-en-1', title: 'Parts of Speech & Determiners', totalQuestions: 750, solvedQuestions: 0 },
+          { id: 'sub-en-2', title: 'Right Form of Verbs & Tense', totalQuestions: 620, solvedQuestions: 0 },
+          { id: 'sub-en-3', title: 'Subject-Verb Agreement', totalQuestions: 440, solvedQuestions: 0 },
+          { id: 'sub-en-4', title: 'Voice, Narration & Modifiers', totalQuestions: 390, solvedQuestions: 0 },
+          { id: 'sub-en-5', title: 'Prepositions & Conjunctions', totalQuestions: 400, solvedQuestions: 0 },
         ],
       },
       {
@@ -152,9 +166,17 @@ export const DEFAULT_MOCK_CURRICULUM: CurriculumSubject[] = [
           { id: 'sub-en-8', title: 'One Word Substitution & Spellings', totalQuestions: 600, solvedQuestions: 0 },
         ],
       },
+    ],
+  },
+  {
+    id: 'subj-english-lit',
+    name: 'English Literature',
+    iconType: 'eng_lit',
+    totalQuestions: 1800,
+    topics: [
       {
         id: 'top-en-lit',
-        title: 'English Literature',
+        title: 'English Literature Periods & Authors',
         totalQuestions: 1800,
         solvedQuestions: 0,
         subtopics: [

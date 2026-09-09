@@ -32,7 +32,7 @@ import {
   saveUserReportedQuestions,
   addUserReportedQuestion
 } from './utils';
-import { getCache, setCache, invalidateCache } from './cache';
+import { getCache, setCache, invalidateCache, invalidateAllQuestionCaches } from './cache';
 
 // Wildcard column selectors to prevent 42703 schema errors completely
 export const QUESTION_COLS = '*';
@@ -1569,15 +1569,9 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
         const qList: any[] = rawQ ? JSON.parse(rawQ) : [];
         qList.unshift(createdQuestion);
         localStorage.setItem('miniquiz_questions_cache', JSON.stringify(qList));
-
-        localStorage.removeItem('miniquiz_exams_cache');
-        localStorage.removeItem('published_questions_cache');
-        localStorage.removeItem('mock_curriculum_data_v4');
       } catch {}
 
-      invalidateCache('admin_all_questions');
-      invalidateCache('mock_curriculum_data');
-      invalidateCache('subtopic_questions');
+      invalidateAllQuestionCaches();
 
       window.dispatchEvent(new Event('tamreen_data_changed'));
       window.dispatchEvent(new Event('tamreen_questions_updated'));
@@ -1659,16 +1653,7 @@ export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[])
       };
     }
 
-    try {
-      localStorage.removeItem('miniquiz_questions_cache');
-      localStorage.removeItem('miniquiz_exams_cache');
-      localStorage.removeItem('published_questions_cache');
-      localStorage.removeItem('mock_curriculum_data_v4');
-    } catch {}
-
-    invalidateCache('admin_all_questions');
-    invalidateCache('mock_curriculum_data');
-    invalidateCache('subtopic_questions');
+    invalidateAllQuestionCaches();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('tamreen_data_changed'));
@@ -1706,12 +1691,11 @@ export async function deleteQuestionFromSupabase(id: string | number): Promise<{
       return { success: false, error: error.message };
     }
 
-    try {
-      localStorage.removeItem('miniquiz_questions_cache');
-      localStorage.removeItem('miniquiz_exams_cache');
-    } catch {}
+    invalidateAllQuestionCaches();
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('tamreen_data_changed'));
+      window.dispatchEvent(new Event('tamreen_questions_updated'));
     }
 
     return { success: true };
@@ -4086,17 +4070,20 @@ export function subscribeToLeaderboard(onLeaderboardChange: () => void, examId?:
  */
 export function subscribeToExamsAndQuestionsTable(onDataChange: () => void): () => void {
   const handleLocalEvent = () => {
+    invalidateAllQuestionCaches();
     onDataChange();
   };
 
   if (typeof window !== 'undefined') {
     window.addEventListener('tamreen_data_changed', handleLocalEvent);
+    window.addEventListener('tamreen_questions_updated', handleLocalEvent);
   }
 
   if (!supabaseInstance) {
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+        window.removeEventListener('tamreen_questions_updated', handleLocalEvent);
       }
     };
   }
@@ -4105,11 +4092,11 @@ export function subscribeToExamsAndQuestionsTable(onDataChange: () => void): () 
     const channel = supabaseInstance
       .channel('exams_and_questions_live_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, () => {
-        try { localStorage.removeItem('miniquiz_questions_cache'); } catch {}
+        invalidateAllQuestionCaches();
         onDataChange();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => {
-        try { localStorage.removeItem('miniquiz_exams_cache'); } catch {}
+        invalidateAllQuestionCaches();
         onDataChange();
       })
       .subscribe();
@@ -4118,12 +4105,14 @@ export function subscribeToExamsAndQuestionsTable(onDataChange: () => void): () 
       supabaseInstance.removeChannel(channel);
       if (typeof window !== 'undefined') {
         window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+        window.removeEventListener('tamreen_questions_updated', handleLocalEvent);
       }
     };
   } catch {
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('tamreen_data_changed', handleLocalEvent);
+        window.removeEventListener('tamreen_questions_updated', handleLocalEvent);
       }
     };
   }

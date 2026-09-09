@@ -92,3 +92,26 @@ export function invalidateCache(keyPrefix?: string): void {
     } catch {}
   }
 }
+
+/**
+ * Invalidate all question, curriculum, and subject related caches across memory, sessionStorage, and localStorage
+ */
+export function invalidateAllQuestionCaches(): void {
+  invalidateCache('admin_all_questions');
+  invalidateCache('mock_curriculum_data');
+  invalidateCache('subtopic_questions');
+  invalidateCache('published_questions_cache');
+  invalidateCache('subjects_page_list');
+  invalidateCache('subject_topics_');
+  invalidateCache('exams_list_cache');
+  
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('miniquiz_questions_cache');
+      localStorage.removeItem('published_questions_cache');
+      localStorage.removeItem('mock_curriculum_data_v4');
+      localStorage.removeItem('subjects_page_list_v4');
+    } catch {}
+  }
+}
+
