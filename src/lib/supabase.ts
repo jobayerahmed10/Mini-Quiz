@@ -685,95 +685,225 @@ export interface AdminSubTopicOption {
  * Fetch list of subjects for admin question creation dropdown
  */
 export async function fetchSubjectsForAdmin(): Promise<AdminSubjectOption[]> {
-  if (!supabaseInstance) return [];
-  try {
-    const { data, error } = await supabaseInstance
-      .from('subjects')
-      .select('id, name, code')
-      .order('name', { ascending: true });
-    if (!error && data) return data;
-  } catch (err) {
-    console.warn('fetchSubjectsForAdmin error:', err);
+  const subjectsMap = new Map<string, AdminSubjectOption>();
+  if (supabaseInstance) {
+    try {
+      const { data, error } = await supabaseInstance
+        .from('subjects')
+        .select('id, name, code')
+        .order('id', { ascending: true });
+      if (!error && data && Array.isArray(data)) {
+        data.forEach((s) => {
+          if (s && s.id && s.name) {
+            subjectsMap.set(String(s.id), {
+              id: String(s.id),
+              name: s.name,
+              code: s.code || undefined,
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('fetchSubjectsForAdmin error:', err);
+    }
   }
-  return [];
+
+  // If empty or as fallback, load from curriculum
+  if (subjectsMap.size === 0) {
+    try {
+      const { fetchMockCurriculumFromSupabase } = await import('./mockTopicService');
+      const curr = await fetchMockCurriculumFromSupabase();
+      curr.forEach((cs: any) => {
+        if (cs && cs.id && cs.name && !subjectsMap.has(String(cs.id))) {
+          subjectsMap.set(String(cs.id), {
+            id: String(cs.id),
+            name: cs.name,
+            code: cs.code || undefined,
+          });
+        }
+      });
+    } catch {}
+  }
+
+  return Array.from(subjectsMap.values());
 }
 
 /**
  * Fetch list of topics from 'topics' table for admin question creation dropdown
  */
 export async function fetchTopicsForAdmin(subjectId?: string): Promise<AdminTopicOption[]> {
-  if (!supabaseInstance) return [];
-  try {
-    let query = supabaseInstance
-      .from('topics')
-      .select('id, title, code, subject_id, parent_id')
-      .is('parent_id', null)
-      .order('title', { ascending: true });
-    if (subjectId) {
-      query = query.eq('subject_id', subjectId);
+  const topicsMap = new Map<string, AdminTopicOption>();
+
+  if (supabaseInstance) {
+    try {
+      // 1. Attempt standard query with parent_id is null
+      let query = supabaseInstance
+        .from('topics')
+        .select('id, title, code, subject_id, parent_id');
+      if (subjectId) {
+        query = query.eq('subject_id', subjectId);
+      }
+      const { data, error } = await query;
+      if (!error && data && Array.isArray(data)) {
+        data.forEach((t: any) => {
+          if (t && t.id && (t.title || t.name) && !t.parent_id) {
+            topicsMap.set(String(t.id), {
+              id: String(t.id),
+              title: t.title || t.name,
+              code: t.code,
+              subject_id: t.subject_id ? String(t.subject_id) : undefined,
+              parent_id: t.parent_id ? String(t.parent_id) : undefined,
+            });
+          }
+        });
+      }
+    } catch (err) {}
+
+    // 2. If empty, attempt query without parent_id filter (in case schema is flat)
+    if (topicsMap.size === 0) {
+      try {
+        let query2 = supabaseInstance
+          .from('topics')
+          .select('id, title, name, code, subject_id');
+        if (subjectId) {
+          query2 = query2.eq('subject_id', subjectId);
+        }
+        const { data: data2, error: error2 } = await query2;
+        if (!error2 && data2 && Array.isArray(data2)) {
+          data2.forEach((t: any) => {
+            const topicTitle = t.title || t.name;
+            if (t && t.id && topicTitle) {
+              topicsMap.set(String(t.id), {
+                id: String(t.id),
+                title: topicTitle,
+                code: t.code,
+                subject_id: t.subject_id ? String(t.subject_id) : undefined,
+              });
+            }
+          });
+        }
+      } catch (err2) {}
     }
-    const { data, error } = await query;
-    if (!error && data) return data;
-  } catch (err) {
-    console.warn('fetchTopicsForAdmin error:', err);
   }
-  return [];
+
+  // 3. Fallback: Load from mockTopicService curriculum
+  if (topicsMap.size === 0 && subjectId) {
+    try {
+      const { getSubjectTopicsAndSubtopics, fetchMockCurriculumFromSupabase } = await import('./mockTopicService');
+      const subTopics = await getSubjectTopicsAndSubtopics(subjectId);
+      if (subTopics && subTopics.length > 0) {
+        subTopics.forEach((t: any) => {
+          if (t && t.id && t.title) {
+            topicsMap.set(String(t.id), {
+              id: String(t.id),
+              title: t.title,
+              code: t.code,
+              subject_id: subjectId,
+            });
+          }
+        });
+      } else {
+        const fullCurr = await fetchMockCurriculumFromSupabase();
+        const matchedSubj = fullCurr.find((cs: any) => String(cs.id) === String(subjectId) || (cs.aliasIds && cs.aliasIds.includes(String(subjectId))));
+        if (matchedSubj && matchedSubj.topics) {
+          matchedSubj.topics.forEach((t: any) => {
+            if (t && t.id && t.title) {
+              topicsMap.set(String(t.id), {
+                id: String(t.id),
+                title: t.title,
+                code: t.code,
+                subject_id: subjectId,
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+  }
+
+  return Array.from(topicsMap.values());
 }
 
 /**
  * Fetch list of subtopics from 'sub_topics' and child 'topics' tables for admin question creation dropdown
  */
 export async function fetchSubTopicsForAdmin(topicId?: string): Promise<AdminSubTopicOption[]> {
-  if (!supabaseInstance) return [];
   const subTopicsMap = new Map<string, AdminSubTopicOption>();
-  try {
-    // 1. From topics table where parent_id is topicId
-    if (topicId) {
-      const { data: childTopics } = await supabaseInstance
-        .from('topics')
-        .select('id, title, code, parent_id, subject_id')
-        .eq('parent_id', topicId)
-        .order('title', { ascending: true });
-      if (childTopics) {
-        childTopics.forEach((ct: any) => {
-          subTopicsMap.set(String(ct.id), {
-            id: String(ct.id),
-            title: ct.title,
-            code: ct.code,
-            topic_id: ct.parent_id,
-            subject_id: ct.subject_id,
-          });
+
+  if (supabaseInstance && topicId) {
+    // 1. From sub_topics table
+    try {
+      const { data: stData, error: stErr } = await supabaseInstance
+        .from('sub_topics')
+        .select('id, title, name, code, topic_id, subject_id')
+        .eq('topic_id', topicId);
+      if (!stErr && stData && Array.isArray(stData)) {
+        stData.forEach((st: any) => {
+          const subTitle = st.title || st.name;
+          if (st && st.id && subTitle) {
+            subTopicsMap.set(String(st.id), {
+              id: String(st.id),
+              title: subTitle,
+              name: st.name,
+              code: st.code,
+              topic_id: st.topic_id ? String(st.topic_id) : topicId,
+              subject_id: st.subject_id ? String(st.subject_id) : undefined,
+            });
+          }
         });
       }
-    }
+    } catch {}
 
-    // 2. From sub_topics table
-    let stQuery = supabaseInstance
-      .from('sub_topics')
-      .select('id, title, name, code, topic_id, subject_id')
-      .order('title', { ascending: true });
-    if (topicId) {
-      stQuery = stQuery.eq('topic_id', topicId);
-    }
-    const { data: stData } = await stQuery;
-    if (stData) {
-      stData.forEach((st: any) => {
-        const subTitle = st.title || st.name;
-        if (subTitle && !subTopicsMap.has(String(st.id))) {
-          subTopicsMap.set(String(st.id), {
-            id: String(st.id),
-            title: subTitle,
-            name: st.name,
-            code: st.code,
-            topic_id: st.topic_id,
-            subject_id: st.subject_id,
-          });
-        }
-      });
-    }
-  } catch (err) {
-    console.warn('fetchSubTopicsForAdmin error:', err);
+    // 2. From topics table where parent_id is topicId
+    try {
+      const { data: childTopics, error: ctErr } = await supabaseInstance
+        .from('topics')
+        .select('id, title, name, code, parent_id, subject_id')
+        .eq('parent_id', topicId);
+      if (!ctErr && childTopics && Array.isArray(childTopics)) {
+        childTopics.forEach((ct: any) => {
+          const subTitle = ct.title || ct.name;
+          if (ct && ct.id && subTitle && !subTopicsMap.has(String(ct.id))) {
+            subTopicsMap.set(String(ct.id), {
+              id: String(ct.id),
+              title: subTitle,
+              code: ct.code,
+              topic_id: topicId,
+              subject_id: ct.subject_id ? String(ct.subject_id) : undefined,
+            });
+          }
+        });
+      }
+    } catch {}
   }
+
+  // 3. Fallback from curriculum tree if DB query returned empty
+  if (subTopicsMap.size === 0 && topicId) {
+    try {
+      const { fetchMockCurriculumFromSupabase } = await import('./mockTopicService');
+      const curr = await fetchMockCurriculumFromSupabase();
+      for (const subj of curr) {
+        for (const top of subj.topics || []) {
+          const topAny = top as any;
+          if (String(top.id) === String(topicId) || (topAny.aliasIds && topAny.aliasIds.includes(String(topicId)))) {
+            (top.subtopics || []).forEach((st: any) => {
+              if (st && st.id && st.title && !subTopicsMap.has(String(st.id))) {
+                subTopicsMap.set(String(st.id), {
+                  id: String(st.id),
+                  title: st.title,
+                  code: st.code,
+                  topic_id: topicId,
+                  subject_id: String(subj.id),
+                });
+              }
+            });
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
+
   return Array.from(subTopicsMap.values());
 }
 
@@ -1223,25 +1353,29 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
 
     // 3. If sub_topic_id is missing, look up actual id from 'sub_topics' and child 'topics'
     if (!finalSubTopicId && (finalSubTopicName || finalTopicName)) {
-      const searchSubName = (finalSubTopicName || finalTopicName)!;
+      const searchSubName = (finalSubTopicName || finalTopicName)!.trim();
       try {
         // Check sub_topics table
         const { data: matchedSubTopics } = await supabaseInstance
           .from('sub_topics')
-          .select('id, title, name, topic_id')
-          .or(`title.ilike.%${searchSubName}%,name.ilike.%${searchSubName}%`)
+          .select('id, title, topic_id')
+          .ilike('title', `%${searchSubName}%`)
           .limit(1);
 
         if (matchedSubTopics && matchedSubTopics.length > 0) {
           finalSubTopicId = String(matchedSubTopics[0].id);
           if (!finalSubTopicName) {
-            finalSubTopicName = matchedSubTopics[0].title || matchedSubTopics[0].name;
+            finalSubTopicName = matchedSubTopics[0].title;
           }
           if (!finalTopicId && matchedSubTopics[0].topic_id) {
             finalTopicId = String(matchedSubTopics[0].topic_id);
           }
-        } else {
-          // Check child topics in topics table where parent_id is not null
+        }
+      } catch (lookupErr) {}
+
+      // Fallback: Check topics table where parent_id is not null
+      if (!finalSubTopicId) {
+        try {
           const { data: matchedChildTopics } = await supabaseInstance
             .from('topics')
             .select('id, title, parent_id, subject_id')
@@ -1260,24 +1394,55 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
               finalSubjectId = String(matchedChildTopics[0].subject_id);
             }
           }
-        }
-      } catch (lookupErr) {
-        console.warn('Notice resolving sub_topic_id:', lookupErr);
+        } catch {}
+      }
+
+      // Fallback: Search in full curriculum tree
+      if (!finalSubTopicId) {
+        try {
+          const { fetchMockCurriculumFromSupabase } = await import('./mockTopicService');
+          const curr = await fetchMockCurriculumFromSupabase();
+          for (const subj of curr) {
+            for (const top of subj.topics || []) {
+              if (searchSubName && (top.title.includes(searchSubName) || searchSubName.includes(top.title))) {
+                if (!finalTopicId) finalTopicId = String(top.id);
+                if (!finalTopicName) finalTopicName = top.title;
+                if (!finalSubjectId) finalSubjectId = String(subj.id);
+                if (!finalSubjectName) finalSubjectName = subj.name;
+              }
+              for (const st of top.subtopics || []) {
+                if (searchSubName && (st.title.includes(searchSubName) || searchSubName.includes(st.title))) {
+                  finalSubTopicId = String(st.id);
+                  if (!finalSubTopicName) finalSubTopicName = st.title;
+                  if (!finalTopicId) finalTopicId = String(top.id);
+                  if (!finalTopicName) finalTopicName = top.title;
+                  if (!finalSubjectId) finalSubjectId = String(subj.id);
+                  if (!finalSubjectName) finalSubjectName = subj.name;
+                  break;
+                }
+              }
+            }
+          }
+        } catch {}
       }
     } else if (finalSubTopicId && !finalSubTopicName) {
       // If sub_topic name is missing but sub_topic_id is provided, resolve name
       try {
         const { data: matchedSubTopics } = await supabaseInstance
           .from('sub_topics')
-          .select('id, title, name, topic_id')
+          .select('id, title, topic_id')
           .eq('id', finalSubTopicId)
           .limit(1);
         if (matchedSubTopics && matchedSubTopics.length > 0) {
-          finalSubTopicName = matchedSubTopics[0].title || matchedSubTopics[0].name;
+          finalSubTopicName = matchedSubTopics[0].title;
           if (!finalTopicId && matchedSubTopics[0].topic_id) {
             finalTopicId = String(matchedSubTopics[0].topic_id);
           }
-        } else {
+        }
+      } catch {}
+
+      if (!finalSubTopicName) {
+        try {
           const { data: matchedChildTopics } = await supabaseInstance
             .from('topics')
             .select('id, title, parent_id, subject_id')
@@ -1292,8 +1457,8 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
               finalSubjectId = String(matchedChildTopics[0].subject_id);
             }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
 
     // Re-verify subject if subject_id was resolved but subject name is still empty

@@ -372,9 +372,33 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
       showToast('অনুগ্রহ করে ৪টি অপশন পূরণ করুন!');
       return;
     }
-    if (!qSubjectName) {
+
+    // Fully resolve subject name & ID
+    let finalSubjName = qSubjectName.trim();
+    let finalSubjId = qSubjectId.trim();
+    if (!finalSubjName && finalSubjId) {
+      const foundSub = questionSubjects.find((s) => s.id === finalSubjId);
+      if (foundSub) finalSubjName = foundSub.name;
+    }
+    if (!finalSubjName) {
       showToast('অনুগ্রহ করে বিষয় নির্বাচন করুন!');
       return;
+    }
+
+    // Fully resolve topic name & ID
+    let finalTopName = qTopicName.trim();
+    let finalTopId = qTopicId.trim();
+    if (!finalTopName && finalTopId) {
+      const foundTop = questionTopics.find((t) => t.id === finalTopId);
+      if (foundTop) finalTopName = foundTop.title;
+    }
+
+    // Fully resolve sub-topic name & ID
+    let finalSubTopName = qSubTopicName.trim();
+    let finalSubTopId = qSubTopicId.trim();
+    if (!finalSubTopName && finalSubTopId) {
+      const foundSubTop = questionSubTopics.find((st) => st.id === finalSubTopId);
+      if (foundSubTop) finalSubTopName = foundSubTop.title;
     }
 
     setIsSubmittingQ(true);
@@ -386,18 +410,18 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
         option_c: qOptionC,
         option_d: qOptionD,
         correct_answer: qCorrectAnswer,
-        subject: qSubjectName,
-        subject_id: qSubjectId || undefined,
-        topic: qTopicName || undefined,
-        topic_id: qTopicId || undefined,
-        sub_topic: qSubTopicName || undefined,
-        sub_topic_id: qSubTopicId || undefined,
+        subject: finalSubjName,
+        subject_id: finalSubjId || undefined,
+        topic: finalTopName || undefined,
+        topic_id: finalTopId || undefined,
+        sub_topic: finalSubTopName || undefined,
+        sub_topic_id: finalSubTopId || undefined,
         explanation: qExplanation.trim() || undefined,
         status: qStatus,
       });
 
       if (res.success && res.data) {
-        showToast('✓ প্রশ্নটি সফলভাবে Supabase ডাটাবেসে topic_id এবং sub_topic_id সহ সেভ হয়েছে!');
+        showToast('✓ প্রশ্নটি সফলভাবে Supabase ডাটাবেসে subject_id, topic_id এবং sub_topic_id সহ সেভ হয়েছে!');
         setQQuestion('');
         setQOptionA('');
         setQOptionB('');
@@ -1507,6 +1531,20 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                         />
                       )}
                     </div>
+                  </div>
+
+                  {/* Selected Metadata Live Info Banner */}
+                  <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="font-bold text-slate-600 dark:text-slate-400">ডাটাবেসে সেভ হবে:</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-medium">
+                      বিষয়: <strong>{qSubjectName || 'N/A'}</strong> <span className="font-mono opacity-80">(ID: {qSubjectId || 'N/A'})</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-medium">
+                      টপিক: <strong>{qTopicName || 'N/A'}</strong> <span className="font-mono opacity-80">(ID: {qTopicId || 'N/A'})</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 font-medium">
+                      সাব-টপিক: <strong>{qSubTopicName || 'N/A'}</strong> <span className="font-mono opacity-80">(ID: {qSubTopicId || 'N/A'})</span>
+                    </span>
                   </div>
 
                   {/* Question Text */}
