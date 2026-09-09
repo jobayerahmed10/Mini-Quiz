@@ -20,7 +20,7 @@ import {
   PenTool
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { subscribeToQuestionsRealtime } from '../lib/mockTopicService';
+import { fetchMockCurriculumFromSupabase, subscribeToQuestionsRealtime } from '../lib/mockTopicService';
 import { isUserPremium } from '../lib/utils';
 import { getSubjectPriority, getCanonicalSubjectName, getIconType } from '../lib/subjects';
 import { getCache, setCache } from '../lib/cache';
@@ -38,6 +38,7 @@ interface SubjectItem {
   name: string;
   iconType?: string;
   code?: string;
+  totalQuestions?: number;
 }
 
 const DEFAULT_SUBJECTS: SubjectItem[] = [
@@ -46,9 +47,9 @@ const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'bn_grammar', name: 'বাংলা ভাষা ও ব্যাকরণ', iconType: 'bn2' },
   { id: 'eng_lit', name: 'English Literature', iconType: 'eng_lit' },
   { id: 'eng_lang', name: 'English Grammar', iconType: 'eng_lang' },
-  { id: 'math', name: 'গাণিতিক যুক্তি', iconType: 'math' },
   { id: 'bd_affairs', name: 'বাংলাদেশ বিষয়াবলি', iconType: 'bd' },
   { id: 'intl_affairs', name: 'আন্তর্জাতিক বিষয়াবলি', iconType: 'intl' },
+  { id: 'math', name: 'গাণিতিক যুক্তি', iconType: 'math' },
   { id: 'general_sci', name: 'সাধারণ বিজ্ঞান', iconType: 'science' },
   { id: 'geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', iconType: 'geo' },
   { id: 'ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', iconType: 'ethics' },
@@ -57,7 +58,7 @@ const DEFAULT_SUBJECTS: SubjectItem[] = [
 ];
 
 const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) => {
-  const resolvedType = type || getIconType(name);
+  const resolvedType = getIconType(name, type) || type;
 
   switch (resolvedType) {
     case 'news': // 1. কারেন্ট অ্যাফেয়ার্স (Cyan blue badge with globe & NEWS text)
@@ -71,6 +72,7 @@ const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) 
       );
 
     case 'bn1': // 2. বাংলা সাহিত্য (Bold red 'অ।')
+    case 'bangla':
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none font-hind font-black text-2xl sm:text-3xl text-[#E03131]">
           <span>অ</span>
@@ -94,6 +96,7 @@ const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) 
       );
 
     case 'eng_lang': // 5. English Grammar (Purple badge with 'Aa')
+    case 'english':
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#7C3AED] text-white flex items-center justify-center shrink-0 shadow-xs select-none">
           <span className="bg-white/20 px-1.5 py-0.5 rounded font-sans font-black text-xs sm:text-sm tracking-tight text-white border border-white/30">
@@ -102,14 +105,7 @@ const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) 
         </div>
       );
 
-    case 'math': // 6. গাণিতিক যুক্তি (Hot pink '√x')
-      return (
-        <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none font-mono font-black text-xl sm:text-2xl text-[#D946EF]">
-          <span>√x</span>
-        </div>
-      );
-
-    case 'bd': // 7. বাংলাদেশ বিষয়াবলি (Concentric green/white/red ring badge)
+    case 'bd': // 6. বাংলাদেশ বিষয়াবলি (Concentric green/white/red ring badge)
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0">
           <div className="w-8 h-8 rounded-full bg-[#006A4E] p-[3px] flex items-center justify-center shadow-xs">
@@ -120,10 +116,17 @@ const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) 
         </div>
       );
 
-    case 'intl': // 8. আন্তর্জাতিক বিষয়াবলি (Magenta globe)
+    case 'intl': // 7. আন্তর্জাতিক বিষয়াবলি (Magenta globe)
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 select-none text-[#E11D48]">
           <Globe2 className="w-7 h-7 stroke-[2.2]" />
+        </div>
+      );
+
+    case 'math': // 8. গাণিতিক যুক্তি (ক্যালকুলেটর ব্যাজ আইকন)
+      return (
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-gradient-to-br from-[#D946EF] to-[#A21CAF] text-white flex items-center justify-center shrink-0 shadow-xs select-none">
+          <Calculator className="w-5.5 h-5.5 stroke-[2.2] text-white" />
         </div>
       );
 
@@ -163,6 +166,14 @@ const SubjectIcon: React.FC<{ type?: string; name: string }> = ({ type, name }) 
       );
 
     default:
+      // Fallback if name matches math in any way
+      if (name?.toLowerCase().includes('গণিত') || name?.toLowerCase().includes('গাণিতিক') || name?.toLowerCase().includes('math')) {
+        return (
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-gradient-to-br from-[#D946EF] to-[#A21CAF] text-white flex items-center justify-center shrink-0 shadow-xs select-none">
+            <Calculator className="w-5.5 h-5.5 stroke-[2.2] text-white" />
+          </div>
+        );
+      }
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#046A38] text-white flex items-center justify-center shrink-0 font-bold text-base">
           {name?.[0] || 'ব'}
@@ -188,61 +199,30 @@ export const SubjectsPage: React.FC<SubjectsPageProps> = ({
     }
   }, [initialSubTab]);
 
-  // Fetch subjects from Supabase 'subjects' table with fallback to default
+  // Fetch subjects & curriculum with question counts from Supabase
   useEffect(() => {
     let isMounted = true;
 
     async function fetchSubjects() {
-      const cached = getCache<SubjectItem[]>('subjects_page_list', 600000);
-      if (cached && cached.length > 0) {
-        if (isMounted) {
-          setSubjects(cached);
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('id, name, code, created_at')
-          .limit(100)
-          .order('id', { ascending: true });
+        const curriculumData = await fetchMockCurriculumFromSupabase();
+        if (!isMounted) return;
 
-        if (!error && data && data.length > 0) {
-          if (isMounted) {
-            // Map Supabase subjects with canonical names & icon matching
-            const subjectMap = new Map<string, SubjectItem>();
+        if (curriculumData && curriculumData.length > 0) {
+          const mapped: SubjectItem[] = curriculumData.map((c) => ({
+            id: c.id,
+            name: c.name,
+            iconType: getIconType(c.name, c.iconType) || c.iconType,
+            totalQuestions: c.totalQuestions || 0,
+          }));
 
-            data.forEach((s: any) => {
-              const canonicalName = getCanonicalSubjectName(s.name, s.code);
-              if (subjectMap.has(canonicalName)) return;
+          mapped.sort((a, b) => getSubjectPriority(a.name) - getSubjectPriority(b.name));
 
-              const iconType = getIconType(canonicalName, s.code);
-
-              subjectMap.set(canonicalName, {
-                id: s.id,
-                name: canonicalName,
-                iconType,
-                code: s.code,
-              });
-            });
-
-            const mappedSubjects = Array.from(subjectMap.values());
-
-            // Sort subjects according to priority
-            mappedSubjects.sort((a, b) => {
-              const pA = getSubjectPriority(a.name, a.code);
-              const pB = getSubjectPriority(b.name, b.code);
-              return pA - pB;
-            });
-
-            setSubjects(mappedSubjects);
-            setCache('subjects_page_list', mappedSubjects);
-          }
+          setSubjects(mapped);
+          setCache('subjects_page_list_v4', mapped);
         }
       } catch (err) {
-        console.error('Error loading subjects from Supabase:', err);
+        console.error('Error loading curriculum subjects:', err);
       } finally {
         if (isMounted) {
           setLoading(false);

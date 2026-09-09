@@ -25,7 +25,10 @@ import {
   Crown,
   Search,
   Phone,
-  User
+  User,
+  HelpCircle,
+  Layers,
+  Tag
 } from 'lucide-react';
 import { BlogPost, BlogCategory, QuestionCommunityExplanation, CourseEnrollmentRecord } from '../types';
 import { BLOG_TAXONOMY } from '../data/blogData';
@@ -39,8 +42,17 @@ import {
   rejectExplanationInSupabase,
   fetchAllQuestionReportsForAdmin,
   fetchCourseApplicationsFromSupabase,
-  updateEnrollmentStatusInSupabase
+  updateEnrollmentStatusInSupabase,
+  addQuestionToSupabase,
+  deleteQuestionFromSupabase,
+  fetchSubjectsForAdmin,
+  fetchTopicsForAdmin,
+  fetchSubTopicsForAdmin,
+  AdminSubjectOption,
+  AdminTopicOption,
+  AdminSubTopicOption
 } from '../lib/supabase';
+import { getAllAvailableAdminQuestions } from '../lib/mockTopicService';
 import { approveUserPremiumPackage, toBengaliNumeral } from '../lib/utils';
 
 import { RichTextEditor } from './RichTextEditor';
@@ -127,12 +139,37 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
   onClose,
   onPostSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'list' | 'explanations' | 'reports' | 'enrollments'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'list' | 'explanations' | 'reports' | 'enrollments' | 'questions'>('create');
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Question Bank State
+  const [adminQuestionsList, setAdminQuestionsList] = useState<any[]>([]);
+  const [questionSubjects, setQuestionSubjects] = useState<AdminSubjectOption[]>([]);
+  const [questionTopics, setQuestionTopics] = useState<AdminTopicOption[]>([]);
+  const [questionSubTopics, setQuestionSubTopics] = useState<AdminSubTopicOption[]>([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
+
+  const [qSubjectId, setQSubjectId] = useState<string>('');
+  const [qSubjectName, setQSubjectName] = useState<string>('');
+  const [qTopicId, setQTopicId] = useState<string>('');
+  const [qTopicName, setQTopicName] = useState<string>('');
+  const [qSubTopicId, setQSubTopicId] = useState<string>('');
+  const [qSubTopicName, setQSubTopicName] = useState<string>('');
+
+  const [qQuestion, setQQuestion] = useState<string>('');
+  const [qOptionA, setQOptionA] = useState<string>('');
+  const [qOptionB, setQOptionB] = useState<string>('');
+  const [qOptionC, setQOptionC] = useState<string>('');
+  const [qOptionD, setQOptionD] = useState<string>('');
+  const [qCorrectAnswer, setQCorrectAnswer] = useState<'option_a' | 'option_b' | 'option_c' | 'option_d'>('option_a');
+  const [qExplanation, setQExplanation] = useState<string>('');
+  const [qStatus, setQStatus] = useState<'published' | 'draft'>('published');
+  const [isSubmittingQ, setIsSubmittingQ] = useState<boolean>(false);
+  const [questionSearchQuery, setQuestionSearchQuery] = useState<string>('');
 
   // Moderation & Enrollments state
   const [adminExplanations, setAdminExplanations] = useState<QuestionCommunityExplanation[]>([]);
@@ -234,13 +271,166 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
     }
   };
 
+  const loadQuestionBankData = async () => {
+    setIsLoadingQuestions(true);
+    try {
+      const [subjs, qList] = await Promise.all([
+        fetchSubjectsForAdmin(),
+        getAllAvailableAdminQuestions(),
+      ]);
+      setQuestionSubjects(subjs);
+      setAdminQuestionsList(qList);
+
+      if (subjs.length > 0 && !qSubjectId) {
+        const firstSub = subjs[0];
+        setQSubjectId(firstSub.id);
+        setQSubjectName(firstSub.name);
+        const tops = await fetchTopicsForAdmin(firstSub.id);
+        setQuestionTopics(tops);
+        if (tops.length > 0) {
+          setQTopicId(tops[0].id);
+          setQTopicName(tops[0].title);
+          const subTops = await fetchSubTopicsForAdmin(tops[0].id);
+          setQuestionSubTopics(subTops);
+          if (subTops.length > 0) {
+            setQSubTopicId(subTops[0].id);
+            setQSubTopicName(subTops[0].title);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('loadQuestionBankData error:', e);
+    } finally {
+      setIsLoadingQuestions(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadBlogs();
       loadModerationData();
       loadEnrollmentsData();
+      loadQuestionBankData();
     }
   }, [isOpen]);
+
+  const handleSubjectChange = async (subjId: string) => {
+    setQSubjectId(subjId);
+    const matched = questionSubjects.find((s) => s.id === subjId);
+    const sName = matched ? matched.name : '';
+    setQSubjectName(sName);
+    setQTopicId('');
+    setQTopicName('');
+    setQSubTopicId('');
+    setQSubTopicName('');
+
+    const tops = await fetchTopicsForAdmin(subjId);
+    setQuestionTopics(tops);
+    if (tops.length > 0) {
+      setQTopicId(tops[0].id);
+      setQTopicName(tops[0].title);
+      const subTops = await fetchSubTopicsForAdmin(tops[0].id);
+      setQuestionSubTopics(subTops);
+      if (subTops.length > 0) {
+        setQSubTopicId(subTops[0].id);
+        setQSubTopicName(subTops[0].title);
+      }
+    } else {
+      setQuestionSubTopics([]);
+    }
+  };
+
+  const handleTopicChange = async (topId: string) => {
+    setQTopicId(topId);
+    const matched = questionTopics.find((t) => t.id === topId);
+    const tName = matched ? matched.title : '';
+    setQTopicName(tName);
+    setQSubTopicId('');
+    setQSubTopicName('');
+
+    const subTops = await fetchSubTopicsForAdmin(topId);
+    setQuestionSubTopics(subTops);
+    if (subTops.length > 0) {
+      setQSubTopicId(subTops[0].id);
+      setQSubTopicName(subTops[0].title);
+    }
+  };
+
+  const handleSubTopicChange = (subId: string) => {
+    setQSubTopicId(subId);
+    const matched = questionSubTopics.find((st) => st.id === subId);
+    setQSubTopicName(matched ? matched.title : '');
+  };
+
+  const handleCreateQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qQuestion.trim()) {
+      showToast('অনুগ্রহ করে প্রশ্ন লিখুন!');
+      return;
+    }
+    if (!qOptionA.trim() || !qOptionB.trim() || !qOptionC.trim() || !qOptionD.trim()) {
+      showToast('অনুগ্রহ করে ৪টি অপশন পূরণ করুন!');
+      return;
+    }
+    if (!qSubjectName) {
+      showToast('অনুগ্রহ করে বিষয় নির্বাচন করুন!');
+      return;
+    }
+
+    setIsSubmittingQ(true);
+    try {
+      const res = await addQuestionToSupabase({
+        question: qQuestion,
+        option_a: qOptionA,
+        option_b: qOptionB,
+        option_c: qOptionC,
+        option_d: qOptionD,
+        correct_answer: qCorrectAnswer,
+        subject: qSubjectName,
+        subject_id: qSubjectId || undefined,
+        topic: qTopicName || undefined,
+        topic_id: qTopicId || undefined,
+        sub_topic: qSubTopicName || undefined,
+        sub_topic_id: qSubTopicId || undefined,
+        explanation: qExplanation.trim() || undefined,
+        status: qStatus,
+      });
+
+      if (res.success && res.data) {
+        showToast('✓ প্রশ্নটি সফলভাবে Supabase ডাটাবেসে topic_id এবং sub_topic_id সহ সেভ হয়েছে!');
+        setQQuestion('');
+        setQOptionA('');
+        setQOptionB('');
+        setQOptionC('');
+        setQOptionD('');
+        setQExplanation('');
+        const updated = await getAllAvailableAdminQuestions();
+        setAdminQuestionsList(updated);
+      } else {
+        showToast(res.error || 'প্রশ্ন সংরক্ষণ ব্যর্থ হয়েছে');
+      }
+    } catch (err: any) {
+      showToast(`ত্রুটি: ${err.message || 'প্রশ্ন সংরক্ষণ করতে ব্যর্থ'}`);
+    } finally {
+      setIsSubmittingQ(false);
+    }
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই প্রশ্নটি মুছে ফেলতে চান?')) return;
+    try {
+      const res = await deleteQuestionFromSupabase(id);
+      if (res.success) {
+        showToast('প্রশ্ন সফলভাবে মুছে ফেলা হয়েছে।');
+        const updated = await getAllAvailableAdminQuestions();
+        setAdminQuestionsList(updated);
+      } else {
+        showToast(res.error || 'মুছে ফেলতে ব্যর্থ');
+      }
+    } catch (err: any) {
+      showToast(`ত্রুটি: ${err.message}`);
+    }
+  };
 
   const handleApproveEnrollment = async (item: CourseEnrollmentRecord) => {
     if (!item.id) return;
@@ -518,6 +708,22 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                 {enrollments.filter((e) => e.status === 'pending').length}
               </span>
             )}
+          </button>
+
+          {/* Question Bank Tab */}
+          <button
+            onClick={() => {
+              setActiveTab('questions');
+              loadQuestionBankData();
+            }}
+            className={`pb-3 px-2 sm:px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'questions'
+                ? 'border-[#046A38] text-[#046A38] dark:text-emerald-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>প্রশ্ন ব্যাংক ({adminQuestionsList.length})</span>
           </button>
         </div>
 
@@ -1158,7 +1364,7 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                 </div>
               )}
             </div>
-          ) : (
+          ) : activeTab === 'reports' ? (
             /* Question Reports Panel */
             <div className="space-y-4">
               {isLoadingModeration ? (
@@ -1202,6 +1408,402 @@ export const AdminBlogModal: React.FC<AdminBlogModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+          ) : (
+            /* Question Bank & Add Panel (activeTab === 'questions') */
+            <div className="space-y-6">
+              {/* Form: Add Question */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700/70 shadow-xs">
+                <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-[#046A38] dark:text-emerald-400">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">নতুন MCQ প্রশ্ন যুক্ত করুন</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">বিষয়, অধ্যায়/টপিক ও সাব-টপিক সিলেক্ট করলে স্বয়ংক্রিয়ভাবে topic_id এবং sub_topic_id ডাটাবেসে সেভ হবে</p>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCreateQuestion} className="space-y-4">
+                  {/* Cascade Dropdowns: Subject, Topic, Sub-Topic */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Subject Dropdown */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">বিষয় (Subject) *</label>
+                      <select
+                        value={qSubjectId}
+                        onChange={(e) => handleSubjectChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                        required
+                      >
+                        <option value="">বিষয় নির্বাচন করুন</option>
+                        {questionSubjects.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      {qSubjectId && (
+                        <span className="text-[10px] text-slate-400 font-mono">ID: {qSubjectId}</span>
+                      )}
+                    </div>
+
+                    {/* Topic Dropdown */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">টপিক / অধ্যায় (Topic) *</label>
+                      <select
+                        value={qTopicId}
+                        onChange={(e) => handleTopicChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">টপিক নির্বাচন করুন</option>
+                        {questionTopics.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.code ? `[${t.code}] ` : ''}{t.title}
+                          </option>
+                        ))}
+                      </select>
+                      {qTopicId ? (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
+                            topic_id: {qTopicId}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400">টপিক সিলেক্ট করুন</span>
+                      )}
+                    </div>
+
+                    {/* Sub-Topic Dropdown */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">সাব-টপিক (Sub-Topic)</label>
+                      <select
+                        value={qSubTopicId}
+                        onChange={(e) => handleSubTopicChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">সাব-টপিক নির্বাচন করুন</option>
+                        {questionSubTopics.map((st) => (
+                          <option key={st.id} value={st.id}>
+                            {st.code ? `[${st.code}] ` : ''}{st.title}
+                          </option>
+                        ))}
+                      </select>
+                      {qSubTopicId ? (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-mono text-[10px] font-bold border border-blue-200 dark:border-blue-800">
+                            sub_topic_id: {qSubTopicId}
+                          </span>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="অথবা কাস্টম সাব-টপিক নাম..."
+                          value={qSubTopicName}
+                          onChange={(e) => setQSubTopicName(e.target.value)}
+                          className="w-full mt-1 px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Question Text */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">প্রশ্নের বিবরণ *</label>
+                    <textarea
+                      rows={2}
+                      value={qQuestion}
+                      onChange={(e) => setQQuestion(e.target.value)}
+                      placeholder="এখানে সম্পূর্ণ প্রশ্ন লিখুন..."
+                      required
+                      className="w-full px-3 py-2 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* 4 Options Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px]">ক</span>
+                        <span>অপশন (ক) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={qOptionA}
+                        onChange={(e) => setQOptionA(e.target.value)}
+                        placeholder="অপশন ক..."
+                        required
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px]">খ</span>
+                        <span>অপশন (খ) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={qOptionB}
+                        onChange={(e) => setQOptionB(e.target.value)}
+                        placeholder="অপশন খ..."
+                        required
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px]">গ</span>
+                        <span>অপশন (গ) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={qOptionC}
+                        onChange={(e) => setQOptionC(e.target.value)}
+                        placeholder="অপশন গ..."
+                        required
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px]">ঘ</span>
+                        <span>অপশন (ঘ) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={qOptionD}
+                        onChange={(e) => setQOptionD(e.target.value)}
+                        placeholder="অপশন ঘ..."
+                        required
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Correct Answer & Status */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">সঠিক উত্তর *</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {(
+                          [
+                            { key: 'option_a', label: 'ক' },
+                            { key: 'option_b', label: 'খ' },
+                            { key: 'option_c', label: 'গ' },
+                            { key: 'option_d', label: 'ঘ' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            type="button"
+                            key={opt.key}
+                            onClick={() => setQCorrectAnswer(opt.key)}
+                            className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                              qCorrectAnswer === opt.key
+                                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">স্ট্যাটাস</label>
+                      <div className="flex gap-2">
+                        {(
+                          [
+                            { key: 'published', label: 'প্রকাশিত (Published)' },
+                            { key: 'draft', label: 'খসড়া (Draft)' },
+                          ] as const
+                        ).map((st) => (
+                          <button
+                            type="button"
+                            key={st.key}
+                            onClick={() => setQStatus(st.key)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              qStatus === st.key
+                                ? 'bg-[#046A38] text-white shadow-sm'
+                                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Explanation */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">প্রশ্নের ব্যাখ্যা (ঐচ্ছিক)</label>
+                    <textarea
+                      rows={2}
+                      value={qExplanation}
+                      onChange={(e) => setQExplanation(e.target.value)}
+                      placeholder="প্রশ্নের সঠিক উত্তরের পক্ষে বিশদ ব্যাখ্যা লিখুন..."
+                      className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Submit button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingQ}
+                      className="px-6 py-2.5 rounded-xl bg-[#046A38] hover:bg-[#03542c] text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      {isSubmittingQ ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>সংরক্ষণ হচ্ছে...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>প্রশ্ন সেভ করুন (Foreign Keys সহ)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Question Bank List */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-emerald-600" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      সংরক্ষিত প্রশ্ন তালিকা ({adminQuestionsList.length})
+                    </h4>
+                  </div>
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={questionSearchQuery}
+                      onChange={(e) => setQuestionSearchQuery(e.target.value)}
+                      placeholder="প্রশ্ন বা বিষয় খুঁজুন..."
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {isLoadingQuestions ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-[#046A38]" />
+                    <p className="text-xs font-semibold">প্রশ্ন লোড হচ্ছে...</p>
+                  </div>
+                ) : adminQuestionsList.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                    <HelpCircle className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-xs font-semibold">এখনো কোনো প্রশ্ন যুক্ত করা হয়নি। উপরের ফর্ম ব্যবহার করে প্রশ্ন যুক্ত করুন।</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {adminQuestionsList
+                      .filter((q) => {
+                        if (!questionSearchQuery.trim()) return true;
+                        const term = questionSearchQuery.toLowerCase();
+                        return (
+                          (q.question || '').toLowerCase().includes(term) ||
+                          (q.topic || '').toLowerCase().includes(term) ||
+                          (q.sub_topic || '').toLowerCase().includes(term) ||
+                          (q.subject || '').toLowerCase().includes(term)
+                        );
+                      })
+                      .map((q, idx) => (
+                        <div
+                          key={q.id || idx}
+                          className="p-4 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold">
+                                  {q.subject || 'সাধারণ'}
+                                </span>
+                                {q.topic && (
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
+                                    টপিক: {q.topic} {q.topic_id ? `[ID: ${q.topic_id}]` : ''}
+                                  </span>
+                                )}
+                                {q.sub_topic && (
+                                  <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold">
+                                    সাব-টপিক: {q.sub_topic} {q.sub_topic_id ? `[ID: ${q.sub_topic_id}]` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white pt-1">
+                                {q.question}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQuestion(q.id)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition-colors cursor-pointer shrink-0"
+                              title="প্রশ্ন মুছে ফেলুন"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                            <div
+                              className={`p-2 rounded-lg border ${
+                                q.correct_answer === 'option_a'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold'
+                                  : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              ক) {q.option_a}
+                            </div>
+                            <div
+                              className={`p-2 rounded-lg border ${
+                                q.correct_answer === 'option_b'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold'
+                                  : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              খ) {q.option_b}
+                            </div>
+                            <div
+                              className={`p-2 rounded-lg border ${
+                                q.correct_answer === 'option_c'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold'
+                                  : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              গ) {q.option_c}
+                            </div>
+                            <div
+                              className={`p-2 rounded-lg border ${
+                                q.correct_answer === 'option_d'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold'
+                                  : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              ঘ) {q.option_d}
+                            </div>
+                          </div>
+
+                          {q.explanation && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/40 p-2 rounded-lg">
+                              <span className="font-bold text-slate-700 dark:text-slate-300">ব্যাখ্যা:</span> {q.explanation}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

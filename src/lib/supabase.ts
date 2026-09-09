@@ -648,10 +648,133 @@ export interface NewQuestionInput {
   option_d: string;
   correct_answer: 'option_a' | 'option_b' | 'option_c' | 'option_d';
   subject: string;
+  subject_id?: string | null;
   topic?: string;
+  topic_id?: string | null;
+  sub_topic?: string;
+  sub_topic_id?: string | null;
   explanation?: string;
   status?: string;
   exam_id?: string;
+}
+
+export interface AdminSubjectOption {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface AdminTopicOption {
+  id: string;
+  title: string;
+  code?: string;
+  subject_id?: string;
+  parent_id?: string | null;
+}
+
+export interface AdminSubTopicOption {
+  id: string;
+  title: string;
+  name?: string;
+  code?: string;
+  topic_id?: string;
+  subject_id?: string;
+}
+
+/**
+ * Fetch list of subjects for admin question creation dropdown
+ */
+export async function fetchSubjectsForAdmin(): Promise<AdminSubjectOption[]> {
+  if (!supabaseInstance) return [];
+  try {
+    const { data, error } = await supabaseInstance
+      .from('subjects')
+      .select('id, name, code')
+      .order('name', { ascending: true });
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('fetchSubjectsForAdmin error:', err);
+  }
+  return [];
+}
+
+/**
+ * Fetch list of topics from 'topics' table for admin question creation dropdown
+ */
+export async function fetchTopicsForAdmin(subjectId?: string): Promise<AdminTopicOption[]> {
+  if (!supabaseInstance) return [];
+  try {
+    let query = supabaseInstance
+      .from('topics')
+      .select('id, title, code, subject_id, parent_id')
+      .is('parent_id', null)
+      .order('title', { ascending: true });
+    if (subjectId) {
+      query = query.eq('subject_id', subjectId);
+    }
+    const { data, error } = await query;
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('fetchTopicsForAdmin error:', err);
+  }
+  return [];
+}
+
+/**
+ * Fetch list of subtopics from 'sub_topics' and child 'topics' tables for admin question creation dropdown
+ */
+export async function fetchSubTopicsForAdmin(topicId?: string): Promise<AdminSubTopicOption[]> {
+  if (!supabaseInstance) return [];
+  const subTopicsMap = new Map<string, AdminSubTopicOption>();
+  try {
+    // 1. From topics table where parent_id is topicId
+    if (topicId) {
+      const { data: childTopics } = await supabaseInstance
+        .from('topics')
+        .select('id, title, code, parent_id, subject_id')
+        .eq('parent_id', topicId)
+        .order('title', { ascending: true });
+      if (childTopics) {
+        childTopics.forEach((ct: any) => {
+          subTopicsMap.set(String(ct.id), {
+            id: String(ct.id),
+            title: ct.title,
+            code: ct.code,
+            topic_id: ct.parent_id,
+            subject_id: ct.subject_id,
+          });
+        });
+      }
+    }
+
+    // 2. From sub_topics table
+    let stQuery = supabaseInstance
+      .from('sub_topics')
+      .select('id, title, name, code, topic_id, subject_id')
+      .order('title', { ascending: true });
+    if (topicId) {
+      stQuery = stQuery.eq('topic_id', topicId);
+    }
+    const { data: stData } = await stQuery;
+    if (stData) {
+      stData.forEach((st: any) => {
+        const subTitle = st.title || st.name;
+        if (subTitle && !subTopicsMap.has(String(st.id))) {
+          subTopicsMap.set(String(st.id), {
+            id: String(st.id),
+            title: subTitle,
+            name: st.name,
+            code: st.code,
+            topic_id: st.topic_id,
+            subject_id: st.subject_id,
+          });
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('fetchSubTopicsForAdmin error:', err);
+  }
+  return Array.from(subTopicsMap.values());
 }
 
 function isUuidString(str: string): boolean {
@@ -1019,6 +1142,8 @@ export async function fetchQuestionBySlugOrId(slugOrId: string): Promise<Questio
 
 /**
  * Inserts a new MCQ question into Supabase 'public.questions' table
+ * Requirement: Fetch actual 'id' from 'topics' and 'sub_topics' tables based on selected dropdowns,
+ * and save both 'topic_id' and 'sub_topic_id' into the questions table.
  */
 export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ success: boolean; data?: Question; error?: string }> {
   if (!supabaseInstance) {
@@ -1029,6 +1154,81 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
   }
 
   try {
+    let finalTopicId = input.topic_id || null;
+    let finalSubTopicId = input.sub_topic_id || null;
+    let finalSubjectId = input.subject_id || null;
+    let finalTopicName = input.topic ? input.topic.trim() : null;
+    let finalSubTopicName = input.sub_topic ? input.sub_topic.trim() : null;
+
+    // 1. If topic_id is missing, look up actual id from 'topics' table
+    if (!finalTopicId && finalTopicName) {
+      try {
+        const { data: matchedTopics } = await supabaseInstance
+          .from('topics')
+          .select('id, title, subject_id, parent_id')
+          .ilike('title', finalTopicName)
+          .limit(1);
+        if (matchedTopics && matchedTopics.length > 0) {
+          finalTopicId = String(matchedTopics[0].id);
+          if (!finalSubjectId && matchedTopics[0].subject_id) {
+            finalSubjectId = String(matchedTopics[0].subject_id);
+          }
+        }
+      } catch (lookupErr) {
+        console.warn('Notice resolving topic_id:', lookupErr);
+      }
+    }
+
+    // 2. If sub_topic_id is missing, look up actual id from 'sub_topics' and child 'topics'
+    if (!finalSubTopicId && (finalSubTopicName || finalTopicName)) {
+      const searchSubName = (finalSubTopicName || finalTopicName)!;
+      try {
+        // Check sub_topics table
+        const { data: matchedSubTopics } = await supabaseInstance
+          .from('sub_topics')
+          .select('id, title, name, topic_id')
+          .or(`title.ilike.%${searchSubName}%,name.ilike.%${searchSubName}%`)
+          .limit(1);
+
+        if (matchedSubTopics && matchedSubTopics.length > 0) {
+          finalSubTopicId = String(matchedSubTopics[0].id);
+          if (!finalTopicId && matchedSubTopics[0].topic_id) {
+            finalTopicId = String(matchedSubTopics[0].topic_id);
+          }
+        } else {
+          // Check child topics in topics table where parent_id is not null
+          const { data: matchedChildTopics } = await supabaseInstance
+            .from('topics')
+            .select('id, title, parent_id')
+            .not('parent_id', 'is', null)
+            .ilike('title', `%${searchSubName}%`)
+            .limit(1);
+          if (matchedChildTopics && matchedChildTopics.length > 0) {
+            finalSubTopicId = String(matchedChildTopics[0].id);
+            if (!finalTopicId && matchedChildTopics[0].parent_id) {
+              finalTopicId = String(matchedChildTopics[0].parent_id);
+            }
+          }
+        }
+      } catch (lookupErr) {
+        console.warn('Notice resolving sub_topic_id:', lookupErr);
+      }
+    }
+
+    // 3. If subject_id is missing, look up from subjects table
+    if (!finalSubjectId && input.subject) {
+      try {
+        const { data: matchedSubjects } = await supabaseInstance
+          .from('subjects')
+          .select('id, name')
+          .ilike('name', input.subject.trim())
+          .limit(1);
+        if (matchedSubjects && matchedSubjects.length > 0) {
+          finalSubjectId = String(matchedSubjects[0].id);
+        }
+      } catch {}
+    }
+
     const newRecord: any = {
       question: input.question.trim(),
       option_a: input.option_a.trim(),
@@ -1037,21 +1237,47 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       option_d: input.option_d.trim(),
       correct_answer: input.correct_answer,
       subject: input.subject.trim(),
-      topic: input.topic?.trim() || null,
+      topic: finalTopicName,
+      sub_topic: finalSubTopicName,
+      topic_id: finalTopicId,
+      sub_topic_id: finalSubTopicId,
       explanation: input.explanation?.trim() || null,
       status: input.status || 'published',
       created_at: new Date().toISOString(),
     };
 
+    if (finalSubjectId) {
+      newRecord.subject_id = finalSubjectId;
+    }
+
     if (input.exam_id && input.exam_id.trim() !== '') {
       newRecord.exam_id = input.exam_id.trim();
     }
 
-    const { data, error } = await supabaseInstance
+    // Try inserting with both topic_id and sub_topic_id
+    let insertedRow: any = null;
+    let { data, error } = await supabaseInstance
       .from('questions')
       .insert([newRecord])
       .select()
       .single();
+
+    // If error occurs due to sub_topic_id column not existing in DB schema yet, retry without sub_topic_id
+    if (error && error.message && (error.message.includes('sub_topic_id') || error.message.includes('column'))) {
+      const fallbackRecord = { ...newRecord };
+      delete fallbackRecord.sub_topic_id;
+      const retryResult = await supabaseInstance
+        .from('questions')
+        .insert([fallbackRecord])
+        .select()
+        .single();
+      if (!retryResult.error && retryResult.data) {
+        data = retryResult.data;
+        error = null;
+      } else {
+        error = retryResult.error;
+      }
+    }
 
     if (error) {
       console.error('Supabase insert error:', error);
@@ -1061,31 +1287,53 @@ export async function addQuestionToSupabase(input: NewQuestionInput): Promise<{ 
       };
     }
 
-    try {
-      localStorage.removeItem('miniquiz_questions_cache');
-      localStorage.removeItem('miniquiz_exams_cache');
-    } catch {}
+    insertedRow = data;
+
+    // Cache locally to instantly reflect new question in question bank and counts
+    const createdQuestion: Question = {
+      id: String(insertedRow.id),
+      question: insertedRow.question,
+      option_a: insertedRow.option_a,
+      option_b: insertedRow.option_b,
+      option_c: insertedRow.option_c,
+      option_d: insertedRow.option_d,
+      correct_answer: insertedRow.correct_answer,
+      explanation: insertedRow.explanation,
+      subject: insertedRow.subject,
+      subject_id: insertedRow.subject_id || finalSubjectId,
+      topic: insertedRow.topic || finalTopicName,
+      topic_id: insertedRow.topic_id || finalTopicId,
+      sub_topic: insertedRow.sub_topic || finalSubTopicName,
+      sub_topic_id: insertedRow.sub_topic_id || finalSubTopicId,
+      status: insertedRow.status,
+      exam_id: insertedRow.exam_id ? String(insertedRow.exam_id) : undefined,
+      created_at: insertedRow.created_at,
+    };
+
     if (typeof window !== 'undefined') {
+      try {
+        const rawAdmin = localStorage.getItem('miniquiz_admin_questions');
+        const adminList: any[] = rawAdmin ? JSON.parse(rawAdmin) : [];
+        adminList.unshift(createdQuestion);
+        localStorage.setItem('miniquiz_admin_questions', JSON.stringify(adminList));
+
+        const rawQ = localStorage.getItem('miniquiz_questions_cache');
+        const qList: any[] = rawQ ? JSON.parse(rawQ) : [];
+        qList.unshift(createdQuestion);
+        localStorage.setItem('miniquiz_questions_cache', JSON.stringify(qList));
+
+        localStorage.removeItem('miniquiz_exams_cache');
+        localStorage.removeItem('published_questions_cache');
+        localStorage.removeItem('mock_curriculum_data_v4');
+      } catch {}
+
       window.dispatchEvent(new Event('tamreen_data_changed'));
+      window.dispatchEvent(new Event('tamreen_questions_updated'));
     }
 
     return {
       success: true,
-      data: {
-        id: String(data.id),
-        question: data.question,
-        option_a: data.option_a,
-        option_b: data.option_b,
-        option_c: data.option_c,
-        option_d: data.option_d,
-        correct_answer: data.correct_answer,
-        explanation: data.explanation,
-        subject: data.subject,
-        topic: data.topic,
-        status: data.status,
-        exam_id: data.exam_id ? String(data.exam_id) : undefined,
-        created_at: data.created_at,
-      },
+      data: createdQuestion,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'অজানা ত্রুটি';
@@ -1116,17 +1364,37 @@ export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[])
       option_d: input.option_d.trim(),
       correct_answer: input.correct_answer,
       subject: input.subject.trim(),
+      subject_id: input.subject_id || null,
       topic: input.topic?.trim() || null,
+      sub_topic: input.sub_topic?.trim() || null,
+      topic_id: input.topic_id || null,
+      sub_topic_id: input.sub_topic_id || null,
       explanation: input.explanation?.trim() || null,
       status: input.status || 'published',
       exam_id: input.exam_id?.trim() || null,
       created_at: new Date().toISOString(),
     }));
 
-    const { data, error } = await supabaseInstance
+    let { data, error } = await supabaseInstance
       .from('questions')
       .insert(newRecords)
       .select();
+
+    if (error && error.message && error.message.includes('sub_topic_id')) {
+      const fallbackRecords = newRecords.map(r => {
+        const copy = { ...r };
+        delete copy.sub_topic_id;
+        return copy;
+      });
+      const retryResult = await supabaseInstance
+        .from('questions')
+        .insert(fallbackRecords)
+        .select();
+      if (!retryResult.error) {
+        data = retryResult.data;
+        error = null;
+      }
+    }
 
     if (error) {
       console.error('Supabase bulk insert error:', error);
@@ -1139,9 +1407,12 @@ export async function addMultipleQuestionsToSupabase(inputs: NewQuestionInput[])
     try {
       localStorage.removeItem('miniquiz_questions_cache');
       localStorage.removeItem('miniquiz_exams_cache');
+      localStorage.removeItem('published_questions_cache');
+      localStorage.removeItem('mock_curriculum_data_v4');
     } catch {}
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('tamreen_data_changed'));
+      window.dispatchEvent(new Event('tamreen_questions_updated'));
     }
 
     return {

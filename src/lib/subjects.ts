@@ -303,14 +303,14 @@ export function getSubjectPriority(name: string, code?: string): number {
   // 5. English Language / English Grammar
   if (n.includes('english') || n.includes('grammar') || n.includes('ইংরেজি') || c === 'ENG-GRM' || c === 'ENG-LNG') return 5;
 
-  // 6. গাণিতিক যুক্তি
-  if (n.includes('গণিত') || n.includes('math') || c === 'MATH') return 6;
+  // 6. বাংলাদেশ বিষয়াবলি
+  if (n.includes('বাংলাদেশ') || c === 'GK-BD') return 6;
 
-  // 7. বাংলাদেশ বিষয়াবলি
-  if (n.includes('বাংলাদেশ') || c === 'GK-BD') return 7;
+  // 7. আন্তর্জাতিক বিষয়াবলি
+  if (n.includes('আন্তর্জাতিক') || c === 'GK-INT') return 7;
 
-  // 8. আন্তর্জাতিক বিষয়াবলি
-  if (n.includes('আন্তর্জাতিক') || c === 'GK-INT') return 8;
+  // 8. গাণিতিক যুক্তি (আন্তর্জাতিক বিষয়াবলি এর পর)
+  if (n.includes('গণিত') || n.includes('গাণিতিক') || n.includes('math') || c === 'MATH') return 8;
 
   // 9. সাধারণ বিজ্ঞান
   if (n.includes('বিজ্ঞান') || n.includes('science') || c === 'GK-SCI' || c === 'GEN-SCI') return 9;
@@ -341,9 +341,9 @@ export function getCanonicalSubjectName(name: string, code?: string): string {
     case 3: return 'বাংলা ভাষা ও ব্যাকরণ';
     case 4: return 'English Literature';
     case 5: return 'English Grammar';
-    case 6: return 'গাণিতিক যুক্তি';
-    case 7: return 'বাংলাদেশ বিষয়াবলি';
-    case 8: return 'আন্তর্জাতিক বিষয়াবলি';
+    case 6: return 'বাংলাদেশ বিষয়াবলি';
+    case 7: return 'আন্তর্জাতিক বিষয়াবলি';
+    case 8: return 'গাণিতিক যুক্তি';
     case 9: return 'সাধারণ বিজ্ঞান';
     case 10: return 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা';
     case 11: return 'নৈতিকতা, মূল্যবোধ ও সুশাসন';
@@ -357,6 +357,24 @@ export function getCanonicalSubjectName(name: string, code?: string): string {
  * Returns icon key string based on subject name or code
  */
 export function getIconType(name: string, code?: string): string {
+  const n = (name || '').toLowerCase().trim();
+  const c = (code || '').toUpperCase().trim();
+
+  // Direct robust string matching
+  if (n.includes('কারেন্ট') || n.includes('current') || c === 'GK-CA' || c === 'NEWS') return 'news';
+  if ((n.includes('বাংলা') && n.includes('সাহিত্য')) || c === 'BNG-LIT') return 'bn1';
+  if (n.includes('বাংলা ভাষা') || n.includes('ব্যাকরণ') || c === 'BNG-LNG' || n === 'বাংলা') return 'bn2';
+  if (n.includes('english lit') || n.includes('ইংরেজি সাহিত্য') || c === 'ENG-LIT') return 'eng_lit';
+  if (n.includes('english') || n.includes('grammar') || n.includes('ইংরেজি') || c === 'ENG-GRM' || c === 'ENG-LNG') return 'eng_lang';
+  if (n.includes('বাংলাদেশ') || c === 'GK-BD') return 'bd';
+  if (n.includes('আন্তর্জাতিক') || c === 'GK-INT') return 'intl';
+  if (n.includes('গণিত') || n.includes('গাণিতিক') || n.includes('math') || c === 'MATH') return 'math';
+  if (n.includes('বিজ্ঞান') || n.includes('science') || c === 'GK-SCI' || c === 'GEN-SCI') return 'science';
+  if (n.includes('ভূগোল') || n.includes('দুর্যোগ') || n.includes('পরিবেশ') || c === 'GK-GEO' || c === 'GEO') return 'geo';
+  if (n.includes('নৈতিকতা') || n.includes('সুশাসন') || c === 'ETH') return 'ethics';
+  if (n.includes('কম্পিউটার') || n.includes('তথ্যপ্রযুক্তি') || n.includes('তথ্য প্রযুক্তি') || n.includes('ict') || c === 'GK-CS' || c === 'CS-IT') return 'ict';
+  if (n.includes('মানসিক') || c === 'MENTAL') return 'mental';
+
   const priority = getSubjectPriority(name, code);
   switch (priority) {
     case 1: return 'news';
@@ -364,9 +382,9 @@ export function getIconType(name: string, code?: string): string {
     case 3: return 'bn2';
     case 4: return 'eng_lit';
     case 5: return 'eng_lang';
-    case 6: return 'math';
-    case 7: return 'bd';
-    case 8: return 'intl';
+    case 6: return 'bd';
+    case 7: return 'intl';
+    case 8: return 'math';
     case 9: return 'science';
     case 10: return 'geo';
     case 11: return 'ethics';
@@ -396,7 +414,7 @@ export function detectQuestionSubject(question: Question): string {
     if (norm.includes('বাংলাদেশ')) return 'বাংলাদেশ বিষয়াবলি';
     if (norm.includes('আন্তর্জাতিক')) return 'আন্তর্জাতিক বিষয়াবলি';
     if (norm.includes('বিজ্ঞান') || norm.includes('কম্পিউটার') || norm.includes('তথ্য')) return 'বিজ্ঞান ও তথ্য প্রযুক্তি';
-    if (norm.includes('গণিত') || norm.includes('মানসিক')) return 'গণিত ও মানসিক দক্ষতা';
+    if (norm.includes('গণিত') || norm.includes('গাণিতিক') || norm.includes('মানসিক')) return 'গণিত ও মানসিক দক্ষতা';
     return norm;
   }
 
@@ -409,7 +427,7 @@ export function detectQuestionSubject(question: Question): string {
   if (text.includes('কম্পিউটার') || text.includes('cpu') || text.includes('বিজ্ঞান')) return 'বিজ্ঞান ও তথ্য প্রযুক্তি';
   if (text.includes('বাংলা') || text.includes('কাব্য') || text.includes('উপন্যাস')) return 'বাংলা ও সাহিত্য';
   if (text.includes('আন্তর্জাতিক') || text.includes('জাতিসংঘ')) return 'আন্তর্জাতিক বিষয়াবলি';
-  if (text.includes('গণিত') || text.includes('শতকরা') || text.includes('সংখ্যা')) return 'গণিত ও মানসিক দক্ষতা';
+  if (text.includes('গণিত') || text.includes('গাণিতিক') || text.includes('শতকরা') || text.includes('সংখ্যা')) return 'গণিত ও মানসিক দক্ষতা';
 
   return 'বাংলাদেশ বিষয়াবলি';
 }

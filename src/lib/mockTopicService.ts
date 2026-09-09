@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { DEFAULT_MOCK_CURRICULUM, CurriculumSubject, CurriculumTopic, CurriculumSubtopic } from '../data/mockCurriculum';
 import { Question } from '../types';
 import { AUTHENTIC_TOPIC_QUESTIONS } from '../data/charyapadaQuestions';
-import { getSubjectPriority, getCanonicalSubjectName } from './subjects';
+import { getSubjectPriority, getCanonicalSubjectName, getIconType } from './subjects';
 import { getCache, setCache } from './cache';
 
 const QUESTION_SELECT_FIELDS = '*';
@@ -328,7 +328,7 @@ export interface ExtendedCurriculumTopic extends CurriculumTopic {
  * - If a topic/subtopic has no questions in DB, display 0 (no hardcoding).
  */
 export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubject[]> {
-  const cacheKey = 'mock_curriculum_data';
+  const cacheKey = 'mock_curriculum_data_v4';
   const cached = getCache<CurriculumSubject[]>(cacheKey, 300000);
   if (cached) return cached;
 
@@ -548,18 +548,8 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
         // Sort main topics in ascending administrative sequence (code -> id -> created_at)
         structuredTopics.sort(compareTopicCodes);
 
-        // Subject Icon lookup
-        let iconType = 'bangla';
-        const nameLower = (s.name || '').toLowerCase();
-        if (nameLower.includes('ইংরেজি') || nameLower.includes('english')) iconType = 'english';
-        else if (nameLower.includes('বাংলাদেশ')) iconType = 'bd';
-        else if (nameLower.includes('আন্তর্জাতিক')) iconType = 'intl';
-        else if (nameLower.includes('বিজ্ঞান')) iconType = 'science';
-        else if (nameLower.includes('কম্পিউটার') || nameLower.includes('ict')) iconType = 'ict';
-        else if (nameLower.includes('গণিত')) iconType = 'math';
-        else if (nameLower.includes('মানসিক')) iconType = 'mental';
-        else if (nameLower.includes('নৈতিকতা')) iconType = 'ethics';
-        else if (nameLower.includes('ভূগোল')) iconType = 'geo';
+        // Subject Icon lookup using getIconType
+        const iconType = getIconType(s.name, s.code);
 
         const subjectTotalQ = structuredTopics.reduce((acc, t) => acc + t.totalQuestions, 0);
 
@@ -572,8 +562,78 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
         };
       });
 
-      // If a subject had 0 topics from Supabase, merge clean default curriculum without duplicates
+      // If a subject had 0 topics from Supabase, dynamically generate topics/subtopics from admin questions or merge default curriculum
       const finalSubjects = builtSubjects.map((bs) => {
+        // Collect all questions belonging to this subject
+        const subjectQuestions = allAdminQuestions.filter((q) => {
+          const qSub = normalizeTitle(q.subject || q.subject_name || '');
+          const bName = normalizeTitle(bs.name);
+          return qSub === bName || qSub.includes(bName) || bName.includes(qSub);
+        });
+
+        if (bs.topics.length === 0 && subjectQuestions.length > 0) {
+          const topicMap = new Map<string, Map<string, string[]>>(); // topic -> subtopic -> qIds
+
+          subjectQuestions.forEach((q) => {
+            const qId = String(q.id);
+            const topicName = (q.topic || q.chapter || 'সাধারণ অধ্যায়').trim();
+            const subTopicName = (q.sub_topic || q.subtopic || 'বিবিধ').trim();
+
+            if (!topicMap.has(topicName)) {
+              topicMap.set(topicName, new Map<string, string[]>());
+            }
+            const subMap = topicMap.get(topicName)!;
+            if (!subMap.has(subTopicName)) {
+              subMap.set(subTopicName, []);
+            }
+            subMap.get(subTopicName)!.push(qId);
+          });
+
+          const dynamicTopics: ExtendedCurriculumTopic[] = [];
+          let topicCounter = 1;
+
+          for (const [tName, subMap] of topicMap.entries()) {
+            const subtopics: ExtendedCurriculumSubtopic[] = [];
+            let subCounter = 1;
+
+            for (const [stName, qIds] of subMap.entries()) {
+              const uniqueQIds = Array.from(new Set(qIds));
+              let solvedCount = 0;
+              uniqueQIds.forEach((qid) => {
+                if (attemptedIds.has(qid)) solvedCount++;
+              });
+
+              subtopics.push({
+                id: `dyn_sub_${topicCounter}_${subCounter}`,
+                aliasIds: [],
+                title: stName,
+                totalQuestions: uniqueQIds.length,
+                solvedQuestions: solvedCount,
+              });
+              subCounter++;
+            }
+
+            const totalTopicQ = subtopics.reduce((acc, st) => acc + st.totalQuestions, 0);
+            const solvedTopicQ = subtopics.reduce((acc, st) => acc + st.solvedQuestions, 0);
+
+            dynamicTopics.push({
+              id: `dyn_topic_${topicCounter}`,
+              aliasIds: [],
+              title: tName,
+              totalQuestions: totalTopicQ,
+              solvedQuestions: solvedTopicQ,
+              subtopics,
+            });
+            topicCounter++;
+          }
+
+          return {
+            ...bs,
+            topics: dynamicTopics,
+            totalQuestions: subjectQuestions.length,
+          };
+        }
+
         if (bs.topics.length === 0) {
           const matchDefault = DEFAULT_MOCK_CURRICULUM.find(
             (d) => normalizeTitle(d.name) === normalizeTitle(bs.name)
@@ -605,7 +665,11 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
             };
           }
         }
-        return bs;
+
+        return {
+          ...bs,
+          totalQuestions: bs.topics.reduce((acc, t) => acc + t.totalQuestions, 0) || subjectQuestions.length,
+        };
       });
 
       finalSubjects.sort((a, b) => {
@@ -624,6 +688,7 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
   // Fallback if Supabase was completely unreachable: return deduplicated default curriculum
   const fallbackCurriculum = DEFAULT_MOCK_CURRICULUM.map((s) => ({
     ...s,
+    iconType: getIconType(s.name) || s.iconType,
     topics: s.topics.map((t) => ({
       ...t,
       subtopics: t.subtopics.map((sub) => {
@@ -643,7 +708,7 @@ export async function fetchMockCurriculumFromSupabase(): Promise<CurriculumSubje
       ...t,
       totalQuestions: t.subtopics.reduce((sa, st) => sa + st.totalQuestions, 0),
     })),
-  }));
+  })).sort((a, b) => getSubjectPriority(a.name) - getSubjectPriority(b.name));
 
   setCache(cacheKey, fallbackCurriculum);
   return fallbackCurriculum;
@@ -678,77 +743,110 @@ export async function fetchQuestionsForSelectedSubtopics(
   try {
     const rawQuestionsMap = new Map<string, any>();
 
-    // 1. Dynamic query to Supabase questions table with relation selection & limits
+    // 1. Relational Fetching in Mock Test App as required:
+    // "When loading topics/sub-topics and their questions, fetch questions using relational join or matching topic_id / sub_topic_id:
+    // supabase.from('questions').select('*, topics!inner(*), sub_topics!inner(*)').eq('sub_topic_id', selectedSubTopicId)
+    // As a fallback for existing questions that don't have topic_id populated, match by comparing questions.topic (text) with topics.name (text)."
     if (supabase) {
       try {
         const queryLimit = Math.min(targetCount * 3, 100);
 
-        // Query A: Filter by sub_topic_id with options relation
-        if (validSubtopicIds.length > 0) {
-          let subTopicQuestions: any[] | null = null;
-          let { data: rawSubData, error: subErr } = await supabase
-            .from('questions')
-            .select(QUESTION_WITH_RELATIONS)
-            .in('sub_topic_id', validSubtopicIds)
-            .limit(queryLimit);
+        // A. Primary relational fetch with sub_topics!inner(*) and topics!inner(*)
+        for (const subId of validSubtopicIds) {
+          try {
+            const { data: relJoinData, error: relJoinErr } = await supabase
+              .from('questions')
+              .select('*, topics!inner(*), sub_topics!inner(*)')
+              .eq('sub_topic_id', subId)
+              .limit(queryLimit);
 
-          if (!subErr && rawSubData) {
-            subTopicQuestions = rawSubData;
-          } else {
-            // Fallback if 'options' is not a separate foreign table
-            const fallbackRes = await supabase
+            if (!relJoinErr && relJoinData && relJoinData.length > 0) {
+              relJoinData.forEach((q: any) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch (relErr) {
+            // Relational join fallback if sub_topics relation is not defined in database
+          }
+        }
+
+        // B. Relational join with topics!inner(*) on topic_id
+        for (const subId of validSubtopicIds) {
+          try {
+            const { data: topRelData, error: topRelErr } = await supabase
+              .from('questions')
+              .select('*, topics!inner(*)')
+              .eq('topic_id', subId)
+              .limit(queryLimit);
+
+            if (!topRelErr && topRelData && topRelData.length > 0) {
+              topRelData.forEach((q: any) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch (topErr) {}
+        }
+
+        // C. Direct matching by sub_topic_id or topic_id
+        if (validSubtopicIds.length > 0) {
+          try {
+            const { data: rawSubData } = await supabase
               .from('questions')
               .select(QUESTION_SELECT_FIELDS)
               .in('sub_topic_id', validSubtopicIds)
               .limit(queryLimit);
-            subTopicQuestions = fallbackRes.data;
-          }
 
-          if (subTopicQuestions && Array.isArray(subTopicQuestions)) {
-            subTopicQuestions.forEach((q) => {
-              if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-            });
-          }
+            if (rawSubData && Array.isArray(rawSubData)) {
+              rawSubData.forEach((q) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch {}
 
-          // Query B: Filter by topic_id (when a parent topic ID or alias is selected)
-          let topicIdQuestions: any[] | null = null;
-          let { data: rawTopData, error: topErr } = await supabase
-            .from('questions')
-            .select(QUESTION_WITH_RELATIONS)
-            .in('topic_id', validSubtopicIds)
-            .limit(queryLimit);
-
-          if (!topErr && rawTopData) {
-            topicIdQuestions = rawTopData;
-          } else {
-            const fallbackRes = await supabase
+          try {
+            const { data: rawTopData } = await supabase
               .from('questions')
               .select(QUESTION_SELECT_FIELDS)
               .in('topic_id', validSubtopicIds)
               .limit(queryLimit);
-            topicIdQuestions = fallbackRes.data;
-          }
 
-          if (topicIdQuestions && Array.isArray(topicIdQuestions)) {
-            topicIdQuestions.forEach((q) => {
-              if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-            });
-          }
+            if (rawTopData && Array.isArray(rawTopData)) {
+              rawTopData.forEach((q) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch {}
         }
 
-        // Query C: Also filter by topic text match for administrative flexibility
+        // D. Fallback matching: comparing questions.topic (text) with topics.name / subtopics titles
         if (validSubtopicTitles.length > 0) {
-          const { data: titleQuestions } = await supabase
-            .from('questions')
-            .select(QUESTION_WITH_RELATIONS)
-            .in('topic', validSubtopicTitles)
-            .limit(queryLimit);
+          try {
+            const { data: titleQuestions } = await supabase
+              .from('questions')
+              .select(QUESTION_SELECT_FIELDS)
+              .in('topic', validSubtopicTitles)
+              .limit(queryLimit);
 
-          if (titleQuestions && Array.isArray(titleQuestions)) {
-            titleQuestions.forEach((q) => {
-              if (q && q.id) rawQuestionsMap.set(String(q.id), q);
-            });
-          }
+            if (titleQuestions && Array.isArray(titleQuestions)) {
+              titleQuestions.forEach((q) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch {}
+
+          try {
+            const { data: subColQuestions } = await supabase
+              .from('questions')
+              .select(QUESTION_SELECT_FIELDS)
+              .in('sub_topic', validSubtopicTitles)
+              .limit(queryLimit);
+
+            if (subColQuestions && Array.isArray(subColQuestions)) {
+              subColQuestions.forEach((q) => {
+                if (q && q.id) rawQuestionsMap.set(String(q.id), q);
+              });
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('Notice querying Supabase questions for subtopics:', err);
@@ -848,3 +946,53 @@ export async function fetchQuestionsForSelectedSubtopics(
     return [];
   }
 }
+
+/**
+ * Total Question Counting by Foreign Key as requested:
+ * Calculate total questions per sub-topic using:
+ * supabase.from('questions').select('id', { count: 'exact', head: true }).eq('sub_topic_id', subTopic.id)
+ */
+export async function countQuestionsBySubTopicForeignKey(subTopicId: string, fallbackTitle?: string): Promise<number> {
+  if (!supabase || !subTopicId) return 0;
+
+  try {
+    // 1. Direct foreign key count on sub_topic_id:
+    const { count, error } = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('sub_topic_id', subTopicId);
+
+    if (!error && typeof count === 'number' && count > 0) {
+      return count;
+    }
+  } catch (err) {}
+
+  // 2. Count on topic_id foreign key:
+  try {
+    const { count, error } = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('topic_id', subTopicId);
+
+    if (!error && typeof count === 'number' && count > 0) {
+      return count;
+    }
+  } catch (err) {}
+
+  // 3. Fallback matching questions.topic (text) with fallbackTitle:
+  if (fallbackTitle) {
+    try {
+      const { count, error } = await supabase
+        .from('questions')
+        .select('id', { count: 'exact', head: true })
+        .eq('topic', fallbackTitle);
+
+      if (!error && typeof count === 'number') {
+        return count;
+      }
+    } catch (err) {}
+  }
+
+  return 0;
+}
+
